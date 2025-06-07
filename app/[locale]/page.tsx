@@ -166,7 +166,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
   // TEF 分析功能
   const performTEFAnalysis = async (foodEntries: FoodEntry[]) => {
-    if (!foodEntries.length || !checkAIConfig()) return null;
+    if (!foodEntries.length) return null;
 
     try {
       const response = await fetch("/api/openai/tef-analysis", {
@@ -195,13 +195,17 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
   // 智能建议功能
   const generateSmartSuggestions = async (targetDate?: string) => {
-    if (!checkAIConfig()) return;
-
     const analysisDate = targetDate || dailyLog.date;
     const targetLog = targetDate ? await getDailyLog(targetDate) : dailyLog;
 
-    if (!targetLog || targetLog.foodEntries.length === 0) {
+    if (!targetLog || (targetLog.foodEntries.length === 0 && targetLog.exerciseEntries.length === 0)) {
       console.warn("No data available for smart suggestions on", analysisDate);
+      // 可选：在这里给用户一个提示
+      toast({
+        title: t('smartSuggestions.noData.title'),
+        description: t('smartSuggestions.noData.description', { date: analysisDate }),
+        variant: "default",
+      })
       return;
     }
 
@@ -210,12 +214,12 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       // 获取目标日期前7天的数据
       const recentLogs = [];
       const targetDateObj = new Date(analysisDate);
-      for (let i = 0; i < 7; i++) {
+      for (let i = 1; i <= 7; i++) { // 从前一天开始
         const date = new Date(targetDateObj);
         date.setDate(date.getDate() - i);
         const dateKey = date.toISOString().split('T')[0];
         const log = await getDailyLog(dateKey);
-        if (log && log.foodEntries.length > 0) {
+        if (log && (log.foodEntries.length > 0 || log.exerciseEntries.length > 0)) {
           recentLogs.push(log);
         }
       }
@@ -224,17 +228,23 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-ai-config": JSON.stringify(aiConfig),
         },
         body: JSON.stringify({
           dailyLog: targetLog,
           userProfile,
-          recentLogs
+          recentLogs,
+          aiConfig: aiConfig // 将 aiConfig 放入 body 中
         }),
       });
 
       if (!response.ok) {
-        console.warn("Smart suggestions failed:", response.statusText);
+        const errorData = await response.json();
+        console.warn("Smart suggestions failed:", response.statusText, errorData);
+        toast({
+          title: t('smartSuggestions.error.title'),
+          description: errorData.error || t('smartSuggestions.error.description'),
+          variant: "destructive",
+        })
         return;
       }
 
@@ -245,8 +255,19 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       newSuggestions[analysisDate] = suggestions as SmartSuggestionsResponse;
       setSmartSuggestions(newSuggestions);
 
+      toast({
+        title: t('smartSuggestions.success.title'),
+        description: t('smartSuggestions.success.description', { date: analysisDate }),
+        variant: "default",
+      })
+
     } catch (error) {
       console.warn("Smart suggestions error:", error);
+       toast({
+        title: t('smartSuggestions.unknownError.title'),
+        description: t('smartSuggestions.unknownError.description'),
+        variant: "destructive",
+      })
     } finally {
       setSmartSuggestionsLoading(false);
     }
@@ -447,12 +468,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
     if (!modelConfig.name || !modelConfig.baseUrl || !modelConfig.apiKey) {
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.aiConfigIncomplete')}
-          </span>
-        ),
+        title: t('errors.aiConfigIncomplete'),
         description: t('errors.configureModelFirst', {
           modelType: uploadedImages.length > 0 ? t('modelTypes.vision') : t('modelTypes.work')
         }),
@@ -470,12 +486,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
     if (uploadedImages.length + files.length > 5) {
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.imageCountExceeded')}
-          </span>
-        ),
+        title: t('errors.imageCountExceeded'),
         description: t('errors.maxImagesAllowed'),
         variant: "destructive",
       })
@@ -492,12 +503,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
         if (!file.type.startsWith("image/")) {
           toast({
-            title: (
-              <span className="flex items-center">
-                <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-                {t('errors.invalidFileType')}
-              </span>
-            ),
+            title: t('errors.invalidFileType'),
             description: t('errors.notImageFile', { fileName: file.name }),
             variant: "destructive",
           })
@@ -518,12 +524,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     } catch (error) {
       console.error("Error processing images:", error)
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.imageProcessingFailed')}
-          </span>
-        ),
+        title: t('errors.imageProcessingFailed'),
         description: t('errors.cannotProcessImages'),
         variant: "destructive",
       })
@@ -549,12 +550,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   const handleSubmit = async () => {
     if (!inputText.trim() && uploadedImages.length === 0) {
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.emptyInput')}
-          </span>
-        ),
+        title: t('errors.emptyInput'),
         description: t('errors.enterTextOrUpload'),
         variant: "destructive",
       })
@@ -630,23 +626,13 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       setUploadedImages([])
 
       toast({
-        title: (
-          <span className="flex items-center">
-            <CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />
-            {t('success.recordAdded')}
-          </span>
-        ),
+        title: t('success.recordAdded'),
         description: activeTab === "food" ? t('success.foodAdded') : t('success.exerciseAdded'),
       })
     } catch (error: any) {
       console.error("Error:", error)
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            处理失败
-          </span>
-        ),
+        title: "处理失败",
         description: error.message || "无法解析您的输入，请重试。",
         variant: "destructive",
       })
@@ -674,12 +660,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     refreshRecords()
 
     toast({
-      title: (
-        <span className="flex items-center">
-          <Trash2 className="mr-2 h-5 w-5 text-green-500" />
-          {t('success.recordDeleted')}
-        </span>
-      ),
+      title: t('success.recordDeleted'),
       description: type === "food" ? t('success.foodDeleted') : t('success.exerciseDeleted'),
     })
   }
@@ -707,12 +688,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     refreshRecords()
 
     toast({
-      title: (
-        <span className="flex items-center">
-          <Edit3 className="mr-2 h-5 w-5 text-green-500" />
-          {t('success.recordUpdated')}
-        </span>
-      ),
+      title: t('success.recordUpdated'),
       description: type === "food" ? t('success.foodUpdated') : t('success.exerciseUpdated'),
     })
   }
@@ -760,7 +736,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       // 刷新日期记录状态
       refreshRecords()
       toast({
-        title: <span className="flex items-center"><Info className="mr-2 h-5 w-5" />{t('success.weightCleared')}</span>,
+        title: t('success.weightCleared'),
         description: t('success.weightClearedDesc', { date: dateKey })
       })
       return
@@ -769,7 +745,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     const weightValue = parseFloat(currentDayWeight)
     if (isNaN(weightValue) || weightValue <= 0) {
       toast({
-        title: <span className="flex items-center"><AlertCircle className="mr-2 h-5 w-5 text-destructive" />{t('validation.invalidWeight')}</span>,
+        title: t('validation.invalidWeight'),
         description: t('validation.invalidWeightDesc'),
         variant: "destructive"
       })
@@ -784,7 +760,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     // 刷新日期记录状态
     refreshRecords()
     toast({
-      title: <span className="flex items-center"><CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />{t('success.weightSaved')}</span>,
+      title: t('success.weightSaved'),
       description: t('success.weightSavedDesc', { date: dateKey, weight: weightValue })
     })
   }
@@ -798,7 +774,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     // 刷新日期记录状态
     refreshRecords()
     toast({
-      title: <span className="flex items-center"><CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />每日状态已保存</span>,
+      title: "每日状态已保存",
       description: `已保存 ${dateKey} 的状态记录`
     })
   }

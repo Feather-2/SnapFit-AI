@@ -1,35 +1,55 @@
-import { auth } from "@/lib/auth" // 导入 NextAuth 的 auth 函数
 import { SharedOpenAIClient } from "@/lib/shared-openai-client"
 import type { DailyLog, UserProfile } from "@/lib/types"
 import { formatDailyStatusForAI } from "@/lib/utils"
+import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: Request) {
   try {
-    const { dailyLog, userProfile, recentLogs, aiConfig: localAiConfig } = await req.json()
+    const { dailyLog, userProfile, recentLogs } = await req.json()
 
     if (!dailyLog || !userProfile) {
       return Response.json({ error: "Missing required data" }, { status: 400 })
     }
 
-    const session = await auth()
-    let userId: string | null = session?.user?.id ?? null
+    // 获取用户身份（从认证头或session）
+    const authHeader = req.headers.get("authorization")
+    let userId: string | null = null
     let fallbackConfig: any = null
 
-    // 如果用户未登录，则检查请求体中是否包含本地aiConfig作为备用
-    if (!userId && localAiConfig) {
-      const modelConfig = localAiConfig.agentModel
-      if (modelConfig?.baseUrl && modelConfig?.apiKey) {
-        fallbackConfig = {
-          baseUrl: modelConfig.baseUrl,
-          apiKey: modelConfig.apiKey,
+    if (authHeader) {
+      try {
+        const token = authHeader.replace('Bearer ', '')
+        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+        if (!authError && user) {
+          userId = user.id
         }
-        // 对于使用自己Key的匿名用户，可以分配一个临时ID
-        userId = 'anonymous-fallback-user'
+      } catch (error) {
+        console.warn('Failed to get user from token:', error)
+      }
+    }
+
+    // 如果没有用户身份，尝试从AI配置获取fallback
+    if (!userId) {
+      const aiConfigStr = req.headers.get("x-ai-config")
+      if (aiConfigStr) {
+        try {
+          const aiConfig = JSON.parse(aiConfigStr)
+          const modelConfig = aiConfig.agentModel
+          if (modelConfig?.baseUrl && modelConfig?.apiKey) {
+            fallbackConfig = {
+              baseUrl: modelConfig.baseUrl,
+              apiKey: modelConfig.apiKey
+            }
+            userId = 'anonymous' // 匿名用户
+          }
+        } catch (error) {
+          console.warn('Failed to parse AI config:', error)
+        }
       }
     }
 
     if (!userId) {
-      return Response.json({ error: "Authentication or fallback key required" }, { status: 401 })
+      return Response.json({ error: "Authentication required" }, { status: 401 })
     }
 
     // 创建共享客户端
@@ -39,7 +59,7 @@ export async function POST(req: Request) {
       fallbackConfig
     })
 
-    // 准备数据摘要
+    // 准备数据摘要（与原版相同）
     const dataSummary = {
       today: {
         date: dailyLog.date,
@@ -115,7 +135,7 @@ export async function POST(req: Request) {
           "summary": "营养状况专业评价"
         }
       `,
-
+      
       exercise: `
         你是一位认证的运动生理学家，专精运动处方设计和能量代谢优化。
 
@@ -146,10 +166,10 @@ export async function POST(req: Request) {
           prompt,
           response_format: { type: "json_object" },
         })
-
+        
         const result = JSON.parse(text)
-        return {
-          key,
+        return { 
+          key, 
           ...result,
           keyInfo // 包含使用的Key信息
         }
@@ -187,7 +207,7 @@ export async function POST(req: Request) {
 
   } catch (error) {
     console.error("Smart Suggestions Error:", error)
-    return Response.json({
+    return Response.json({ 
       error: "Failed to generate suggestions",
       suggestions: []
     }, { status: 500 })

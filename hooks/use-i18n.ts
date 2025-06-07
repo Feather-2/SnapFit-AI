@@ -91,9 +91,16 @@ export function useI18n() {
 }
 
 // 便捷的翻译钩子
-export function useTranslation(namespace?: string) {
+type TFunction = (key: string, values?: Record<string, any>) => string;
+
+export function useTranslation(namespace?: string): TFunction {
   try {
-    return useTranslations(namespace);
+    const t = useTranslations(namespace);
+    return (key: string, values?: Record<string, any>): string => {
+      // next-intl的t函数可以返回React元素，我们这里强制转为字符串
+      const message = t(key, values);
+      return typeof message === 'string' ? message : key;
+    };
   } catch (error) {
     // 如果上下文不可用，返回一个默认函数
     return (key: string) => key;

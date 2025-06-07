@@ -1,51 +1,16 @@
-"use client"
-
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, MessageSquare, Settings, Moon, Sun } from "lucide-react"
-import { useTheme } from "next-themes"
-import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { GitHubStar } from "@/components/github-star"
-import { useTranslation } from "@/hooks/use-i18n"
-import { locales, type Locale } from "@/i18n"
+import type { Locale } from "@/i18n"
 import Image from "next/image"
+import { auth } from "@/lib/auth"
+import { MainNavLinks } from "./main-nav-links"
+import { UserNav } from "./user-nav"
+import { ThemeToggle } from "./theme-toggle"
 
-export function MainNav() {
-  const pathname = usePathname()
-  const { theme, setTheme } = useTheme()
-  const t = useTranslation('navigation')
-
-  // 直接从路径中提取当前语言，确保准确性
-  const getCurrentLocale = (): Locale => {
-    for (const loc of locales) {
-      if (pathname.startsWith(`/${loc}`)) {
-        return loc;
-      }
-    }
-    return 'zh'; // 默认语言
-  };
-
-  const locale = getCurrentLocale()
-
-  const navItems = [
-    {
-      name: t('home'),
-      href: `/${locale}`,
-      icon: Home,
-    },
-    {
-      name: t('chat'),
-      href: `/${locale}/chat`,
-      icon: MessageSquare,
-    },
-    {
-      name: t('settings'),
-      href: `/${locale}/settings`,
-      icon: Settings,
-    },
-  ]
+export async function MainNav({ locale }: { locale: Locale }) {
+  const session = await auth()
 
   return (
     <div className="sticky top-0 z-50 w-full border-b border-slate-200/20 dark:border-slate-600/30 bg-white/85 dark:bg-slate-800/85 backdrop-blur-xl shadow-sm">
@@ -67,36 +32,12 @@ export function MainNav() {
           </Link>
         </div>
 
-        <nav className="flex items-center space-x-2 lg:space-x-3 mx-8">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-300 hover:bg-green-50 dark:hover:bg-slate-700/50 hover:scale-105",
-                pathname === item.href
-                  ? "bg-gradient-to-r from-green-500 to-green-600 dark:from-green-400 dark:to-green-500 text-white dark:text-slate-900 shadow-lg shadow-green-500/25 dark:shadow-green-400/20"
-                  : "text-slate-600 dark:text-slate-200 hover:text-green-600 dark:hover:text-green-300",
-              )}
-            >
-              <item.icon className="h-4 w-4 mr-2.5" />
-              <span className="hidden sm:inline">{item.name}</span>
-            </Link>
-          ))}
-        </nav>
+        <MainNavLinks locale={locale} />
 
         <div className="ml-auto flex items-center space-x-3">
+          <UserNav session={session} />
           <LanguageSwitcher />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-            className="h-10 w-10 rounded-xl hover:bg-green-50 dark:hover:bg-slate-700/50 hover:scale-105 transition-all duration-300 border border-transparent hover:border-green-200 dark:hover:border-slate-600"
-          >
-            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-green-600 dark:text-green-400" />
-            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-green-500 dark:text-green-300" />
-            <span className="sr-only">切换主题</span>
-          </Button>
+          <ThemeToggle />
           <GitHubStar repo="Feather-2/SnapFit-AI" />
         </div>
       </div>

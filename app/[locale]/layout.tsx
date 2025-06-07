@@ -8,7 +8,7 @@ import "../globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { MainNav } from "@/components/main-nav"
-import { locales } from '@/i18n';
+import { locales, type Locale } from '@/i18n';
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -20,17 +20,17 @@ export const metadata: Metadata = {
 
 interface LocaleLayoutProps {
   children: React.ReactNode;
-  params: Promise<{ locale: string }>;
+  params: { locale: Locale };
 }
 
 export default async function LocaleLayout({
   children,
   params
 }: LocaleLayoutProps) {
-  const { locale } = await params;
+  const { locale } = params;
 
   // 验证语言是否支持
-  if (!locales.includes(locale as any)) {
+  if (!locales.includes(locale)) {
     notFound();
   }
 
@@ -41,7 +41,7 @@ export default async function LocaleLayout({
     <NextIntlClientProvider messages={messages}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
         <div className="min-h-screen bg-background">
-          <MainNav />
+          <MainNav locale={locale} />
           <main>{children}</main>
         </div>
         <Toaster />

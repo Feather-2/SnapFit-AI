@@ -177,3 +177,93 @@ export interface ExtendedMessage {
   reasoning_content?: string // 思考过程内容
   timestamp?: string
 }
+
+// 共享Key配置类型
+export interface SharedKeyConfig {
+  id?: string
+  userId: string
+  name: string
+  baseUrl: string
+  apiKey: string
+  modelName: string
+  dailyLimit: number
+  description?: string
+  tags: string[]
+  isActive: boolean
+  usageCountToday: number
+  totalUsageCount: number
+  lastUsedAt?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+// Key使用日志类型
+export interface KeyUsageLog {
+  id?: string
+  sharedKeyId: string
+  userId: string
+  apiEndpoint: string
+  modelUsed: string
+  tokensUsed?: number
+  costEstimate?: number
+  success: boolean
+  errorMessage?: string
+  createdAt?: string
+}
+
+// 感谢榜贡献者类型
+export interface Contributor {
+  userId: string
+  username: string
+  avatarUrl?: string
+  totalContributions: number
+  dailyLimit: number
+  isActive: boolean
+}
+
+// 当前使用Key信息类型
+export interface CurrentKeyInfo {
+  contributorName: string
+  contributorAvatar?: string
+  modelName: string
+  keyName: string
+  source: 'shared' | 'fallback'
+}
+
+// AI Coach快照类型
+export interface CoachSnapshot {
+  id?: string
+  userId: string
+  title: string
+  description: string
+  conversationData: any // 对话记录
+  modelConfig: any // 模型配置
+  healthDataSnapshot: any // 健康数据快照
+  userRating: number // 用户自评分 1-5
+  isPublic: boolean
+  averageRating?: number // 平均评分
+  ratingCount?: number // 评分人数
+  createdAt?: string
+  updatedAt?: string
+}
+
+// 快照评分类型
+export interface SnapshotRating {
+  id?: string
+  snapshotId: string
+  userId: string
+  rating: number // 1-5星
+  comment?: string
+  createdAt?: string
+}
+
+// 用户认证信息类型
+export interface UserAuth {
+  id: string
+  linuxDoId: string
+  username: string
+  avatarUrl?: string
+  email?: string
+  createdAt: string
+  updatedAt: string
+}
