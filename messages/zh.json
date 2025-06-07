@@ -30,11 +30,12 @@
     "no": "否"
   },
   "navigation": {
-    "home": "首页",
-    "chat": "智能对话",
+    "home": "主页",
+    "chat": "对话",
     "settings": "设置",
-    "dashboard": "仪表板",
-    "profile": "个人资料"
+    "signIn": "登录",
+    "signOut": "退出",
+    "toggleTheme": "切换主题"
   },
   "app": {
     "title": "SnapFit AI",
@@ -793,5 +794,22 @@
       "failed": "截图失败",
       "failedDescription": "请稍后重试或尝试其他浏览器"
     }
+  },
+  "sync": {
+    "info": {
+      "title": "正在同步数据"
+    },
+    "success": {
+      "title": "同步成功"
+    },
+    "error": {
+      "title": "同步失败"
+    },
+    "pullStarted": "正在从云端拉取最新数据...",
+    "pullFinished": "成功从云端拉取 {count} 条记录。",
+    "pullFailed": "从云端拉取数据失败: {error}",
+    "pushStarted": "正在将本地更改推送到云端...",
+    "pushFinished": "成功将更改推送到云端。",
+    "pushFailed": "将数据推送到云端失败: {error}"
   }
 }

@@ -1,16 +1,12 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import "../globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { MainNav } from "@/components/main-nav"
 import { locales, type Locale } from '@/i18n';
-
-const inter = Inter({ subsets: ["latin"] })
+import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
   title: "SnapFit AI",
@@ -20,14 +16,14 @@ export const metadata: Metadata = {
 
 interface LocaleLayoutProps {
   children: React.ReactNode;
-  params: { locale: Locale };
+  params: Promise<{ locale: Locale }>;
 }
 
 export default async function LocaleLayout({
   children,
   params
 }: LocaleLayoutProps) {
-  const { locale } = params;
+  const { locale } = await params;
 
   // 验证语言是否支持
   if (!locales.includes(locale)) {
@@ -38,15 +34,13 @@ export default async function LocaleLayout({
   const messages = await getMessages({ locale });
 
   return (
-    <NextIntlClientProvider messages={messages}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-        <div className="min-h-screen bg-background">
-          <MainNav locale={locale} />
-          <main>{children}</main>
-        </div>
-        <Toaster />
-      </ThemeProvider>
-    </NextIntlClientProvider>
+    <Providers locale={locale} messages={messages} timeZone="Asia/Shanghai">
+      <div className="min-h-screen bg-background">
+        <MainNav locale={locale} />
+        <main>{children}</main>
+      </div>
+      <Toaster />
+    </Providers>
   )
 }
 

@@ -33,8 +33,9 @@
     "home": "Home",
     "chat": "AI Chat",
     "settings": "Settings",
-    "dashboard": "Dashboard",
-    "profile": "Profile"
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "toggleTheme": "Toggle theme"
   },
   "app": {
     "title": "SnapFit AI",
@@ -777,5 +778,22 @@
       "clearErrorDescription": "Unable to clear your health data",
       "selectFile": "Select File"
     }
+  },
+  "sync": {
+    "info": {
+      "title": "Syncing Data"
+    },
+    "success": {
+      "title": "Sync Successful"
+    },
+    "error": {
+      "title": "Sync Failed"
+    },
+    "pullStarted": "Pulling latest data from the cloud...",
+    "pullFinished": "Successfully pulled {count} records from the cloud.",
+    "pullFailed": "Failed to pull data from the cloud: {error}",
+    "pushStarted": "Pushing local changes to the cloud...",
+    "pushFinished": "Successfully pushed changes to the cloud.",
+    "pushFailed": "Failed to push data to the cloud: {error}"
   }
 }

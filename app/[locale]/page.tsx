@@ -37,6 +37,7 @@ import { tefCacheManager } from "@/lib/tef-cache"
 import type { SmartSuggestionsResponse } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTranslation } from "@/hooks/use-i18n"
+import { useSync } from '@/hooks/use-sync';
 
 // 图片预览类型
 interface ImagePreview {
@@ -111,6 +112,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   // 使用移动端检测Hook
   const isMobile = useIsMobile()
 
+  // 集成云同步钩子
+  const { pushData } = useSync();
+
   const [dailyLog, setDailyLog] = useState<DailyLog>(() => ({
     date: format(selectedDate, "yyyy-MM-dd"),
     foodEntries: [],
@@ -126,6 +130,29 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     calculatedBMR: undefined,
     calculatedTDEE: undefined,
   }))
+
+  // 使用防抖来同步数据
+  useEffect(() => {
+    // 只有在dailyLog有实际内容时才启动同步
+    if (!dailyLog.date || (dailyLog.foodEntries.length === 0 && dailyLog.exerciseEntries.length === 0 && !dailyLog.weight && !dailyLog.dailyStatus)) {
+      return;
+    }
+
+    const handler = setTimeout(() => {
+      const logToSync = { ...dailyLog, last_modified: new Date().toISOString() };
+      pushData(logToSync);
+    }, 2000); // 2秒防抖
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [dailyLog, pushData]);
+
+  // 创建一个包装函数，用于更新本地状态和数据库
+  const setDailyLogAndSave = (newLog: DailyLog) => {
+    setDailyLog(newLog);
+    saveDailyLog(newLog.date, newLog);
+  }
 
   // 当选择的日期变化时，加载对应日期的数据
   useEffect(() => {
@@ -158,11 +185,6 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       }
     })
   }, [selectedDate, getDailyLog, userProfile.activityLevel])
-
-  // 辅助 useEffect 来监控 dailyLog 状态的变化
-  // useEffect(() => {
-  //   console.log("[State Monitor] dailyLog state has changed to:", JSON.parse(JSON.stringify(dailyLog)));
-  // }, [dailyLog]);
 
   // TEF 分析功能
   const performTEFAnalysis = async (foodEntries: FoodEntry[]) => {
@@ -293,7 +315,8 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         setDailyLog(currentLog => {
           const updatedLog = {
             ...currentLog,
-            tefAnalysis: cachedAnalysis
+            tefAnalysis: cachedAnalysis,
+            last_modified: new Date().toISOString(),
           };
           saveDailyLog(updatedLog.date, updatedLog);
           return updatedLog;
@@ -369,7 +392,8 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
             setDailyLog(currentLog => {
               const updatedLog = {
                 ...currentLog,
-                tefAnalysis: finalAnalysis
+                tefAnalysis: finalAnalysis,
+                last_modified: new Date().toISOString(),
               };
               saveDailyLog(updatedLog.date, updatedLog);
               return updatedLog;
@@ -384,7 +408,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       setTEFAnalysisCountdown(0);
       if (dailyLog.tefAnalysis) {
         setDailyLog(currentLog => {
-          const updatedLog = { ...currentLog, tefAnalysis: undefined };
+          const updatedLog = { ...currentLog, tefAnalysis: undefined, last_modified: new Date().toISOString() };
           saveDailyLog(updatedLog.date, updatedLog);
           return updatedLog;
         });
@@ -400,7 +424,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         clearInterval(countdownIntervalRef.current);
       }
     };
-  }, [dailyLog.foodEntries, aiConfig, saveDailyLog]);
+  }, [dailyLog.foodEntries, aiConfig, saveDailyLog, getDailyLog, userProfile]);
 
   // 当日期变化时，检查是否有该日期的智能建议
   useEffect(() => {
@@ -439,24 +463,27 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
             ...currentLogState,
             calculatedBMR: newBmr,
             calculatedTDEE: newTdee,
+            last_modified: new Date().toISOString(),
           };
           // 只有在实际值发生变化时才保存，避免不必要的写入
           if (currentLogState.calculatedBMR !== newBmr || currentLogState.calculatedTDEE !== newTdee || (rates && (!currentLogState.calculatedBMR || !currentLogState.calculatedTDEE))){
             saveDailyLog(updatedLogWithNewRates.date, updatedLogWithNewRates);
+            return updatedLogWithNewRates;
           }
           return updatedLogWithNewRates;
         });
       }
     }
-  }, [userProfile, dailyLog.date, dailyLog.weight, dailyLog.activityLevel, dailyLog.tefAnalysis, saveDailyLog, dailyLog.calculatedBMR, dailyLog.calculatedTDEE]); // Added dependencies
+  }, [userProfile, dailyLog.date, dailyLog.weight, dailyLog.activityLevel, dailyLog.tefAnalysis, saveDailyLog, dailyLog.calculatedBMR, dailyLog.calculatedTDEE]);
 
   // 处理每日活动水平变化
   const handleDailyActivityLevelChange = (newValue: string) => {
     setCurrentDayActivityLevelForSelect(newValue);
-    setDailyLog(prevLog => ({
-      ...prevLog,
+    const updatedLog = {
+      ...dailyLog,
       activityLevel: newValue,
-    }));
+    };
+    setDailyLogAndSave(updatedLog);
     // 触发图表刷新（因为活动水平影响TDEE计算）
     setChartRefreshTrigger(prev => prev + 1);
   };
@@ -615,8 +642,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         recalculateSummary(updatedLog)
       }
 
-      setDailyLog(updatedLog)
-      saveDailyLog(updatedLog.date, updatedLog)
+      setDailyLogAndSave(updatedLog)
       // 触发图表刷新
       setChartRefreshTrigger(prev => prev + 1)
       // 刷新日期记录状态
@@ -652,8 +678,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     }
 
     recalculateSummary(updatedLog)
-    setDailyLog(updatedLog)
-    saveDailyLog(updatedLog.date, updatedLog)
+    setDailyLogAndSave(updatedLog)
     // 触发图表刷新
     setChartRefreshTrigger(prev => prev + 1)
     // 刷新日期记录状态
@@ -680,8 +705,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     }
 
     recalculateSummary(updatedLog)
-    setDailyLog(updatedLog)
-    saveDailyLog(updatedLog.date, updatedLog)
+    setDailyLogAndSave(updatedLog)
     // 触发图表刷新
     setChartRefreshTrigger(prev => prev + 1)
     // 刷新日期记录状态
@@ -731,8 +755,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     const dateKey = format(selectedDate, "yyyy-MM-dd")
     if (!currentDayWeight.trim()) {
       const updatedLog = { ...dailyLog, weight: undefined }
-      setDailyLog(updatedLog)
-      saveDailyLog(dateKey, updatedLog)
+      setDailyLogAndSave(updatedLog)
       // 刷新日期记录状态
       refreshRecords()
       toast({
@@ -753,8 +776,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     }
 
     const updatedLog = { ...dailyLog, weight: weightValue }
-    setDailyLog(updatedLog)
-    saveDailyLog(dateKey, updatedLog)
+    setDailyLogAndSave(updatedLog)
     // 触发图表刷新
     setChartRefreshTrigger(prev => prev + 1)
     // 刷新日期记录状态
@@ -769,8 +791,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   const handleSaveDailyStatus = (status: DailyStatus) => {
     const dateKey = format(selectedDate, "yyyy-MM-dd")
     const updatedLog = { ...dailyLog, dailyStatus: status }
-    setDailyLog(updatedLog)
-    saveDailyLog(dateKey, updatedLog)
+    setDailyLogAndSave(updatedLog)
     // 刷新日期记录状态
     refreshRecords()
     toast({

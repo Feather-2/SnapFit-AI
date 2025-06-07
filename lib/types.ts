@@ -117,6 +117,7 @@ export interface DailyLog {
   calculatedTDEE?: number // 新增：当日计算的TDEE
   tefAnalysis?: TEFAnalysis // 新增：TEF分析结果
   dailyStatus?: DailyStatus // 新增：每日状态记录
+  last_modified?: string // ISO 8601 格式的日期时间字符串，用于同步
 }
 
 // 用户配置类型

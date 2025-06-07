@@ -10,6 +10,8 @@ interface IndexedDBHook {
   isLoading: boolean
   isInitializing: boolean
   error: Error | null
+  getAllData: () => Promise<any[]>
+  batchSave: (items: any[]) => Promise<void>
 }
 
 export function useIndexedDB(storeName: string): IndexedDBHook {
@@ -193,5 +195,46 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
     }
   }, [db, storeName])
 
-  return { getData, saveData, deleteData, clearAllData, isLoading, isInitializing, error }
+  const getAllData = useCallback(async (): Promise<any[]> => {
+    if (!db) return []
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([storeName], "readonly")
+      const store = transaction.objectStore(storeName)
+      const request = store.getAll()
+
+      request.onsuccess = () => {
+        setIsLoading(false)
+        resolve(request.result)
+      }
+
+      request.onerror = () => {
+        setIsLoading(false)
+        setError(new Error("获取所有数据失败"))
+        reject(new Error("获取所有数据失败"))
+      }
+    })
+  }, [db, storeName])
+
+  const batchSave = useCallback(async (items: any[]): Promise<void> => {
+    if (!db) return;
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([storeName], "readwrite");
+      const store = transaction.objectStore(storeName);
+
+      items.forEach(item => {
+        store.put(item, (item as any).date);
+      });
+
+      transaction.oncomplete = () => {
+        resolve();
+      };
+
+      transaction.onerror = () => {
+        setError(new Error("批量保存数据失败"));
+        reject(new Error("批量保存数据失败"));
+      };
+    });
+  }, [db, storeName]);
+
+  return { getData, saveData, deleteData, clearAllData, isLoading, isInitializing, error, getAllData, batchSave }
 }
