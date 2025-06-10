@@ -1,36 +1,70 @@
 import { createClient } from '@supabase/supabase-js'
 
-// 环境变量检查和调试
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+// 缓存客户端实例
+let _supabase: any = null
+let _supabaseAdmin: any = null
 
-// 调试信息 (仅在开发环境或构建时显示)
-if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV === 'preview') {
-  console.log('Supabase Environment Check:', {
-    url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'MISSING',
-    anonKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'MISSING',
-    serviceKey: supabaseServiceKey ? `${supabaseServiceKey.substring(0, 20)}...` : 'MISSING'
-  })
+// 获取环境变量的函数
+function getSupabaseConfig() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  // 调试信息 (仅在开发环境或预览环境显示)
+  if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV === 'preview') {
+    console.log('Supabase Environment Check:', {
+      url: supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'MISSING',
+      anonKey: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'MISSING',
+      serviceKey: supabaseServiceKey ? `${supabaseServiceKey.substring(0, 20)}...` : 'MISSING'
+    })
+  }
+
+  // 验证必需的环境变量
+  if (!supabaseUrl) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
+  }
+
+  if (!supabaseAnonKey) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
+  }
+
+  if (!supabaseServiceKey) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable')
+  }
+
+  return { supabaseUrl, supabaseAnonKey, supabaseServiceKey }
 }
 
-// 验证必需的环境变量
-if (!supabaseUrl) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
+// 延迟初始化的 Supabase 客户端
+export function getSupabase() {
+  if (!_supabase) {
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig()
+    _supabase = createClient(supabaseUrl, supabaseAnonKey)
+  }
+  return _supabase
 }
 
-if (!supabaseAnonKey) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
+// 延迟初始化的 Supabase Admin 客户端
+export function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    const { supabaseUrl, supabaseServiceKey } = getSupabaseConfig()
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+  }
+  return _supabaseAdmin
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// 向后兼容的导出
+export const supabase = new Proxy({}, {
+  get(target, prop) {
+    return getSupabase()[prop]
+  }
+})
 
-// 服务端使用的客户端（具有更高权限）
-if (!supabaseServiceKey) {
-  throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable')
-}
-
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+export const supabaseAdmin = new Proxy({}, {
+  get(target, prop) {
+    return getSupabaseAdmin()[prop]
+  }
+})
 
 // 数据库类型定义
 export interface Database {

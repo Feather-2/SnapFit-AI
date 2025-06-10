@@ -2,50 +2,71 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import type { 
-  DatabaseClient, 
-  ServerDatabaseClient, 
-  QueryResult, 
-  QueryOptions, 
-  UpsertOptions, 
-  RPCOptions 
+import type {
+  DatabaseClient,
+  ServerDatabaseClient,
+  QueryResult,
+  QueryOptions,
+  UpsertOptions,
+  RPCOptions
 } from '../types'
 
 export class SupabaseProvider implements DatabaseClient {
   private client: any
 
   constructor(useServiceRole = false) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    
-    if (useServiceRole) {
-      // 使用 Service Role Key（服务端）
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-      this.client = createClient(supabaseUrl, serviceRoleKey)
-    } else {
-      // 使用 Anon Key（客户端）
-      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      this.client = createClient(supabaseUrl, anonKey)
+    // 延迟初始化客户端
+    this.client = null
+    this.useServiceRole = useServiceRole
+  }
+
+  private useServiceRole: boolean
+
+  private getClient() {
+    if (!this.client) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+      if (!supabaseUrl) {
+        throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
+      }
+
+      if (this.useServiceRole) {
+        // 使用 Service Role Key（服务端）
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+        if (!serviceRoleKey) {
+          throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable')
+        }
+        this.client = createClient(supabaseUrl, serviceRoleKey)
+      } else {
+        // 使用 Anon Key（客户端）
+        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        if (!anonKey) {
+          throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
+        }
+        this.client = createClient(supabaseUrl, anonKey)
+      }
     }
+    return this.client
   }
 
   async select<T = any>(table: string, options?: QueryOptions): Promise<QueryResult<T[]>> {
     try {
-      let query = this.client.from(table).select(options?.select || '*')
-      
+      let query = this.getClient().from(table).select(options?.select || '*')
+
       // 应用 where 条件
       if (options?.where) {
         Object.entries(options.where).forEach(([key, value]) => {
           query = query.eq(key, value)
         })
       }
-      
+
       // 应用排序
       if (options?.orderBy) {
         options.orderBy.forEach(({ column, ascending = true }) => {
           query = query.order(column, { ascending })
         })
       }
-      
+
       // 应用分页
       if (options?.limit) {
         query = query.limit(options.limit)
@@ -53,7 +74,7 @@ export class SupabaseProvider implements DatabaseClient {
       if (options?.offset) {
         query = query.range(options.offset, options.offset + (options.limit || 1000) - 1)
       }
-      
+
       const { data, error, count } = await query
       return { data, error, count }
     } catch (error) {
@@ -63,15 +84,15 @@ export class SupabaseProvider implements DatabaseClient {
 
   async selectOne<T = any>(table: string, options?: QueryOptions): Promise<QueryResult<T>> {
     try {
-      let query = this.client.from(table).select(options?.select || '*')
-      
+      let query = this.getClient().from(table).select(options?.select || '*')
+
       // 应用 where 条件
       if (options?.where) {
         Object.entries(options.where).forEach(([key, value]) => {
           query = query.eq(key, value)
         })
       }
-      
+
       const { data, error } = await query.single()
       return { data, error }
     } catch (error) {
@@ -81,12 +102,12 @@ export class SupabaseProvider implements DatabaseClient {
 
   async insert<T = any>(table: string, data: any, options?: UpsertOptions): Promise<QueryResult<T>> {
     try {
-      let query = this.client.from(table).insert(data)
-      
+      let query = this.getClient().from(table).insert(data)
+
       if (options?.returning) {
         query = query.select(options.returning)
       }
-      
+
       const result = await query
       return { data: result.data, error: result.error }
     } catch (error) {
@@ -96,19 +117,19 @@ export class SupabaseProvider implements DatabaseClient {
 
   async update<T = any>(table: string, data: any, options?: QueryOptions & UpsertOptions): Promise<QueryResult<T>> {
     try {
-      let query = this.client.from(table).update(data)
-      
+      let query = this.getClient().from(table).update(data)
+
       // 应用 where 条件
       if (options?.where) {
         Object.entries(options.where).forEach(([key, value]) => {
           query = query.eq(key, value)
         })
       }
-      
+
       if (options?.returning) {
         query = query.select(options.returning)
       }
-      
+
       const result = await query
       return { data: result.data, error: result.error }
     } catch (error) {
@@ -118,12 +139,12 @@ export class SupabaseProvider implements DatabaseClient {
 
   async upsert<T = any>(table: string, data: any, options?: UpsertOptions): Promise<QueryResult<T>> {
     try {
-      let query = this.client.from(table).upsert(data)
-      
+      let query = this.getClient().from(table).upsert(data)
+
       if (options?.returning) {
         query = query.select(options.returning)
       }
-      
+
       const result = await query
       return { data: result.data, error: result.error }
     } catch (error) {
@@ -133,15 +154,15 @@ export class SupabaseProvider implements DatabaseClient {
 
   async delete<T = any>(table: string, options?: QueryOptions): Promise<QueryResult<T>> {
     try {
-      let query = this.client.from(table).delete()
-      
+      let query = this.getClient().from(table).delete()
+
       // 应用 where 条件
       if (options?.where) {
         Object.entries(options.where).forEach(([key, value]) => {
           query = query.eq(key, value)
         })
       }
-      
+
       const result = await query
       return { data: result.data, error: result.error }
     } catch (error) {
@@ -151,7 +172,7 @@ export class SupabaseProvider implements DatabaseClient {
 
   async rpc<T = any>(options: RPCOptions): Promise<QueryResult<T>> {
     try {
-      const { data, error } = await this.client.rpc(options.functionName, options.params)
+      const { data, error } = await this.getClient().rpc(options.functionName, options.params)
       return { data, error }
     } catch (error) {
       return { data: null, error: error as Error }
@@ -174,10 +195,21 @@ export class SupabaseServerProvider extends SupabaseProvider implements ServerDa
 
   async createServerClient() {
     const cookieStore = await cookies()
-    
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl) {
+      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
+    }
+
+    if (!supabaseAnonKey) {
+      throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
+    }
+
     this.serverClient = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll() {
@@ -195,7 +227,7 @@ export class SupabaseServerProvider extends SupabaseProvider implements ServerDa
         },
       }
     )
-    
+
     return this.serverClient
   }
 
