@@ -1,0 +1,55 @@
+name: Update Shared Key Models
+
+on:
+  schedule:
+    # Run every 4 hours
+    - cron: '0 */4 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  update-models:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Update Models
+        run: |
+          # Call the model update API endpoint
+          response=$(curl -s -w "%{http_code}" -X POST \
+            "${{ secrets.APP_URL }}/api/models/update" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_API_KEY }}")
+          
+          http_code="${response: -3}"
+          body="${response%???}"
+          
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+          
+          # Check if the request was successful
+          if [[ "$http_code" -ge 200 && "$http_code" -lt 300 ]]; then
+            echo "✅ Model update completed successfully"
+          else
+            echo "❌ Model update failed with status $http_code"
+            echo "$body"
+            exit 1
+          fi
+
+      - name: Fallback to original cron endpoint
+        if: failure()
+        run: |
+          echo "🔄 Trying fallback endpoint..."
+          response=$(curl -s -w "%{http_code}" -X GET \
+            "${{ secrets.APP_URL }}/api/cron/update-models")
+          
+          http_code="${response: -3}"
+          body="${response%???}"
+          
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+          
+          if [[ "$http_code" -ge 200 && "$http_code" -lt 300 ]]; then
+            echo "✅ Fallback update completed successfully"
+          else
+            echo "❌ Both update methods failed"
+            exit 1
+          fi

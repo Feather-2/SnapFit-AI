@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check-env": "node scripts/check-env.js",
+    "vercel-build": "npm run check-env && next build"
   },
   "dependencies": {
     "@ai-sdk/openai": "latest",
