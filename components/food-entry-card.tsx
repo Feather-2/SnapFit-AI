@@ -75,7 +75,8 @@ export function FoodEntryCard({ entry, onDelete, onUpdate }: FoodEntryCardProps)
     return t(`timePeriods.${period}`) || period
   }
 
-  const getMealTypeLabel = (type: string) => {
+  const getMealTypeLabel = (type: string | null | undefined) => {
+    if (!type) return t('unknown') || '未知'
     return t(`mealTypes.${type}`) || type
   }
 
@@ -84,31 +85,38 @@ export function FoodEntryCard({ entry, onDelete, onUpdate }: FoodEntryCardProps)
       "bg-card rounded-xl border transition-all duration-300 shadow-md hover:shadow-xl hover:shadow-emerald-100/50 dark:hover:shadow-emerald-900/30",
       entry.is_estimated && "border-amber-300 dark:border-amber-600 bg-amber-50/50 dark:bg-amber-900/10"
     )}>
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {isEditing ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-3 md:space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="food_name">{t('foodName')}</Label>
-                <Input id="food_name" name="food_name" value={editedEntry.food_name} onChange={handleInputChange} />
+                <Label htmlFor="food_name" className="text-sm">{t('foodName')}</Label>
+                <Input
+                  id="food_name"
+                  name="food_name"
+                  value={editedEntry.food_name}
+                  onChange={handleInputChange}
+                  className="h-10 text-sm"
+                />
               </div>
               <div>
-                <Label htmlFor="consumed_grams">{t('portion')}</Label>
+                <Label htmlFor="consumed_grams" className="text-sm">{t('portion')}</Label>
                 <Input
                   id="consumed_grams"
                   name="consumed_grams"
                   type="number"
                   value={editedEntry.consumed_grams}
                   onChange={handleInputChange}
+                  className="h-10 text-sm"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="meal_type">{t('mealType')}</Label>
+                <Label htmlFor="meal_type" className="text-sm">{t('mealType')}</Label>
                 <Select value={editedEntry.meal_type} onValueChange={handleMealTypeChange}>
-                  <SelectTrigger id="meal_type">
+                  <SelectTrigger id="meal_type" className="h-10 text-sm">
                     <SelectValue placeholder={t('selectMealType')} />
                   </SelectTrigger>
                   <SelectContent>
@@ -120,9 +128,9 @@ export function FoodEntryCard({ entry, onDelete, onUpdate }: FoodEntryCardProps)
                 </Select>
               </div>
               <div>
-                <Label htmlFor="time_period">{t('timePeriod')}</Label>
+                <Label htmlFor="time_period" className="text-sm">{t('timePeriod')}</Label>
                 <Select value={editedEntry.time_period || ""} onValueChange={handleTimePeriodChange}>
-                  <SelectTrigger id="time_period">
+                  <SelectTrigger id="time_period" className="h-10 text-sm">
                     <SelectValue placeholder={t('selectTimePeriod')} />
                   </SelectTrigger>
                   <SelectContent>
@@ -135,42 +143,42 @@ export function FoodEntryCard({ entry, onDelete, onUpdate }: FoodEntryCardProps)
               </div>
             </div>
 
-            <div className="flex justify-end space-x-2 mt-2">
-              <Button size="sm" variant="outline" onClick={handleCancel}>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 mt-3">
+              <Button size="sm" variant="outline" onClick={handleCancel} className="w-full sm:w-auto">
                 <X className="h-4 w-4 mr-1" /> {t('cancel')}
               </Button>
-              <Button size="sm" onClick={handleSave}>
+              <Button size="sm" onClick={handleSave} className="w-full sm:w-auto">
                 <Check className="h-4 w-4 mr-1" /> {t('save')}
               </Button>
             </div>
           </div>
         ) : (
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center">
-                <h4 className="font-medium">{entry.food_name}</h4>
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0">
+            <div className="flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-0">
+                <h4 className="font-medium text-sm md:text-base">{entry.food_name}</h4>
                 {entry.is_estimated && (
-                  <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-1 rounded">{t('estimated')}</span>
+                  <span className="ml-0 sm:ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded self-start">{t('estimated')}</span>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs md:text-sm text-muted-foreground mt-1">
                 {entry.consumed_grams}{t('grams')} · {getMealTypeLabel(entry.meal_type)}
                 {entry.time_period && ` · ${getTimePeriodLabel(entry.time_period)}`}
               </p>
-              <p className="text-sm font-medium mt-1">
+              <p className="text-sm md:text-base font-medium mt-1">
                 {entry.total_nutritional_info_consumed?.calories?.toFixed(0) || 0} {t('calories')}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                 {t('carbs')}: {entry.total_nutritional_info_consumed?.carbohydrates?.toFixed(1) || 0}g · {t('protein')}:{" "}
                 {entry.total_nutritional_info_consumed?.protein?.toFixed(1) || 0}g · {t('fat')}:{" "}
                 {entry.total_nutritional_info_consumed?.fat?.toFixed(1) || 0}g
               </p>
             </div>
-            <div className="flex space-x-1">
-              <Button size="icon" variant="ghost" onClick={() => setIsEditing(true)} className="h-8 w-8">
+            <div className="flex space-x-1 self-end sm:self-start">
+              <Button size="icon" variant="ghost" onClick={() => setIsEditing(true)} className="h-8 w-8 touch-manipulation">
                 <Edit2 className="h-4 w-4" />
               </Button>
-              <Button size="icon" variant="ghost" onClick={onDelete} className="h-8 w-8 text-destructive hover:text-destructive">
+              <Button size="icon" variant="ghost" onClick={onDelete} className="h-8 w-8 text-destructive hover:text-destructive touch-manipulation">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>

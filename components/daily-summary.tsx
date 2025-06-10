@@ -16,7 +16,14 @@ interface DailySummaryProps {
   selectedDate?: Date
 }
 
-export function DailySummary({ summary, calculatedBMR, calculatedTDEE, tefAnalysis, tefAnalysisCountdown, selectedDate }: DailySummaryProps) {
+const defaultSummary: DailySummaryType = {
+  totalCaloriesConsumed: 0,
+  totalCaloriesBurned: 0,
+  macros: { carbs: 0, protein: 0, fat: 0 },
+  micronutrients: {},
+};
+
+export function DailySummary({ summary = defaultSummary, calculatedBMR, calculatedTDEE, tefAnalysis, tefAnalysisCountdown, selectedDate }: DailySummaryProps) {
   const t = useTranslation('dashboard.summary')
   const tSummary = useTranslation('summary')
   const { totalCaloriesConsumed, totalCaloriesBurned, macros } = summary
@@ -143,9 +150,9 @@ export function DailySummary({ summary, calculatedBMR, calculatedTDEE, tefAnalys
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium flex items-center">
                 <Zap className="mr-2 h-4 w-4 text-primary" />
-                食物热效应 (TEF)
+                {t('tef.title')}
               </h4>
-              {tefAnalysisCountdown > 0 && (
+              {tefAnalysisCountdown && tefAnalysisCountdown > 0 && (
                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full dark:bg-blue-900/30 dark:text-blue-300">
                   分析中 {tefAnalysisCountdown}s
                 </span>

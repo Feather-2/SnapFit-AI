@@ -26,12 +26,13 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  Sparkles,
+
   Brain,
   Camera,
   Download
 } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { FoodEntryCard } from "@/components/food-entry-card"
 import { ExerciseEntryCard } from "@/components/exercise-entry-card"
 
@@ -56,7 +57,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dailyLog, setDailyLog] = useState<DailyLog | null>(null)
   const [smartSuggestions, setSmartSuggestions] = useState<SmartSuggestionsResponse | null>(null)
-  const [isSmartSuggestionsOpen, setIsSmartSuggestionsOpen] = useState(false)
+  const [isSmartSuggestionsOpen, setIsSmartSuggestionsOpen] = useState(true)
   const [isCapturing, setIsCapturing] = useState(false)
   const summaryContentRef = useRef<HTMLDivElement>(null)
 
@@ -423,20 +424,18 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
     }
   }
 
-  // 截图功能 - 只使用html2canvas
+  // 截图功能 - 使用html-to-image
   const handleCapture = async () => {
     if (!summaryContentRef.current) return
 
     setIsCapturing(true)
     try {
-      // 使用html2canvas进行完整长图截图
-      await captureFullPageWithHtml2Canvas()
+      await captureWithHtmlToImage()
     } catch (error) {
-      console.error('html2canvas截图失败:', error)
-      // 直接显示错误，不使用其他降级方案
+      console.error('截图失败:', error)
       toast({
         title: t('screenshot.failed'),
-        description: "html2canvas截图失败，请刷新页面后重试",
+        description: t('screenshot.failedRetry'),
         variant: "destructive",
       })
     } finally {
@@ -444,580 +443,155 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
     }
   }
 
-  // 完整页面截图方案 - 优化版
-  const captureFullPageWithHtml2Canvas = async () => {
+  // 使用html-to-image的截图方案 - 更好的定位精度
+  const captureWithHtmlToImage = async () => {
     try {
-      const html2canvas = (await import('html2canvas')).default
+      const { toPng } = await import('html-to-image')
       const element = summaryContentRef.current!
 
       // 根据当前主题确定背景颜色
       const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
       const backgroundColor = isDark ? '#0f172a' : '#ffffff' // slate-900 : white
 
-      // 保存原始样式 - 包括宽度相关样式
-      const originalStyles = {
-        height: element.style.height,
-        overflow: element.style.overflow,
-        position: element.style.position,
-        transform: element.style.transform,
-        width: element.style.width,
-        maxWidth: element.style.maxWidth,
-        minWidth: element.style.minWidth,
-      }
-      const originalScrollTop = window.pageYOffset || document.documentElement.scrollTop
-      const originalScrollLeft = window.pageXOffset || document.documentElement.scrollLeft
+      // 保存当前滚动位置
+      const originalScrollTop = window.scrollY || document.documentElement.scrollTop
+      const originalScrollLeft = window.scrollX || document.documentElement.scrollLeft
 
-      // 显示滚动提示
+      // 显示准备提示
       toast({
-        title: "准备截图中...",
-        description: "正在自动滚动页面以确保完整内容",
+        title: t('screenshot.preparing'),
+        description: t('screenshot.preparingDescription'),
         duration: 2000,
       })
 
-      // 临时调整样式以确保完整内容可见
-      element.style.height = 'auto'
-      element.style.minHeight = 'auto'
-      element.style.maxHeight = 'none'
-      element.style.overflow = 'visible'
-      element.style.position = 'static'
-      element.style.transform = 'none'
+      // 滚动到页面顶部
+      window.scrollTo(0, 0)
+      await new Promise(resolve => setTimeout(resolve, 200))
 
-      // 确保父容器也能显示完整内容
-      const body = document.body
-      const html = document.documentElement
-      const originalBodyStyles = {
-        height: body.style.height,
-        overflow: body.style.overflow,
-        minHeight: body.style.minHeight
-      }
-      const originalHtmlStyles = {
-        height: html.style.height,
-        overflow: html.style.overflow,
-        minHeight: html.style.minHeight
-      }
+      // 修复导航栏和其他定位问题
+      const navigationElements = document.querySelectorAll('nav, [class*="nav"], .sticky, [class*="sticky"]') as NodeListOf<HTMLElement>
+      const originalNavStyles = new Map<HTMLElement, {
+        position: string;
+        top: string;
+        zIndex: string;
+        transform: string;
+      }>()
 
-      body.style.height = 'auto'
-      body.style.overflow = 'visible'
-      body.style.minHeight = 'auto'
-      html.style.height = 'auto'
-      html.style.overflow = 'visible'
-      html.style.minHeight = 'auto'
+      // 临时修复导航栏
+      navigationElements.forEach((nav) => {
+        if (nav.style) {
+          originalNavStyles.set(nav, {
+            position: nav.style.position,
+            top: nav.style.top,
+            zIndex: nav.style.zIndex,
+            transform: nav.style.transform,
+          })
 
-      // 强制重新布局
-      element.offsetHeight
-      body.offsetHeight
-      html.offsetHeight
-
-      // 自动滚动到底部，然后回到顶部
-      const maxScroll = Math.max(
-        document.body.scrollHeight,
-        document.body.offsetHeight,
-        document.documentElement.clientHeight,
-        document.documentElement.scrollHeight,
-        document.documentElement.offsetHeight
-      )
-
-      // 平滑滚动到底部
-      window.scrollTo({ top: maxScroll, behavior: 'smooth' })
-      await new Promise(resolve => setTimeout(resolve, 800))
-
-      // 平滑滚动回到顶部
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      await new Promise(resolve => setTimeout(resolve, 800))
-
-      // 等待布局稳定
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      // 在截图前强制修复所有Badge元素
-      await fixBadgeElements(element)
-
-      // 强制展开所有可折叠内容
-      await expandAllCollapsibleContent(element)
-
-      // 调整容器宽度，避免右侧空白
-      const restoreContainerStyles = await optimizeContainerWidth(element)
-
-      // 确保所有内容都可见并计算在高度内
-      await ensureAllContentVisible(element)
-
-      // 获取完整尺寸 - 更准确的高度计算
-      const bodyHeight = Math.max(
-        document.body.scrollHeight,
-        document.body.offsetHeight,
-        document.body.clientHeight
-      )
-
-      const documentHeight = Math.max(
-        document.documentElement.scrollHeight,
-        document.documentElement.offsetHeight,
-        document.documentElement.clientHeight
-      )
-
-      const elementHeight = Math.max(
-        element.scrollHeight,
-        element.offsetHeight,
-        element.clientHeight
-      )
-
-      // 使用最大的高度值，并添加更大的安全边距
-      const calculatedHeight = Math.max(bodyHeight, documentHeight, elementHeight)
-      const fullHeight = calculatedHeight + 300 // 增加到300px安全边距，确保底部内容不被截断
-
-      // 更精确的宽度计算 - 避免右侧空白
-      const elementWidth = Math.max(
-        element.scrollWidth,
-        element.offsetWidth,
-        element.clientWidth
-      )
-
-      // 使用容器的实际内容宽度，而不是窗口宽度
-      const fullWidth = Math.min(elementWidth, 800) // 限制最大宽度为800px
-
-      console.log('完整页面尺寸:', {
-        width: fullWidth,
-        height: fullHeight,
-        bodyHeight,
-        documentHeight,
-        elementHeight,
-        windowHeight: window.innerHeight,
-        // 添加更多调试信息
-        elementScrollHeight: element.scrollHeight,
-        elementOffsetHeight: element.offsetHeight,
-        elementClientHeight: element.clientHeight,
-        bodyScrollHeight: document.body.scrollHeight,
-        documentScrollHeight: document.documentElement.scrollHeight
-      })
-
-      // 执行高分辨率紧凑截图
-      const canvas = await html2canvas(element, {
-        backgroundColor: backgroundColor,
-        scale: 2, // 提高到2倍分辨率
-        useCORS: true,
-        allowTaint: true,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: fullWidth, // 使用精确计算的宽度
-        windowHeight: fullHeight,
-        width: fullWidth,
-        height: fullHeight,
-        logging: false, // 关闭日志
-        foreignObjectRendering: false,
-        removeContainer: false,
-        imageTimeout: 30000,
-        x: 0,
-        y: 0,
-        // 确保捕获完整内容但不包含多余空白
-        canvas: null,
-        letterRendering: false,
-        ignoreElements: (el) => {
-          // 排除不需要截图的元素
-          return el.classList.contains('no-screenshot') ||
-                 el.tagName === 'BUTTON' ||
-                 el.classList.contains('smart-suggestions-card')
-        },
-        // 优化截图质量
-        allowTaint: true,
-        useCORS: true,
-        proxy: undefined,
-        onclone: (clonedDoc, clonedElement) => {
-          // 首先添加Tailwind CSS基础样式
-          const tailwindStyle = clonedDoc.createElement('style')
-          tailwindStyle.textContent = `
-            /* Tailwind CSS 基础重置和工具类 */
-            .flex { display: flex !important; }
-            .inline-flex { display: inline-flex !important; }
-            .items-center { align-items: center !important; }
-            .items-start { align-items: flex-start !important; }
-            .justify-between { justify-content: space-between !important; }
-            .justify-center { justify-content: center !important; }
-            .space-x-1 > * + * { margin-left: 0.25rem !important; }
-            .space-x-2 > * + * { margin-left: 0.5rem !important; }
-            .space-x-3 > * + * { margin-left: 0.75rem !important; }
-            .space-x-4 > * + * { margin-left: 1rem !important; }
-            .space-y-2 > * + * { margin-top: 0.5rem !important; }
-            .space-y-4 > * + * { margin-top: 1rem !important; }
-            .space-y-8 > * + * { margin-top: 2rem !important; }
-            .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
-            .text-sm { font-size: 0.875rem !important; line-height: 1.25rem !important; }
-            .text-base { font-size: 1rem !important; line-height: 1.5rem !important; }
-            .text-lg { font-size: 1.125rem !important; line-height: 1.75rem !important; }
-            .text-xl { font-size: 1.25rem !important; line-height: 1.75rem !important; }
-            .text-2xl { font-size: 1.5rem !important; line-height: 2rem !important; }
-            .text-3xl { font-size: 1.875rem !important; line-height: 2.25rem !important; }
-            .font-medium { font-weight: 500 !important; }
-            .font-semibold { font-weight: 600 !important; }
-            .font-bold { font-weight: 700 !important; }
-            .rounded { border-radius: 0.25rem !important; }
-            .rounded-lg { border-radius: 0.5rem !important; }
-            .rounded-xl { border-radius: 0.75rem !important; }
-            .rounded-full { border-radius: 9999px !important; }
-            .border { border-width: 1px !important; }
-            .border-l-2 { border-left-width: 2px !important; }
-            .border-t { border-top-width: 1px !important; }
-            .p-2 { padding: 0.5rem !important; }
-            .p-3 { padding: 0.75rem !important; }
-            .p-4 { padding: 1rem !important; }
-            .px-2 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
-            .px-3 { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
-            .py-1 { padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; }
-            .py-2 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
-            .pl-3 { padding-left: 0.75rem !important; }
-            .pt-0 { padding-top: 0 !important; }
-            .mt-1 { margin-top: 0.25rem !important; }
-            .mt-2 { margin-top: 0.5rem !important; }
-            .mt-3 { margin-top: 0.75rem !important; }
-            .mb-2 { margin-bottom: 0.5rem !important; }
-            .mb-3 { margin-bottom: 0.75rem !important; }
-            .mb-4 { margin-bottom: 1rem !important; }
-            .ml-2 { margin-left: 0.5rem !important; }
-            .mr-2 { margin-right: 0.5rem !important; }
-            .w-8 { width: 2rem !important; }
-            .h-4 { height: 1rem !important; }
-            .h-5 { height: 1.25rem !important; }
-            .h-8 { height: 2rem !important; }
-            .flex-1 { flex: 1 1 0% !important; }
-            .flex-shrink-0 { flex-shrink: 0 !important; }
-            .leading-relaxed { line-height: 1.625 !important; }
-            .whitespace-nowrap { white-space: nowrap !important; }
-            .whitespace-pre-wrap { white-space: pre-wrap !important; }
-          `
-          clonedDoc.head.appendChild(tailwindStyle)
-
-          // 优化克隆文档的样式
-          const style = clonedDoc.createElement('style')
-          style.textContent = `
-            * {
-              -webkit-print-color-adjust: exact !important;
-              color-adjust: exact !important;
-              print-color-adjust: exact !important;
-              box-sizing: border-box !important;
-            }
-            body {
-              margin: 0 !important;
-              padding: 0 !important;
-              overflow: visible !important;
-              height: auto !important;
-              background: ${backgroundColor} !important;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-            }
-            .no-screenshot, button {
-              display: none !important;
-            }
-
-            /* 美化标题区域 */
-            h1 {
-              background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%) !important;
-              -webkit-background-clip: text !important;
-              background-clip: text !important;
-              -webkit-text-fill-color: transparent !important;
-              font-weight: 800 !important;
-              font-size: 2.5rem !important;
-              line-height: 1.2 !important;
-              margin-bottom: 0.5rem !important;
-              text-shadow: 0 2px 4px rgba(5, 150, 105, 0.1) !important;
-            }
-
-            /* 主题适配的卡片样式 */
-            .card, .health-card {
-              background: ${isDark ? '#1e293b !important' : 'white !important'};
-              border: 1px solid ${isDark ? '#334155 !important' : '#e5e7eb !important'};
-              box-shadow: ${isDark
-                ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important'
-                : '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06) !important'
-              };
-              border-radius: 12px !important;
-              padding: 1.5rem !important;
-              margin-bottom: 1.5rem !important;
-              position: relative !important;
-              overflow: visible !important;
-            }
-
-            /* 简单的Badge修复 - 增强微调版本 */
-            .badge, [class*="badge"], .inline-flex, span[class*="bg-"], span[class*="text-"] {
-              display: inline-flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-              border-radius: 9999px !important;
-              padding: 1px 8px !important;
-              padding-top: 0px !important;
-              padding-bottom: 2px !important;
-              font-size: 0.75rem !important;
-              font-weight: 500 !important;
-              line-height: 1 !important;
-              white-space: nowrap !important;
-              vertical-align: middle !important;
-              box-sizing: border-box !important;
-              height: 18px !important;
-              min-height: 18px !important;
-              transform: translateY(-2px) !important;
-            }
-
-            /* 简化其他Badge样式 - 增强微调版本 */
-            span.inline-flex, span.rounded-full, span[class*="px-"], span[class*="py-"] {
-              display: inline-flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-              border-radius: 9999px !important;
-              padding: 1px 8px !important;
-              padding-top: 0px !important;
-              padding-bottom: 2px !important;
-              font-size: 0.75rem !important;
-              font-weight: 500 !important;
-              line-height: 1 !important;
-              white-space: nowrap !important;
-              vertical-align: middle !important;
-              box-sizing: border-box !important;
-              height: 18px !important;
-              min-height: 18px !important;
-              transform: translateY(-2px) !important;
-            }
-
-            /* 主要Badge样式 */
-            .bg-primary\\/10, .bg-primary\\/20 {
-              background-color: ${isDark ? 'rgba(5, 150, 105, 0.2) !important' : 'rgba(5, 150, 105, 0.1) !important'};
-              color: #059669 !important;
-            }
-
-            .bg-green-100 {
-              background-color: ${isDark ? 'rgba(34, 197, 94, 0.2) !important' : '#dcfce7 !important'};
-              color: ${isDark ? '#4ade80 !important' : '#166534 !important'};
-            }
-
-            .bg-red-100 {
-              background-color: ${isDark ? 'rgba(239, 68, 68, 0.2) !important' : '#fee2e2 !important'};
-              color: ${isDark ? '#f87171 !important' : '#991b1b !important'};
-            }
-
-            .bg-yellow-100 {
-              background-color: ${isDark ? 'rgba(245, 158, 11, 0.2) !important' : '#fef3c7 !important'};
-              color: ${isDark ? '#fbbf24 !important' : '#92400e !important'};
-            }
-
-            .bg-gray-100 {
-              background-color: ${isDark ? 'rgba(156, 163, 175, 0.2) !important' : '#f3f4f6 !important'};
-              color: ${isDark ? '#d1d5db !important' : '#374151 !important'};
-            }
-
-            /* 修复Flex布局 */
-            .flex {
-              display: flex !important;
-            }
-            .items-center {
-              align-items: center !important;
-            }
-            .justify-between {
-              justify-content: space-between !important;
-            }
-            .justify-center {
-              justify-content: center !important;
-            }
-            .space-x-2 > * + * {
-              margin-left: 0.5rem !important;
-            }
-            .space-x-4 > * + * {
-              margin-left: 1rem !important;
-            }
-            .space-y-4 > * + * {
-              margin-top: 1rem !important;
-            }
-            .space-y-8 > * + * {
-              margin-top: 2rem !important;
-            }
-
-            /* 主题适配的文字颜色 */
-            .text-muted-foreground {
-              color: ${isDark ? '#94a3b8 !important' : '#6b7280 !important'};
-            }
-            .text-primary {
-              color: #059669 !important;
-              font-weight: 600 !important;
-            }
-
-            /* 主题适配的主要文字 */
-            h1, h2, h3, h4, h5, h6, p, span, div {
-              color: ${isDark ? '#f1f5f9 !important' : '#1f2937 !important'};
-            }
-
-            /* 确保容器样式 */
-            [data-screenshot="true"] {
-              height: auto !important;
-              overflow: visible !important;
-              position: static !important;
-              transform: none !important;
-              background: ${backgroundColor} !important;
-              padding: 2rem !important;
-            }
-
-            /* 美化描述文字 */
-            .text-lg {
-              font-size: 1.125rem !important;
-              opacity: 0.8 !important;
-            }
-
-            /* 修复图标和小元素 */
-            svg {
-              display: inline-block !important;
-              vertical-align: middle !important;
-            }
-
-            /* 强制修复所有可能错位的元素 */
-            * {
-              position: relative !important;
-              box-sizing: border-box !important;
-            }
-
-            /* 但是保持某些元素的绝对定位 */
-            .absolute {
-              position: absolute !important;
-            }
-
-            /* 全局badge修复 - 最高优先级 */
-            span, .badge, [class*="badge"] {
-              display: inline !important;
-              vertical-align: baseline !important;
-            }
-
-            span.inline-flex, span.rounded-full, span[class*="bg-"],
-            span[class*="px-"], span[class*="py-"], span[class*="text-xs"] {
-              display: inline-flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-              vertical-align: middle !important;
-              white-space: nowrap !important;
-              border-radius: 9999px !important;
-              padding: 0.25rem 0.75rem !important;
-              font-size: 0.75rem !important;
-              font-weight: 500 !important;
-              line-height: 1 !important;
-              position: relative !important;
-              z-index: 1 !important;
-              box-sizing: border-box !important;
-            }
-
-            /* 添加页面水印 */
-            [data-screenshot="true"]::after {
-              content: "Generated by SnapFit AI • ${new Date().toLocaleDateString('zh-CN')}" !important;
-              position: absolute !important;
-              bottom: 1rem !important;
-              right: 2rem !important;
-              font-size: 0.75rem !important;
-              opacity: 0.5 !important;
-              color: ${isDark ? '#64748b !important' : '#9ca3af !important'};
-            }
-          `
-          clonedDoc.head.appendChild(style)
-
-          // 确保克隆元素有正确的尺寸和样式
-          if (clonedElement) {
-            const clonedHtmlElement = clonedElement as HTMLElement
-            clonedHtmlElement.style.height = 'auto'
-            clonedHtmlElement.style.overflow = 'visible'
-            clonedHtmlElement.style.position = 'static'
-            clonedHtmlElement.style.transform = 'none'
+          const computedStyle = window.getComputedStyle(nav)
+          if (computedStyle.position === 'sticky' || computedStyle.position === 'fixed') {
+            nav.style.position = 'relative'
+            nav.style.top = ''
+            nav.style.transform = ''
+            nav.style.zIndex = ''
           }
-
-          // 特别处理克隆文档中的Radix UI Collapsible
-          const clonedCollapsibles = clonedDoc.querySelectorAll('[data-radix-collapsible-content], [data-state]')
-          clonedCollapsibles.forEach((el) => {
-            const htmlEl = el as HTMLElement
-            if (htmlEl.hasAttribute('data-state')) {
-              htmlEl.setAttribute('data-state', 'open')
-            }
-            htmlEl.style.display = 'block'
-            htmlEl.style.visibility = 'visible'
-            htmlEl.style.opacity = '1'
-            htmlEl.style.height = 'auto'
-            htmlEl.style.maxHeight = 'none'
-            htmlEl.style.overflow = 'visible'
-          })
-
-          console.log('克隆文档中处理了', clonedCollapsibles.length, '个Radix UI元素')
-
-          // 简化的布局修复 - Badge已经在截图前修复了
-          const allElements = clonedDoc.querySelectorAll('*')
-          allElements.forEach((el) => {
-            try {
-              const htmlEl = el as HTMLElement
-
-              // 确保元素有style属性
-              if (!htmlEl.style) return
-
-              // 移除可能影响布局的样式
-              htmlEl.style.transform = ''
-              htmlEl.style.animation = ''
-              htmlEl.style.transition = ''
-
-              // 安全地检查classList
-              if (htmlEl.classList && typeof htmlEl.classList.contains === 'function') {
-                // 确保flex容器正确显示
-                if (htmlEl.classList.contains('flex')) {
-                  htmlEl.style.display = 'flex'
-                }
-
-                // 确保卡片内容正确布局
-                if (htmlEl.classList.contains('card') || htmlEl.classList.contains('health-card')) {
-                  htmlEl.style.position = 'relative'
-                  htmlEl.style.overflow = 'visible'
-                  htmlEl.style.display = 'block'
-                }
-              }
-            } catch (error) {
-              // 忽略单个元素的错误，继续处理其他元素
-              console.warn('处理元素时出错:', error, el)
-            }
-          })
         }
       })
 
-      // 恢复原始样式
-      Object.assign(element.style, originalStyles)
-      Object.assign(body.style, originalBodyStyles)
-      Object.assign(html.style, originalHtmlStyles)
-
-      // 恢复容器和卡片的样式
-      if (restoreContainerStyles) {
-        restoreContainerStyles()
+      // 临时调整容器样式以确保正确截图
+      const originalStyles = {
+        width: element.style.width,
+        maxWidth: element.style.maxWidth,
+        margin: element.style.margin,
+        padding: element.style.padding,
+        position: element.style.position,
+        transform: element.style.transform,
       }
 
-      console.log('生成的Canvas尺寸:', { width: canvas.width, height: canvas.height })
+      // 设置固定宽度和样式，避免响应式布局影响
+      element.style.width = '800px'
+      element.style.maxWidth = '800px'
+      element.style.margin = '0'
+      element.style.padding = '2rem'
+      element.style.position = 'static'
+      element.style.transform = 'none'
 
-      // 创建并下载图片
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob)
-          else reject(new Error('无法创建图片文件'))
-        }, 'image/png', 0.9)
+      // 等待样式应用
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // 配置html-to-image选项
+      const options = {
+        backgroundColor,
+        pixelRatio: 2, // 高分辨率
+        cacheBust: true,
+        width: 800, // 固定宽度
+        height: element.scrollHeight, // 使用实际内容高度
+        style: {
+          transform: 'none',
+          animation: 'none',
+          transition: 'none',
+          width: '800px',
+          maxWidth: '800px',
+          margin: '0',
+          padding: '2rem',
+          position: 'static',
+        },
+        filter: (node: HTMLElement) => {
+          // 排除不需要截图的元素，但保留STYLE标签以确保样式正确渲染
+          return !node.classList?.contains('no-screenshot') &&
+                 node.tagName !== 'SCRIPT' &&
+                 node.tagName !== 'BUTTON'
+        },
+      }
+
+      // 生成PNG图片
+      const dataUrl = await toPng(element, options)
+
+      // 恢复容器原始样式
+      Object.assign(element.style, originalStyles)
+
+      // 恢复导航栏样式
+      navigationElements.forEach((nav) => {
+        const original = originalNavStyles.get(nav)
+        if (original && nav.style) {
+          Object.assign(nav.style, original)
+        }
       })
 
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      const timestamp = format(selectedDate, 'yyyy-MM-dd')
-      const time = format(new Date(), 'HHmm')
-      link.href = url
-      link.download = `SnapFit健康汇总-${timestamp}-${time}.png`
+      // 恢复滚动位置
+      window.scrollTo(originalScrollLeft, originalScrollTop)
 
+      console.log('html-to-image截图生成成功')
+
+      // 下载图片
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
+      const filename = `health-summary_${timestamp}.png`
+
+      const link = document.createElement('a')
+      link.download = filename
+      link.href = dataUrl
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
 
-      URL.revokeObjectURL(url)
-
+      // 显示成功提示
       toast({
         title: t('screenshot.success'),
-        description: t('screenshot.successDescription'),
+        description: `${t('screenshot.savedAs')} ${filename}`,
+        duration: 3000,
       })
 
     } catch (error) {
-      console.error('完整页面截图失败:', error)
-
-      // 即使出错也要恢复容器样式
-      if (typeof restoreContainerStyles === 'function') {
-        restoreContainerStyles()
-      }
-
+      console.error('html-to-image截图失败:', error)
       throw error
     }
   }
+
+
+
+
+
+
+
 
 
 
@@ -1048,7 +622,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
   const { summary, calculatedBMR, calculatedTDEE, foodEntries, exerciseEntries } = dailyLog
   const { totalCaloriesConsumed, totalCaloriesBurned } = summary
   const netCalories = totalCaloriesConsumed - totalCaloriesBurned
-  
+
   // 计算与TDEE的差额
   const calorieDifference = calculatedTDEE ? calculatedTDEE - netCalories : null
   let calorieStatusText = ""
@@ -1139,7 +713,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   {totalCaloriesConsumed.toFixed(0)} kcal
                 </span>
               </div>
-              
+
               {/* 膳食列表 */}
               {foodEntries.length > 0 ? (
                 <div className="space-y-3">
@@ -1147,9 +721,8 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                     <FoodEntryCard
                       key={entry.log_id}
                       entry={entry}
-                      onEdit={() => {}}
                       onDelete={() => {}}
-                      showActions={false}
+                      onUpdate={() => {}}
                     />
                   ))}
                 </div>
@@ -1171,7 +744,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   {totalCaloriesBurned.toFixed(0)} kcal
                 </span>
               </div>
-              
+
               {/* 运动列表 */}
               {exerciseEntries.length > 0 ? (
                 <div className="space-y-3">
@@ -1179,9 +752,8 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                     <ExerciseEntryCard
                       key={entry.log_id}
                       entry={entry}
-                      onEdit={() => {}}
                       onDelete={() => {}}
-                      showActions={false}
+                      onUpdate={() => {}}
                     />
                   ))}
                 </div>
@@ -1196,8 +768,8 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
             <div className="border-t pt-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  {netCalories > 0 ? 
-                    <TrendingUp className="mr-2 h-5 w-5 text-orange-500" /> : 
+                  {netCalories > 0 ?
+                    <TrendingUp className="mr-2 h-5 w-5 text-orange-500" /> :
                     <TrendingDown className="mr-2 h-5 w-5 text-blue-500" />
                   }
                   <span className="text-lg font-medium">{t('netCalories')}</span>
@@ -1285,7 +857,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
 
         {/* 智能建议 */}
         {smartSuggestions && smartSuggestions.suggestions && smartSuggestions.suggestions.length > 0 && (
-          <Card className="no-screenshot smart-suggestions-card">
+          <Card className="smart-suggestions-card">
             <Collapsible open={isSmartSuggestionsOpen} onOpenChange={setIsSmartSuggestionsOpen}>
               <CollapsibleTrigger asChild>
                 <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
@@ -1309,7 +881,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   <div className="space-y-4">
                     {/* 显示生成时间 */}
                     <div className="text-xs text-muted-foreground mb-4">
-                      生成时间: {format(new Date(smartSuggestions.generatedAt), "yyyy-MM-dd HH:mm")}
+                      {t('generatedTime')}: {format(new Date(smartSuggestions.generatedAt), "yyyy/M/d HH:mm:ss")}
                     </div>
 
                     {/* 按类别显示建议 */}
@@ -1324,8 +896,8 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                               category.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
                               'bg-gray-100 text-gray-700'
                             }`}>
-                              {category.priority === 'high' ? '高优先级' :
-                               category.priority === 'medium' ? '中优先级' : '低优先级'}
+                              {category.priority === 'high' ? t('priorities.high') :
+                               category.priority === 'medium' ? t('priorities.medium') : t('priorities.low')}
                             </span>
                           </h4>
                           <p className="text-sm text-muted-foreground mt-1">{category.summary}</p>
@@ -1344,7 +916,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                                   </p>
                                   {suggestion.actionable && (
                                     <span className="inline-block mt-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                                      可执行建议
+                                      {t('actionable')}
                                     </span>
                                   )}
                                 </div>
@@ -1360,6 +932,36 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
             </Collapsible>
           </Card>
         )}
+
+        {/* 截图专用Logo区域 - 使用与导航栏一致的绿色主题 */}
+        <div className="screenshot-logo-area mt-8 pt-6 border-t border-slate-200/50 dark:border-slate-600/30 text-center">
+          <div className="flex items-center justify-center space-x-4">
+            <div className="flex items-center space-x-3">
+              {/* Logo图标 - 与导航栏一致的绿色渐变背景 */}
+              <div className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 dark:from-green-400 dark:to-green-500 shadow-lg">
+                <Image
+                  src="/placeholder.svg"
+                  alt="SnapFit AI Logo"
+                  width={28}
+                  height={28}
+                  className="brightness-0 invert"
+                />
+              </div>
+              {/* 品牌名称 - 与导航栏一致的绿色渐变文字 */}
+              <div className="text-left">
+                <div className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-700 dark:from-green-300 dark:to-green-400 bg-clip-text text-transparent">
+                  SnapFit AI
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {t('branding.tagline')}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground">
+            {t('branding.slogan')}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -1371,7 +973,7 @@ export default function SummaryPage({ params }: { params: Promise<{ locale: stri
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-        <p className="text-muted-foreground">加载中...</p>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     </div>}>
       <SummaryPageContent params={params} />

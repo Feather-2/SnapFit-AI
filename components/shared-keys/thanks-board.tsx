@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Heart, Trophy, Users, Zap } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useTranslation } from "@/hooks/use-i18n"
 
 interface Contributor {
   userId: string
@@ -25,14 +26,15 @@ interface CurrentKeyInfo {
   keyName: string
 }
 
-export function ThanksBoard({ 
+export function ThanksBoard({
   currentKeyInfo,
-  showCurrentKey = true 
-}: { 
+  showCurrentKey = true
+}: {
   currentKeyInfo?: CurrentKeyInfo
-  showCurrentKey?: boolean 
+  showCurrentKey?: boolean
 }) {
   const { toast } = useToast()
+  const t = useTranslation('sharedKeys')
   const [contributors, setContributors] = useState<Contributor[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -45,20 +47,20 @@ export function ThanksBoard({
     try {
       const response = await fetch('/api/shared-keys/thanks-board')
       const data = await response.json()
-      
+
       if (response.ok) {
         setContributors(data.contributors || [])
       } else {
         toast({
-          title: "加载失败",
-          description: data.error || "无法加载感谢榜",
+          title: t('thanksBoard.loadFailed'),
+          description: data.error || t('thanksBoard.loadFailedDesc'),
           variant: "destructive"
         })
       }
     } catch (error) {
       toast({
-        title: "加载失败",
-        description: "网络错误，请稍后重试",
+        title: t('thanksBoard.loadFailed'),
+        description: t('thanksBoard.networkError'),
         variant: "destructive"
       })
     } finally {
@@ -96,18 +98,21 @@ export function ThanksBoard({
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Zap className="h-4 w-4" />
-        <span>正在使用</span>
+        <span>{t('thanksBoard.currentlyUsing')}</span>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="link" className="h-auto p-0 text-sm">
-              {currentKeyInfo.contributorName} 分享的 {currentKeyInfo.modelName}
+              {t('thanksBoard.contributorSharing', {
+                contributor: currentKeyInfo.contributorName,
+                model: currentKeyInfo.modelName
+              })}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Heart className="h-5 w-5 text-red-500" />
-                感谢榜 - API Key 贡献者
+                {t('thanksBoard.title')}
               </DialogTitle>
             </DialogHeader>
             <ThanksBoard showCurrentKey={false} />
@@ -131,9 +136,12 @@ export function ThanksBoard({
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="font-medium">当前使用</p>
+                <p className="font-medium">{t('thanksBoard.currentlyUsing')}</p>
                 <p className="text-sm text-muted-foreground">
-                  {currentKeyInfo.contributorName} 分享的 {currentKeyInfo.keyName}
+                  {t('thanksBoard.contributorSharing', {
+                    contributor: currentKeyInfo.contributorName,
+                    model: currentKeyInfo.keyName
+                  })}
                 </p>
               </div>
               <Heart className="h-5 w-5 text-red-500 ml-auto" />
@@ -178,7 +186,7 @@ export function ThanksBoard({
             <div className="space-y-3">
               {contributors.map((contributor, index) => (
                 <div
-                  key={contributor.userId}
+                  key={`${contributor.userId}-${index}`}
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   {/* 排名 */}
@@ -205,19 +213,19 @@ export function ThanksBoard({
                       )}
                       {!contributor.isActive && (
                         <Badge variant="outline" className="text-xs">
-                          暂停
+                          {t('leaderboard.inactive')}
                         </Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      贡献了 {contributor.totalContributions} 次调用
+                      贡献了 {contributor.totalContributions} {t('thanksBoard.totalCalls')}
                     </p>
                   </div>
 
                   {/* 每日限制 */}
                   <div className="text-right">
                     <Badge variant="outline" className="text-xs">
-                      {contributor.dailyLimit}/天
+                      {contributor.dailyLimit}/{t('leaderboard.perDay')}
                     </Badge>
                   </div>
                 </div>

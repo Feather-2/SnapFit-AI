@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宽度错位修复测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        /* 模拟Tailwind的container类 */
+        .container {
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        @media (min-width: 640px) {
+            .container { max-width: 640px; }
+        }
+        @media (min-width: 768px) {
+            .container { max-width: 768px; }
+        }
+        @media (min-width: 1024px) {
+            .container { max-width: 1024px; }
+        }
+        @media (min-width: 1280px) {
+            .container { max-width: 1280px; }
+        }
+
+        .max-w-4xl {
+            max-width: 56rem; /* 896px */
+        }
+
+        .mx-auto {
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        .py-8 {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        .test-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .justify-between {
+            justify-content: space-between;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .text-lg {
+            font-size: 1.125rem;
+        }
+
+        .font-bold {
+            font-weight: bold;
+        }
+
+        .text-green-600 {
+            color: #059669;
+        }
+
+        button {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        button:hover {
+            background: #047857;
+        }
+
+        .debug-info {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .result-images {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .result-images img {
+            max-width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>宽度错位修复测试</h1>
+    
+    <div class="debug-info">
+        <strong>测试说明：</strong>
+        <ul>
+            <li>这个容器使用了类似summary页面的Tailwind CSS类</li>
+            <li>container + mx-auto + px-4 + max-w-4xl 的组合</li>
+            <li>测试不同截图方案对宽度处理的差异</li>
+            <li>观察内容是否偏向右边或被截断</li>
+        </ul>
+    </div>
+
+    <!-- 模拟summary页面的容器结构 -->
+    <div id="test-container" class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="test-content">
+            <h2>健康数据总结</h2>
+            <p>这是一个模拟的健康数据页面，用来测试截图时的宽度问题。</p>
+        </div>
+
+        <div class="card">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-lg font-bold">卡路里摄入</span>
+                </div>
+                <span class="text-lg font-bold text-green-600">1,850 kcal</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-lg font-bold">运动消耗</span>
+                </div>
+                <span class="text-lg font-bold text-green-600">450 kcal</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-lg font-bold">净卡路里</span>
+                </div>
+                <span class="text-lg font-bold text-green-600">1,400 kcal</span>
+            </div>
+        </div>
+
+        <div class="test-content">
+            <h3>长文本测试</h3>
+            <p>这是一段比较长的文本，用来测试在不同宽度下的显示效果。当容器宽度发生变化时，这段文本应该能够正确换行，而不会被截断或出现水平滚动条。这对于截图功能来说非常重要，因为我们需要确保所有内容都能完整地显示在截图中。</p>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin: 40px 0;">
+        <button onclick="testOriginalHtml2Canvas()">html2canvas 原始</button>
+        <button onclick="testFixedHtml2Canvas()">html2canvas 修复</button>
+        <button onclick="testHtmlToImage()">html-to-image 修复</button>
+        <button onclick="showDebugInfo()">显示调试信息</button>
+    </div>
+
+    <div id="debug-output" class="debug-info" style="display: none;">
+        <h4>调试信息：</h4>
+        <div id="debug-content"></div>
+    </div>
+
+    <div id="result-container" class="result-images"></div>
+
+    <!-- 加载库 -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.min.js"></script>
+    
+    <script>
+        function showDebugInfo() {
+            const element = document.getElementById('test-container');
+            const rect = element.getBoundingClientRect();
+            const computedStyle = window.getComputedStyle(element);
+            
+            const debugInfo = {
+                'getBoundingClientRect': {
+                    width: rect.width,
+                    height: rect.height,
+                    left: rect.left,
+                    right: rect.right
+                },
+                'scroll尺寸': {
+                    scrollWidth: element.scrollWidth,
+                    scrollHeight: element.scrollHeight
+                },
+                'offset尺寸': {
+                    offsetWidth: element.offsetWidth,
+                    offsetHeight: element.offsetHeight
+                },
+                'client尺寸': {
+                    clientWidth: element.clientWidth,
+                    clientHeight: element.clientHeight
+                },
+                'computed样式': {
+                    width: computedStyle.width,
+                    maxWidth: computedStyle.maxWidth,
+                    margin: computedStyle.margin,
+                    padding: computedStyle.padding
+                },
+                '窗口尺寸': {
+                    innerWidth: window.innerWidth,
+                    innerHeight: window.innerHeight
+                }
+            };
+            
+            document.getElementById('debug-content').innerHTML = 
+                '<pre>' + JSON.stringify(debugInfo, null, 2) + '</pre>';
+            document.getElementById('debug-output').style.display = 'block';
+        }
+
+        function addResultImage(dataUrl, title) {
+            const container = document.getElementById('result-container');
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <h4>${title}</h4>
+                <img src="${dataUrl}" alt="${title}">
+                <p><a href="${dataUrl}" download="${title.replace(/\s+/g, '-')}.png">下载图片</a></p>
+            `;
+            container.appendChild(div);
+        }
+
+        async function testOriginalHtml2Canvas() {
+            const element = document.getElementById('test-container');
+            
+            try {
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                const dataUrl = canvas.toDataURL('image/png');
+                addResultImage(dataUrl, 'html2canvas 原始');
+                
+            } catch (error) {
+                console.error('html2canvas 原始测试失败:', error);
+                alert('测试失败: ' + error.message);
+            }
+        }
+
+        async function testFixedHtml2Canvas() {
+            const element = document.getElementById('test-container');
+            
+            try {
+                // 保存原始样式
+                const originalStyles = {
+                    width: element.style.width,
+                    maxWidth: element.style.maxWidth,
+                    margin: element.style.margin,
+                    padding: element.style.padding,
+                    position: element.style.position,
+                    transform: element.style.transform,
+                };
+
+                // 应用修复样式
+                element.style.width = '800px';
+                element.style.maxWidth = '800px';
+                element.style.margin = '0';
+                element.style.padding = '2rem';
+                element.style.position = 'static';
+                element.style.transform = 'none';
+
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    scrollX: 0,
+                    scrollY: 0,
+                    width: 800,
+                    height: element.scrollHeight
+                });
+
+                // 恢复原始样式
+                Object.assign(element.style, originalStyles);
+                
+                const dataUrl = canvas.toDataURL('image/png');
+                addResultImage(dataUrl, 'html2canvas 修复');
+                
+            } catch (error) {
+                console.error('html2canvas 修复测试失败:', error);
+                alert('测试失败: ' + error.message);
+            }
+        }
+
+        async function testHtmlToImage() {
+            const element = document.getElementById('test-container');
+            
+            try {
+                // 保存原始样式
+                const originalStyles = {
+                    width: element.style.width,
+                    maxWidth: element.style.maxWidth,
+                    margin: element.style.margin,
+                    padding: element.style.padding,
+                    position: element.style.position,
+                    transform: element.style.transform,
+                };
+
+                // 应用修复样式
+                element.style.width = '800px';
+                element.style.maxWidth = '800px';
+                element.style.margin = '0';
+                element.style.padding = '2rem';
+                element.style.position = 'static';
+                element.style.transform = 'none';
+
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const dataUrl = await htmlToImage.toPng(element, {
+                    backgroundColor: '#ffffff',
+                    pixelRatio: 2,
+                    cacheBust: true,
+                    width: 800,
+                    height: element.scrollHeight,
+                    style: {
+                        width: '800px',
+                        maxWidth: '800px',
+                        margin: '0',
+                        padding: '2rem',
+                        position: 'static',
+                        transform: 'none'
+                    }
+                });
+
+                // 恢复原始样式
+                Object.assign(element.style, originalStyles);
+                
+                addResultImage(dataUrl, 'html-to-image 修复');
+                
+            } catch (error) {
+                console.error('html-to-image 测试失败:', error);
+                alert('测试失败: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

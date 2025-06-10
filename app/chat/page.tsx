@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { useChat } from "ai/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,13 +14,22 @@ import { useToast } from "@/hooks/use-toast"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useIndexedDB } from "@/hooks/use-indexed-db"
 import { useAIMemory } from "@/hooks/use-ai-memory"
+import { useChatAIService } from "@/hooks/use-chat-ai-service"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { EnhancedMessageRenderer } from "@/components/enhanced-message-renderer"
 import type { AIConfig, DailyLog, FoodEntry, ExerciseEntry, AIMemoryUpdateRequest } from "@/lib/types"
 import { format } from "date-fns"
-import { Trash2, User, Stethoscope, Dumbbell, Flame, Brain, Clock, Menu, X, ChevronDown } from "lucide-react"
+import { Trash2, User, Stethoscope, Dumbbell, Flame, Brain, Clock, Menu, X, ChevronDown, ImageIcon, Upload } from "lucide-react"
 import type { Message } from "ai"
 import styles from "./chat.module.css"
+import { compressImage } from "@/lib/image-utils"
+
+// 图片预览接口
+interface ImagePreview {
+  file: File
+  url: string
+  compressedFile?: File
+}
 
 // 专家角色定义
 interface ExpertRole {
@@ -393,16 +402,22 @@ export default function ChatPage() {
       name: "gpt-4o",
       baseUrl: "https://api.openai.com",
       apiKey: "",
+      source: "shared", // 默认使用共享模型
     },
     chatModel: {
       name: "gpt-4o",
       baseUrl: "https://api.openai.com",
       apiKey: "",
+      source: "shared", // 默认使用共享模型
     },
     visionModel: {
       name: "gpt-4o",
       baseUrl: "https://api.openai.com",
       apiKey: "",
+      source: "shared", // 默认使用共享模型
+    },
+    sharedKey: {
+      selectedKeyIds: [],
     },
   })
   const { getData } = useIndexedDB("healthLogs")
@@ -415,19 +430,14 @@ export default function ChatPage() {
   // 为每个专家使用独立的聊天记录
   const [allExpertMessages, setAllExpertMessages] = useLocalStorage<Record<string, Message[]>>("expertChatMessages", {})
 
+  // 图片上传相关状态
+  const [uploadedImages, setUploadedImages] = useState<ImagePreview[]>([])
+  const [isCompressing, setIsCompressing] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // 检查AI配置是否完整
   const checkAIConfig = () => {
-    const modelConfig = aiConfig.chatModel
-    //console.log("Checking AI config:", {
-    //  hasName: !!modelConfig?.name,
-    //  hasBaseUrl: !!modelConfig?.baseUrl,
-    //  hasApiKey: !!modelConfig?.apiKey,
-    //})
-
-    if (!modelConfig?.name || !modelConfig?.baseUrl || !modelConfig?.apiKey) {
-      return false
-    }
-    return true
+    return isConfigValid
   }
 
 
@@ -489,6 +499,73 @@ export default function ChatPage() {
     toast({
       title: "已拒绝更新",
       description: "AI记忆更新请求已被拒绝",
+    })
+  }
+
+  // 处理图片上传
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+
+    if (uploadedImages.length + files.length > 5) {
+      toast({
+        title: "图片数量超限",
+        description: "最多只能上传5张图片",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsCompressing(true)
+
+    try {
+      const newImages: ImagePreview[] = []
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+
+        if (!file.type.startsWith("image/")) {
+          toast({
+            title: "文件类型错误",
+            description: `${file.name} 不是图片文件`,
+            variant: "destructive",
+          })
+          continue
+        }
+
+        const previewUrl = URL.createObjectURL(file)
+        const compressedFile = await compressImage(file, 500 * 1024) // 500KB
+
+        newImages.push({
+          file,
+          url: previewUrl,
+          compressedFile,
+        })
+      }
+
+      setUploadedImages((prev) => [...prev, ...newImages])
+    } catch (error) {
+      console.error("Error processing images:", error)
+      toast({
+        title: "图片处理失败",
+        description: "无法处理上传的图片",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCompressing(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    }
+  }
+
+  // 删除已上传的图片
+  const handleRemoveImage = (index: number) => {
+    setUploadedImages((prev) => {
+      const newImages = [...prev]
+      URL.revokeObjectURL(newImages[index].url)
+      newImages.splice(index, 1)
+      return newImages
     })
   }
 
@@ -586,52 +663,49 @@ export default function ChatPage() {
   // 获取当前选择的专家
   const currentExpert = expertRoles.find(expert => expert.id === selectedExpert) || expertRoles[0]
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error, setMessages } = useChat({
-    api: "/api/openai/chat",
-    initialMessages: [],
-    headers: {
-      "x-ai-config": JSON.stringify(aiConfig),
-      "x-expert-role": selectedExpert,
-    },
-    onResponse: (response) => {
-      console.log("Chat response received:", {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-      })
+  // 清除图片的回调
+  const clearImages = useCallback(() => {
+    uploadedImages.forEach(img => URL.revokeObjectURL(img.url))
+    setUploadedImages([])
+  }, [uploadedImages])
 
-      if (!response.ok) {
-        console.error("Chat response not ok:", response.status, response.statusText)
-        toast({
-          title: "聊天失败",
-          description: `服务器响应错误: ${response.status} ${response.statusText}`,
-          variant: "destructive",
-        })
-      }
-    },
-    onError: (error) => {
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error, setMessages, isPrivateMode, isConfigValid, configError } = useChatAIService({
+    aiConfig,
+    expertRole: selectedExpert,
+    includeHealthData,
+    recentHealthData,
+    userProfile,
+    todayLog,
+    memories: memories[selectedExpert] || null,
+    uploadedImages,
+    onImagesClear: clearImages,
+  })
+
+  // 处理错误显示
+  useEffect(() => {
+    if (error) {
       console.error("Chat error:", error)
+
+      // 根据错误类型提供不同的标题和描述
+      let title = "聊天失败"
+      let description = error.message || "聊天服务出现错误，请稍后重试"
+
+      if (error.message.includes('请登录后再使用')) {
+        title = "需要登录"
+        description = "请登录后再使用AI聊天功能"
+      } else if (error.message.includes('使用次数已达上限')) {
+        title = "使用次数已达上限"
+      } else if (error.message.includes('服务暂时不可用')) {
+        title = "服务暂时不可用"
+      }
+
       toast({
-        title: "聊天失败",
-        description: checkAIConfig() ? `错误: ${error.message}` : "请先在设置页面配置聊天模型",
+        title,
+        description,
         variant: "destructive",
       })
-    },
-    onFinish: (message) => {
-      console.log("Chat finished:", {
-        messageLength: message.content.length,
-        role: message.role,
-      })
-    },
-    body: {
-      userProfile: includeHealthData ? userProfile : undefined,
-      healthData: includeHealthData ? todayLog : undefined,
-      recentHealthData: includeHealthData ? recentHealthData : undefined,
-      systemPrompt: currentExpert.systemPrompt,
-      expertRole: currentExpert,
-      aiMemory: memories, // 包含所有专家的记忆（只读其他专家，可写当前专家）
-    },
-  })
+    }
+  }, [error, toast])
 
   // 当切换专家时，加载对应的消息记录
   useEffect(() => {
@@ -684,149 +758,11 @@ export default function ChatPage() {
   }, [messages])
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-
-    // 详细的健康数据传递日志
-    console.log("=== 聊天数据传递详情 ===")
-    console.log("1. 基本信息:", {
-      inputLength: input.length,
-      hasAIConfig: isClient ? checkAIConfig() : false,
-      includeHealthData,
-      selectedExpert: selectedExpert,
-      expertName: currentExpert.name,
-    })
-
-    console.log("2. 用户资料 (userProfile):", userProfile)
-
-    console.log("3. 今日健康数据 (todayLog):", {
-      hasData: !!todayLog,
-      date: todayLog?.date,
-      weight: todayLog?.weight,
-      calculatedBMR: todayLog?.calculatedBMR,
-      calculatedTDEE: todayLog?.calculatedTDEE,
-      foodEntriesCount: todayLog?.foodEntries?.length || 0,
-      exerciseEntriesCount: todayLog?.exerciseEntries?.length || 0,
-      summary: todayLog?.summary,
-      dailyStatus: todayLog?.dailyStatus,
-      tefAnalysis: todayLog?.tefAnalysis,
-    })
-
-    if (todayLog && todayLog.foodEntries && todayLog.foodEntries.length > 0) {
-      console.log("3.1 今日食物记录详情:", todayLog.foodEntries.map((entry: FoodEntry, index: number) => ({
-        index: index + 1,
-        food_name: entry.food_name,
-        consumed_grams: entry.consumed_grams,
-        calories: entry.total_nutritional_info_consumed?.calories,
-        protein: entry.total_nutritional_info_consumed?.protein,
-        carbs: entry.total_nutritional_info_consumed?.carbohydrates,
-        fat: entry.total_nutritional_info_consumed?.fat,
-        meal_type: entry.meal_type,
-        time_period: entry.time_period,
-        timestamp: entry.timestamp,
-      })))
-    }
-
-    if (todayLog && todayLog.exerciseEntries && todayLog.exerciseEntries.length > 0) {
-      console.log("3.2 今日运动记录详情:", todayLog.exerciseEntries.map((entry: ExerciseEntry, index: number) => ({
-        index: index + 1,
-        exercise_name: entry.exercise_name,
-        duration_minutes: entry.duration_minutes,
-        calories_burned: entry.calories_burned_estimated,
-        exercise_type: entry.exercise_type,
-        muscle_groups: entry.muscle_groups,
-      })))
-    }
-
-    console.log("4. 近期健康数据 (recentHealthData):", {
-      daysCount: recentHealthData.length,
-      dates: recentHealthData.map(log => log.date),
-      summary: recentHealthData.map(log => ({
-        date: log.date,
-        weight: log.weight,
-        calculatedBMR: log.calculatedBMR,
-        calculatedTDEE: log.calculatedTDEE,
-        foodEntries: log.foodEntries?.length || 0,
-        exerciseEntries: log.exerciseEntries?.length || 0,
-        totalCaloriesConsumed: log.summary?.totalCaloriesConsumed,
-        totalCaloriesBurned: log.summary?.totalCaloriesBurned,
-        netCalories: log.summary ? (log.summary.totalCaloriesConsumed - log.summary.totalCaloriesBurned) : 0,
-        calorieDeficit: log.summary && log.calculatedTDEE ?
-          (log.calculatedTDEE - (log.summary.totalCaloriesConsumed - log.summary.totalCaloriesBurned)) : null,
-        macros: log.summary?.macros,
-        dailyStatus: log.dailyStatus,
-        tefAnalysis: log.tefAnalysis,
-      }))
-    })
-
-    // 详细显示每天的食物和运动记录
-    recentHealthData.forEach((log, dayIndex) => {
-      const dayLabel = dayIndex === 0 ? "今天" : dayIndex === 1 ? "昨天" : `${dayIndex}天前`
-      console.log(`4.${dayIndex + 1} ${dayLabel} (${log.date}) 详细数据:`, {
-        基本信息: {
-          体重: log.weight,
-          BMR: log.calculatedBMR,
-          TDEE: log.calculatedTDEE,
-        },
-        营养摄入: {
-          总卡路里: log.summary?.totalCaloriesConsumed,
-          蛋白质: log.summary?.macros?.protein,
-          碳水化合物: log.summary?.macros?.carbs,
-          脂肪: log.summary?.macros?.fat,
-        },
-        运动消耗: {
-          总卡路里: log.summary?.totalCaloriesBurned,
-          运动记录数: log.exerciseEntries?.length || 0,
-        },
-        每日状态: log.dailyStatus ? {
-          压力: `${log.dailyStatus.stress}/6`,
-          心情: `${log.dailyStatus.mood}/6`,
-          健康: `${log.dailyStatus.health}/6`,
-          睡眠质量: log.dailyStatus.sleepQuality ? `${log.dailyStatus.sleepQuality}/6` : "未记录",
-          睡眠时间: `${log.dailyStatus.bedTime || "未记录"} - ${log.dailyStatus.wakeTime || "未记录"}`,
-        } : "未记录",
-        TEF分析: log.tefAnalysis ? {
-          基础TEF: log.tefAnalysis.baseTEF,
-          增强乘数: log.tefAnalysis.enhancementMultiplier,
-          增强后TEF: log.tefAnalysis.enhancedTEF,
-          增强因素: log.tefAnalysis.enhancementFactors,
-        } : "未分析",
-        食物记录: log.foodEntries?.slice(0, 3).map((entry: FoodEntry) => ({
-          名称: entry.food_name,
-          重量: `${entry.consumed_grams}g`,
-          卡路里: entry.total_nutritional_info_consumed?.calories,
-          餐次: entry.meal_type,
-        })) || [],
-        运动记录: log.exerciseEntries?.slice(0, 2).map((entry: ExerciseEntry) => ({
-          名称: entry.exercise_name,
-          时长: `${entry.duration_minutes}分钟`,
-          卡路里: entry.calories_burned_estimated,
-          类型: entry.exercise_type,
-        })) || [],
-      })
-    })
-
-    console.log("5. 专家角色信息:", {
-      id: currentExpert.id,
-      name: currentExpert.name,
-      title: currentExpert.title,
-      description: currentExpert.description,
-      systemPromptLength: currentExpert.systemPrompt.length,
-    })
-
-    console.log("6. 将要发送的body数据结构:", {
-      userProfile: includeHealthData ? "包含" : "不包含",
-      healthData: includeHealthData ? "包含今日数据" : "不包含",
-      recentHealthData: includeHealthData ? `包含${recentHealthData.length}天数据` : "不包含",
-      systemPrompt: "包含专家角色提示词",
-      expertRole: "包含专家角色信息",
-    })
-
-    console.log("=== 数据传递完成 ===")
-
     if (isClient && !checkAIConfig()) {
+      e.preventDefault()
       toast({
         title: "AI 配置不完整",
-        description: "请先在设置页面配置聊天模型",
+        description: configError || "请先在设置页面配置聊天模型",
         variant: "destructive",
       })
       return
@@ -834,12 +770,7 @@ export default function ChatPage() {
     handleSubmit(e)
   }
 
-  // 显示错误信息
-  useEffect(() => {
-    if (error) {
-      console.error("useChat error:", error)
-    }
-  }, [error])
+
 
   return (
     <div className="container mx-auto py-3 md:py-6 max-w-7xl min-w-0 px-4 md:px-6">
@@ -990,8 +921,23 @@ export default function ChatPage() {
               </div>
             )}
             {isClient && error && (
-              <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 p-2 rounded mt-2">
-                错误: {error.message}
+              <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 p-3 rounded-lg mt-2 border border-red-200 dark:border-red-800">
+                <div className="flex items-center space-x-2">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span>{error.message}</span>
+                </div>
+                {error.message.includes('请登录后再使用') && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => window.location.href = '/login'}
+                      className="text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors"
+                    >
+                      前往登录
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </CardHeader>
@@ -1058,8 +1004,23 @@ export default function ChatPage() {
                       }`}
                     >
                       {message.role === "user" ? (
-                        // 用户消息保持简单格式，确保文本换行
-                        <div className={`${styles.userMessage} ${isMobile ? 'text-sm' : ''}`}>{message.content}</div>
+                        // 用户消息，支持文本和图片
+                        <div className={`${styles.userMessage} ${isMobile ? 'text-sm' : ''}`}>
+                          {message.content && <div className="mb-2">{message.content}</div>}
+                          {/* @ts-ignore - 扩展Message类型以支持图片 */}
+                          {message.images && Array.isArray(message.images) && message.images.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {message.images.map((imageUrl: string, index: number) => (
+                                <img
+                                  key={index}
+                                  src={imageUrl}
+                                  alt={`用户上传的图片 ${index + 1}`}
+                                  className="max-w-48 max-h-48 rounded-lg object-cover border border-white/20"
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         // AI消息使用增强渲染器，支持思考过程显示
                         <div className={`${styles.aiMessage} ${isMobile ? 'text-sm' : ''}`}>
@@ -1101,23 +1062,73 @@ export default function ChatPage() {
             </div>
           </ScrollArea>
 
-          <form onSubmit={onSubmit} className={`${isMobile ? 'mt-2' : 'mt-4'} flex space-x-2`}>
-            <Input
-              value={input}
-              onChange={handleInputChange}
-              placeholder={isClient && checkAIConfig() ? "输入您的问题..." : "请先配置AI模型"}
-              disabled={isLoading || (isClient && !checkAIConfig())}
-              className={`flex-1 ${isMobile ? 'text-base' : ''}`}
-            />
-            <Button
-              type="submit"
-              disabled={isLoading || !input.trim() || (isClient && !checkAIConfig())}
-              size={isMobile ? "default" : "default"}
-              className={isMobile ? 'px-4' : ''}
-            >
-              {isLoading ? "发送中..." : "发送"}
-            </Button>
-          </form>
+          {/* 图片预览区域 */}
+          {uploadedImages.length > 0 && (
+            <div className={`${isMobile ? 'p-2' : 'p-4'} border-t border-border`}>
+              <p className="text-muted-foreground mb-2 flex items-center font-medium text-sm">
+                <ImageIcon className="mr-2 h-4 w-4" /> 已上传图片 ({uploadedImages.length}/5)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {uploadedImages.map((img, index) => (
+                  <div key={index} className="relative w-16 h-16 rounded-lg overflow-hidden border-2 border-white dark:border-slate-700 shadow-md hover:shadow-lg transition-all group">
+                    <img
+                      src={img.url}
+                      alt={`预览 ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(index)}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className={`${isMobile ? 'p-2' : 'p-4'} border-t border-border`}>
+            <form onSubmit={onSubmit} className="space-y-3">
+              <div className="flex space-x-2">
+                <Input
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder={isClient && checkAIConfig() ? "输入您的问题..." : "请先配置AI模型"}
+                  disabled={isLoading || (isClient && !checkAIConfig())}
+                  className={`flex-1 ${isMobile ? 'text-base' : ''}`}
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleImageUpload}
+                  disabled={isLoading || isCompressing || uploadedImages.length >= 5}
+                  ref={fileInputRef}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size={isMobile ? "default" : "default"}
+                  disabled={isLoading || isCompressing || uploadedImages.length >= 5}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={isMobile ? 'px-3' : 'px-4'}
+                >
+                  <Upload className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isLoading || (!input.trim() && uploadedImages.length === 0) || (isClient && !checkAIConfig())}
+                  size={isMobile ? "default" : "default"}
+                  className={isMobile ? 'px-4' : ''}
+                >
+                  {isLoading ? "发送中..." : "发送"}
+                </Button>
+              </div>
+            </form>
+          </div>
         </CardContent>
       </Card>
       </div>

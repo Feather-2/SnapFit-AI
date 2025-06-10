@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas导出错位测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            height: 200vh; /* 创建滚动条 */
+        }
+
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .badge {
+            background: #10b981;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            position: relative;
+        }
+
+        .card-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #374151;
+        }
+
+        .card-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #059669;
+        }
+
+        .absolute-element {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ef4444;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .fixed-element {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #3b82f6;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            z-index: 1000;
+        }
+
+        .sticky-nav {
+            position: sticky;
+            top: 0;
+            background: #1f2937;
+            color: white;
+            padding: 12px 24px;
+            z-index: 100;
+            border-bottom: 1px solid #374151;
+            margin-bottom: 20px;
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .nav-logo {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 16px;
+        }
+
+        .nav-link {
+            color: #d1d5db;
+            text-decoration: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .nav-link:hover {
+            background: #374151;
+            color: white;
+        }
+
+        .transform-element {
+            transform: translateX(20px) rotate(2deg);
+            background: #8b5cf6;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        button {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: #047857;
+        }
+
+        .scroll-indicator {
+            text-align: center;
+            color: #6b7280;
+            margin: 40px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sticky导航栏 - 这是导致错位的主要原因 -->
+    <nav class="sticky-nav">
+        <div class="nav-content">
+            <div class="nav-logo">测试网站</div>
+            <div class="nav-links">
+                <a href="#" class="nav-link">首页</a>
+                <a href="#" class="nav-link">关于</a>
+                <a href="#" class="nav-link">联系</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="scroll-indicator">
+        ⬇️ 请先滚动页面到中间位置，然后点击截图按钮测试错位问题 ⬇️
+        <br>
+        <small style="color: #6b7280;">注意：上方的sticky导航栏是导致错位的主要原因</small>
+    </div>
+
+    <div class="test-container" id="screenshot-target">
+        <div class="absolute-element">绝对定位</div>
+
+        <div class="header">
+            <div class="title">Canvas导出错位测试</div>
+            <div class="badge">测试中</div>
+        </div>
+
+        <div class="content-grid">
+            <div class="card">
+                <div class="card-title">普通卡片</div>
+                <div class="card-value">123</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Flex布局</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>左侧</span>
+                    <span style="font-weight: bold;">右侧</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">网格布局</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div>A</div>
+                    <div>B</div>
+                    <div>C</div>
+                    <div>D</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="transform-element">
+            这个元素有transform变换 (translateX + rotate)
+        </div>
+
+        <div style="background: #fef3c7; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <h3 style="margin: 0 0 8px 0; color: #92400e;">测试说明</h3>
+            <ul style="margin: 0; color: #92400e;">
+                <li><strong>Sticky导航栏</strong>：页面顶部的导航栏是错位的主要原因</li>
+                <li><strong>三种方案对比</strong>：
+                    <ul style="margin: 8px 0;">
+                        <li>html2canvas原始 - 展示原始错位问题</li>
+                        <li>html2canvas修复 - 使用修复后的html2canvas</li>
+                        <li>html-to-image - 使用新的库，更好的定位精度</li>
+                    </ul>
+                </li>
+                <li><strong>滚动测试</strong>：滚动页面到不同位置测试各方案的表现</li>
+                <li><strong>定位元素</strong>：观察绝对定位和固定定位元素是否正确显示</li>
+                <li><strong>Transform元素</strong>：检查transform元素是否出现错位</li>
+                <li><strong>布局测试</strong>：验证flex和grid布局是否正常</li>
+            </ul>
+        </div>
+
+        <div class="buttons">
+            <button onclick="testOriginalMethod()">html2canvas原始</button>
+            <button onclick="testFixedMethod()">html2canvas修复</button>
+            <button onclick="testHtmlToImage()">html-to-image</button>
+            <button onclick="scrollToTop()">回到顶部</button>
+            <button onclick="scrollToMiddle()">滚动到中间</button>
+        </div>
+    </div>
+
+    <div class="fixed-element">固定定位元素</div>
+
+    <div class="scroll-indicator">
+        ⬆️ 测试完成后可以滚动回顶部 ⬆️
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.min.js"></script>
+    <script>
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function scrollToMiddle() {
+            window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
+        }
+
+        async function testOriginalMethod() {
+            const element = document.getElementById('screenshot-target');
+
+            try {
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                });
+
+                downloadCanvas(canvas, 'original-method.png');
+            } catch (error) {
+                console.error('原始方法截图失败:', error);
+                alert('截图失败: ' + error.message);
+            }
+        }
+
+        async function testFixedMethod() {
+            const element = document.getElementById('screenshot-target');
+
+            // 保存当前滚动位置
+            const originalScrollTop = window.scrollY || document.documentElement.scrollTop;
+            const originalScrollLeft = window.scrollX || document.documentElement.scrollLeft;
+
+            try {
+                // 滚动到顶部
+                window.scrollTo(0, 0);
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // 修复导航栏和定位问题
+                const restoreStyles = fixElementPositioningWithNav(element);
+
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    scrollX: 0,
+                    scrollY: 0,
+                    windowWidth: element.scrollWidth,
+                    windowHeight: element.scrollHeight,
+                    x: 0,
+                    y: 0,
+                    ignoreElements: (el) => {
+                        return el.tagName === 'SCRIPT' || el.tagName === 'STYLE';
+                    },
+                    onclone: (clonedDoc, clonedElement) => {
+                        // 在克隆文档中修复样式
+                        const allElements = clonedDoc.querySelectorAll('*');
+                        allElements.forEach((el) => {
+                            const htmlEl = el;
+                            if (htmlEl.style) {
+                                htmlEl.style.transform = '';
+                                htmlEl.style.animation = '';
+                                htmlEl.style.transition = '';
+
+                                if (htmlEl.style.position === 'fixed' || htmlEl.style.position === 'sticky') {
+                                    htmlEl.style.position = 'relative';
+                                }
+                            }
+                        });
+                    }
+                });
+
+                // 恢复样式和滚动位置
+                restoreStyles();
+                window.scrollTo(originalScrollLeft, originalScrollTop);
+
+                downloadCanvas(canvas, 'fixed-method.png');
+            } catch (error) {
+                console.error('修复方法截图失败:', error);
+                alert('截图失败: ' + error.message);
+                // 确保恢复滚动位置
+                window.scrollTo(originalScrollLeft, originalScrollTop);
+            }
+        }
+
+        function fixElementPositioning(element) {
+            const originalStyles = new Map();
+            const allElements = [element, ...element.querySelectorAll('*')];
+
+            allElements.forEach((el) => {
+                if (!el.style) return;
+
+                originalStyles.set(el, {
+                    transform: el.style.transform,
+                    position: el.style.position,
+                    top: el.style.top,
+                    left: el.style.left,
+                    right: el.style.right,
+                    bottom: el.style.bottom,
+                    animation: el.style.animation,
+                    transition: el.style.transition,
+                });
+
+                // 应用修复
+                el.style.transform = '';
+                el.style.animation = '';
+                el.style.transition = '';
+
+                const currentPosition = el.style.position;
+                if (currentPosition === 'fixed' || currentPosition === 'sticky') {
+                    el.style.position = 'relative';
+                    el.style.top = '';
+                    el.style.left = '';
+                    el.style.right = '';
+                    el.style.bottom = '';
+                }
+            });
+
+            // 返回恢复函数
+            return () => {
+                allElements.forEach((el) => {
+                    const original = originalStyles.get(el);
+                    if (original && el.style) {
+                        Object.assign(el.style, original);
+                    }
+                });
+            };
+        }
+
+        function fixElementPositioningWithNav(element) {
+            const originalStyles = new Map();
+            const originalNavStyles = new Map();
+
+            // 修复导航栏
+            const navigationElements = document.querySelectorAll('nav, [class*="nav"], .sticky, [class*="sticky"]');
+            navigationElements.forEach((nav) => {
+                if (nav.style) {
+                    originalNavStyles.set(nav, {
+                        position: nav.style.position,
+                        top: nav.style.top,
+                        zIndex: nav.style.zIndex,
+                        transform: nav.style.transform,
+                    });
+
+                    const computedStyle = window.getComputedStyle(nav);
+                    if (computedStyle.position === 'sticky' || computedStyle.position === 'fixed') {
+                        nav.style.position = 'relative';
+                        nav.style.top = '';
+                        nav.style.transform = '';
+                        nav.style.zIndex = '';
+                    }
+                }
+            });
+
+            // 修复其他元素
+            const allElements = [element, ...element.querySelectorAll('*')];
+            allElements.forEach((el) => {
+                if (!el.style) return;
+
+                originalStyles.set(el, {
+                    transform: el.style.transform,
+                    position: el.style.position,
+                    top: el.style.top,
+                    left: el.style.left,
+                    right: el.style.right,
+                    bottom: el.style.bottom,
+                    animation: el.style.animation,
+                    transition: el.style.transition,
+                });
+
+                // 应用修复
+                el.style.transform = '';
+                el.style.animation = '';
+                el.style.transition = '';
+
+                const currentPosition = el.style.position || window.getComputedStyle(el).position;
+                if (currentPosition === 'fixed' || currentPosition === 'sticky') {
+                    el.style.position = 'relative';
+                    el.style.top = '';
+                    el.style.left = '';
+                    el.style.right = '';
+                    el.style.bottom = '';
+                }
+            });
+
+            // 返回恢复函数
+            return () => {
+                // 恢复导航栏
+                navigationElements.forEach((nav) => {
+                    const original = originalNavStyles.get(nav);
+                    if (original && nav.style) {
+                        Object.assign(nav.style, original);
+                    }
+                });
+
+                // 恢复其他元素
+                allElements.forEach((el) => {
+                    const original = originalStyles.get(el);
+                    if (original && el.style) {
+                        Object.assign(el.style, original);
+                    }
+                });
+            };
+        }
+
+        async function testHtmlToImage() {
+            const element = document.getElementById('screenshot-target');
+
+            // 保存当前滚动位置
+            const originalScrollTop = window.scrollY || document.documentElement.scrollTop;
+            const originalScrollLeft = window.scrollX || document.documentElement.scrollLeft;
+
+            try {
+                // 滚动到顶部
+                window.scrollTo(0, 0);
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // 修复导航栏和定位问题
+                const restoreStyles = fixElementPositioningWithNav(element);
+
+                // 使用html-to-image (注意：在浏览器中直接使用全局对象)
+                const dataUrl = await htmlToImage.toPng(element, {
+                    backgroundColor: '#ffffff',
+                    pixelRatio: 2,
+                    cacheBust: true,
+                    style: {
+                        transform: 'none',
+                        animation: 'none',
+                        transition: 'none',
+                    },
+                    filter: (node) => {
+                        return node.tagName !== 'SCRIPT' &&
+                               node.tagName !== 'STYLE' &&
+                               !node.classList?.contains('no-screenshot');
+                    }
+                });
+
+                // 恢复样式和滚动位置
+                restoreStyles();
+                window.scrollTo(originalScrollLeft, originalScrollTop);
+
+                // 下载图片
+                const link = document.createElement('a');
+                link.download = 'html-to-image-method.png';
+                link.href = dataUrl;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+            } catch (error) {
+                console.error('html-to-image截图失败:', error);
+                alert('截图失败: ' + error.message);
+                // 确保恢复滚动位置
+                window.scrollTo(originalScrollLeft, originalScrollTop);
+            }
+        }
+
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

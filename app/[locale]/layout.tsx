@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { MainNav } from "@/components/main-nav"
 import { locales, type Locale } from '@/i18n';
 import { Providers } from "@/components/providers";
+import { auth } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "SnapFit AI",
@@ -33,8 +34,16 @@ export default async function LocaleLayout({
   // 获取翻译消息
   const messages = await getMessages({ locale });
 
+  // 使用 next-auth 的 auth() 方法在服务器端获取会话
+  const session = await auth();
+
   return (
-    <Providers locale={locale} messages={messages} timeZone="Asia/Shanghai">
+    <Providers
+      locale={locale}
+      messages={messages}
+      timeZone="Asia/Shanghai"
+      initialSession={session}
+    >
       <div className="min-h-screen bg-background">
         <MainNav locale={locale} />
         <main>{children}</main>

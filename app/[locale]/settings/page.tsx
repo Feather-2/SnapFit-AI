@@ -2,8 +2,9 @@
 
 import type React from "react"
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,6 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useIndexedDB } from "@/hooks/use-indexed-db"
 import { useAIMemory } from "@/hooks/use-ai-memory"
+import { useSync } from "@/hooks/use-sync"
 import type { AIConfig, ModelConfig } from "@/lib/types"
 import type { OpenAIModel } from "@/lib/openai-client"
 import {
@@ -29,8 +31,26 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Loader2, RefreshCw, UploadCloud } from "lucide-react"
+import { Check, ChevronsUpDown, Download, Loader2, Network, Plus, RefreshCw, Settings, Upload, UploadCloud, X } from "lucide-react"
 import { useTranslation } from "@/hooks/use-i18n"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import { MultiSelect } from "@/components/ui/multi-select"
+import { NetworkDiagnostic } from "@/components/network-diagnostic"
+
+// 定义共享Key的类型
+interface PublicSharedKey {
+  id: string;
+  name: string;
+  availableModels: string[] | null;
+  provider: {
+    username: string;
+    avatarUrl: string | null;
+  };
+}
 
 const defaultUserProfile = {
   weight: 70,
@@ -50,6 +70,10 @@ const defaultUserProfile = {
   medicalHistory: undefined as string | undefined,
   lifestyle: undefined as string | undefined,
   healthAwareness: undefined as string | undefined,
+  // 新增共享Key配置
+  sharedKey: {
+    selectedKeyIds: [],
+  }
 }
 
 const defaultAIConfig: AIConfig = {
@@ -57,40 +81,186 @@ const defaultAIConfig: AIConfig = {
     name: "gpt-4o",
     baseUrl: "https://api.openai.com",
     apiKey: "",
+    source: 'shared', // 默认使用共享模型
+    sharedKeyConfig: {
+      mode: 'auto',
+      selectedKeyIds: [],
+    }
   },
   chatModel: {
     name: "gpt-4o",
     baseUrl: "https://api.openai.com",
     apiKey: "",
+    source: 'shared', // 默认使用共享模型
+    sharedKeyConfig: {
+      mode: 'auto',
+      selectedKeyIds: [],
+    }
   },
   visionModel: {
     name: "gpt-4o",
     baseUrl: "https://api.openai.com",
     apiKey: "",
+    source: 'shared', // 默认使用共享模型
+    sharedKeyConfig: {
+      mode: 'auto',
+      selectedKeyIds: [],
+    }
   },
+  sharedKey: {
+    selectedKeyIds: [],
+  }
 }
+
+type ModelType = 'agentModel' | 'chatModel' | 'visionModel';
+
+function LoadingFallback() {
+  const t = useTranslation('settings')
+  return (
+    <div className="container mx-auto py-6 px-6 md:px-8 lg:px-12 max-w-8xl">
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">{t('data.loadingSettings')}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const SharedPoolConfigurator = ({
+  modelType,
+  config,
+  publicSharedKeys,
+  onConfigChange,
+}: {
+  modelType: ModelType;
+  config: ModelConfig;
+  publicSharedKeys: PublicSharedKey[];
+  onConfigChange: (
+    modelType: ModelType,
+    updates: Partial<ModelConfig> | { sharedKeyConfig: Partial<NonNullable<ModelConfig['sharedKeyConfig']>> }
+  ) => void;
+}) => {
+  const t = useTranslation('settings')
+  const sharedConfig = config.sharedKeyConfig || { mode: 'auto' };
+
+  // 从所有共享Key中提取出可用的模型列表
+  const availableSharedModels = useMemo(() => {
+    const models = new Set<string>();
+    publicSharedKeys.forEach(key => {
+      (key.availableModels || []).forEach(model => models.add(model));
+    });
+    return Array.from(models).sort();
+  }, [publicSharedKeys]);
+
+  // 根据选择的模型，过滤出可用的特定Key
+  const keysForSelectedModel = useMemo(() => {
+    if (!sharedConfig.selectedModel) return [];
+    return publicSharedKeys.filter(key =>
+      (key.availableModels || []).includes(sharedConfig.selectedModel!)
+    );
+  }, [sharedConfig.selectedModel, publicSharedKeys]);
+
+  return (
+    <div className="space-y-4 pt-4 mt-4 border-t">
+      {/* 第一步：选择模型 */}
+      <div className="space-y-2">
+        <Label>{t('ai.selectSharedModel')}</Label>
+        <Select
+          value={sharedConfig.selectedModel}
+          onValueChange={(model) => {
+            onConfigChange(modelType, {
+              sharedKeyConfig: { selectedModel: model, selectedKeyIds: [] } // 切换模型时重置已选的特定Key
+            });
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={t('ai.pleaseSelectModel')} />
+          </SelectTrigger>
+          <SelectContent>
+            {availableSharedModels.map(model => (
+              <SelectItem key={model} value={model}>{model}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* 第二步：选择模式 (仅当模型被选择后显示) */}
+      {sharedConfig.selectedModel && (
+        <div className="space-y-4 pt-4 mt-2 border-t border-dashed">
+           <Label>{t('ai.selectRunMode')}</Label>
+          <RadioGroup
+            value={sharedConfig.mode}
+            onValueChange={(mode) => onConfigChange(modelType, { sharedKeyConfig: { mode: mode as any } })}
+            className="flex space-x-4"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="auto" id={`${modelType}-auto`} />
+              <Label htmlFor={`${modelType}-auto`}>{t('ai.autoBalance')}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="manual" id={`${modelType}-manual`} />
+              <Label htmlFor={`${modelType}-manual`}>{t('ai.manualSpecify')}</Label>
+            </div>
+          </RadioGroup>
+
+          {sharedConfig.mode === 'auto' && (
+            <p className="text-sm text-muted-foreground">
+              {t('ai.autoBalanceDescription', { model: sharedConfig.selectedModel })}
+            </p>
+          )}
+
+          {sharedConfig.mode === 'manual' && (
+            <div className="space-y-2">
+              <Label>{t('ai.selectSpecificKeys')}</Label>
+               <MultiSelect
+                options={keysForSelectedModel.map(key => ({
+                  value: key.id,
+                  label: `${key.name} (${key.provider.username})`,
+                }))}
+                selected={sharedConfig.selectedKeyIds || []}
+                onChange={(ids) => onConfigChange(modelType, { sharedKeyConfig: { selectedKeyIds: ids } })}
+                placeholder={t('ai.selectSharedKeysPlaceholder')}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 function SettingsContent() {
   const { toast } = useToast()
   const t = useTranslation('settings')
   const searchParams = useSearchParams()
+  const { data: session } = useSession()
   const [userProfile, setUserProfile] = useLocalStorage("userProfile", defaultUserProfile)
   const [aiConfig, setAIConfig] = useLocalStorage<AIConfig>("aiConfig", defaultAIConfig)
 
   // 获取URL参数中的tab值，默认为profile
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams.get('tab')
-    return ['profile', 'goals', 'ai', 'data'].includes(tabParam || '') ? tabParam : 'profile'
+    // 更健壮的检查，确保 activeTab 始终是字符串
+    return (tabParam && ['profile', 'goals', 'ai', 'data'].includes(tabParam)) ? tabParam : 'profile'
   })
 
   const { clearAllData } = useIndexedDB("healthLogs")
   const { memories, updateMemory, clearMemory, clearAllMemories } = useAIMemory()
+  const { isSyncing, lastSynced, syncProgress, syncAll, pushMemories, pullMemories, pushProfile, pullProfile, shouldAutoSync, clearThrottleState, SYNC_THROTTLE_MINUTES } = useSync()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 记忆编辑状态管理
   const [editingMemories, setEditingMemories] = useState<Record<string, string>>({})
   const [memoryUpdateTimeouts, setMemoryUpdateTimeouts] = useState<Record<string, NodeJS.Timeout>>({})
   const [savingMemories, setSavingMemories] = useState<Record<string, boolean>>({})
+
+  // 高级选项展开状态
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
+
+  // 网络诊断状态
+  const [showDiagnostic, setShowDiagnostic] = useState(false)
 
   // 初始化编辑状态
   useEffect(() => {
@@ -199,7 +369,7 @@ function SettingsContent() {
         description: t('ai.memoryManagement.memorySavedDescription'),
       })
     } catch (error) {
-      console.error("保存记忆失败:", error)
+      console.error("Save memory failed:", error)
       toast({
         title: t('ai.memoryManagement.saveFailed'),
         description: t('ai.memoryManagement.saveFailedDescription'),
@@ -218,6 +388,7 @@ function SettingsContent() {
   const [agentModels, setAgentModels] = useState<OpenAIModel[]>([])
   const [chatModels, setChatModels] = useState<OpenAIModel[]>([])
   const [visionModels, setVisionModels] = useState<OpenAIModel[]>([])
+  const [publicSharedKeys, setPublicSharedKeys] = useState<PublicSharedKey[]>([])
 
   // 加载状态
   const [loadingAgentModels, setLoadingAgentModels] = useState(false)
@@ -232,6 +403,26 @@ function SettingsContent() {
   useEffect(() => {
     setAIFormData(aiConfig)
   }, [aiConfig])
+
+  // 获取可用的共享Key列表，并只在组件挂载时运行一次
+  useEffect(() => {
+    const fetchPublicKeys = async () => {
+      try {
+        const response = await fetch('/api/shared-keys/public-list');
+        const data = await response.json();
+        if (data.keys) {
+          setPublicSharedKeys(data.keys);
+        }
+      } catch (error) {
+        console.error('Failed to fetch public shared keys:', error);
+        toast({
+          title: t('data.fetchSharedKeysListFailed'),
+          variant: "destructive"
+        });
+      }
+    };
+    fetchPublicKeys();
+  }, [toast]);
 
   // 处理表单输入变化
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,146 +478,90 @@ function SettingsContent() {
     }));
   }, [])
 
-  // 处理AI配置变化
-  const handleAIConfigChange = useCallback((modelType: keyof AIConfig, field: keyof ModelConfig, value: string) => {
-    setAIFormData((prev) => ({
-      ...prev,
-      [modelType]: {
-        ...prev[modelType],
-        [field]: value,
-      },
-    }))
-
-    // 如果修改了 baseUrl 或 apiKey，清空对应的模型列表
-    if (field === "baseUrl" || field === "apiKey") {
-      setTimeout(() => {
-        switch (modelType) {
-          case "agentModel":
-            setAgentModels([])
-            break
-          case "chatModel":
-            setChatModels([])
-            break
-          case "visionModel":
-            setVisionModels([])
-            break
-        }
-      }, 100)
-    }
-  }, [])
-
-  // 获取模型列表
-  const fetchModels = useCallback(
-    async (modelType: keyof AIConfig) => {
-      const modelConfig = aiFormData[modelType]
-
-      if (!modelConfig.baseUrl || !modelConfig.apiKey) {
-        toast({
-          title: t('ai.configIncomplete'),
-          description: t('ai.fillBaseUrlAndKey'),
-          variant: "destructive",
-        })
-        return
+  // 统一处理AI配置的更新，包括顶层source切换
+  const handleAIConfigUpdate = (
+    modelType: ModelType,
+    updates: Partial<ModelConfig> | { sharedKeyConfig: Partial<NonNullable<ModelConfig['sharedKeyConfig']>> }
+  ) => {
+    setAIFormData(prev => {
+      const newConfig = { ...prev };
+      if ('sharedKeyConfig' in updates) {
+        newConfig[modelType] = {
+          ...newConfig[modelType],
+          sharedKeyConfig: {
+            ...newConfig[modelType].sharedKeyConfig,
+            ...updates.sharedKeyConfig as object,
+          } as any,
+        };
+      } else {
+        newConfig[modelType] = {
+          ...newConfig[modelType],
+          ...updates,
+        };
       }
-
-      // 设置加载状态
-      switch (modelType) {
-        case "agentModel":
-          setLoadingAgentModels(true)
-          break
-        case "chatModel":
-          setLoadingChatModels(true)
-          break
-        case "visionModel":
-          setLoadingVisionModels(true)
-          break
-      }
-
-      try {
-        const response = await fetch("/api/models", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            baseUrl: modelConfig.baseUrl,
-            apiKey: modelConfig.apiKey,
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error(t('ai.fetchModelsFailed'))
-        }
-
-        const data = await response.json()
-
-        if (data.error) {
-          throw new Error(data.error)
-        }
-
-        // 更新对应的模型列表
-        switch (modelType) {
-          case "agentModel":
-            setAgentModels(data.data || [])
-            break
-          case "chatModel":
-            setChatModels(data.data || [])
-            break
-          case "visionModel":
-            setVisionModels(data.data || [])
-            break
-        }
-
-        toast({
-          title: t('ai.fetchSuccess'),
-          description: t('ai.fetchSuccessDesc', { count: data.data?.length || 0 }),
-        })
-      } catch (error) {
-        console.error("Error fetching models:", error)
-        toast({
-          title: t('ai.fetchFailed'),
-          description: error instanceof Error ? error.message : t('ai.fetchFailedDesc'),
-          variant: "destructive",
-        })
-      } finally {
-        // 清除加载状态
-        switch (modelType) {
-          case "agentModel":
-            setLoadingAgentModels(false)
-            break
-          case "chatModel":
-            setLoadingChatModels(false)
-            break
-          case "visionModel":
-            setLoadingVisionModels(false)
-            break
-        }
-      }
-    },
-    [aiFormData, toast],
-  )
+      return newConfig;
+    });
+  };
 
   // 保存用户配置
-  const handleSaveProfile = useCallback(() => {
-    setUserProfile(formData)
-    toast({
-      title: t('profile.saveSuccess'),
-      description: t('profile.saveSuccessDesc'),
-    })
-  }, [formData, setUserProfile, toast])
+  const handleSaveProfile = useCallback(async () => {
+    try {
+      // 1. 先更新本地存储
+      setUserProfile(formData)
+
+      // 2. 如果用户已登录，自动推送到云端
+      if (session?.user?.id) {
+        console.log('[Settings] Auto-pushing profile to cloud after save...')
+        await pushProfile()
+        console.log('[Settings] Profile successfully synced to cloud')
+      }
+
+      toast({
+        title: t('profile.saveSuccess'),
+        description: t('profile.saveSuccessDesc'),
+      })
+    } catch (error) {
+      console.error('[Settings] Failed to sync profile to cloud:', error)
+      // 即使云端同步失败，本地保存仍然成功
+      toast({
+        title: t('profile.saveSuccess'),
+        description: t('profile.saveSuccessDesc') + ' (' + t('data.localSavedCloudSyncRetry') + ')',
+      })
+    }
+  }, [formData, setUserProfile, toast, session?.user?.id, pushProfile])
 
   // 保存AI配置
   const handleSaveAIConfig = useCallback(() => {
     // 验证配置
-    const models = [aiFormData.agentModel, aiFormData.chatModel, aiFormData.visionModel]
-    for (const model of models) {
-      if (!model.name || !model.baseUrl || !model.apiKey) {
-        toast({
-          title: t('ai.configIncomplete'),
-          description: t('ai.fillAllFields'),
-          variant: "destructive",
-        })
-        return
+    for (const modelType of ['agentModel', 'chatModel', 'visionModel'] as ModelType[]) {
+      const model = aiFormData[modelType];
+
+      if (model.source === 'private') {
+        if (!model.name || !model.baseUrl || !model.apiKey) {
+          toast({
+            title: t('ai.privateConfigIncomplete'),
+            description: t('ai.fillAllFieldsForModel', { modelType }),
+            variant: "destructive",
+          });
+          return;
+        }
+      } else { // 'shared'
+        if (!model.sharedKeyConfig?.selectedModel) {
+           toast({
+            title: t('ai.sharedPoolConfigIncomplete'),
+            description: t('ai.selectSharedModelForModel', { modelType }),
+            variant: "destructive",
+          });
+          return;
+        }
+        if (model.sharedKeyConfig.mode === 'manual' && (!model.sharedKeyConfig.selectedKeyIds || model.sharedKeyConfig.selectedKeyIds.length === 0)) {
+           toast({
+            title: t('ai.sharedPoolConfigIncomplete'),
+            description: t('ai.selectSharedKeysForModel', { modelType }),
+            variant: "destructive",
+          });
+          return;
+        }
       }
     }
 
@@ -437,9 +572,66 @@ function SettingsContent() {
     })
   }, [aiFormData, setAIConfig, toast])
 
+  const handleFetchModels = useCallback(async (modelType: ModelType) => {
+    const modelConfig = aiFormData[modelType];
+    const setLoading = {
+      agentModel: setLoadingAgentModels,
+      chatModel: setLoadingChatModels,
+      visionModel: setLoadingVisionModels
+    }[modelType];
+    const setModels = {
+      agentModel: setAgentModels,
+      chatModel: setChatModels,
+      visionModel: setVisionModels
+    }[modelType];
+
+    if (!modelConfig.baseUrl || !modelConfig.apiKey) {
+      toast({
+        title: t('ai.cannotFetchModels'),
+        description: t('ai.fillApiUrlAndKey'),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/shared-keys/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseUrl: modelConfig.baseUrl,
+          apiKey: modelConfig.apiKey,
+          modelName: modelConfig.name, // Use current name for the test
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.availableModels) {
+        toast({
+          title: t('ai.fetchModelsSuccess'),
+          description: t('ai.foundModels', { count: result.availableModels.length })
+        });
+        setModels(result.availableModels.map((id: string) => ({ id })));
+      } else {
+        throw new Error(result.error || t('ai.getModelsError'));
+      }
+    } catch (error: any) {
+      toast({
+        title: t('ai.fetchModelsFailed'),
+        description: error.message || t('ai.networkErrorOrApiUnavailable'),
+        variant: "destructive"
+      });
+      setModels([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [aiFormData, toast]);
+
   // 测试AI配置
   const handleTestAIConfig = useCallback(
-    async (modelType: keyof AIConfig) => {
+    async (modelType: ModelType) => {
       const model = aiFormData[modelType]
       if (!model.name || !model.baseUrl || !model.apiKey) {
         toast({
@@ -468,7 +660,7 @@ function SettingsContent() {
             description: t('ai.modelConnectionOk', { modelType }),
           })
         } else {
-          throw new Error("测试失败")
+          throw new Error(t('ai.testConnectionFailed'))
         }
       } catch (error) {
         toast({
@@ -503,9 +695,9 @@ function SettingsContent() {
             }
           }
 
-          transaction.onerror = () => reject(new Error("无法读取数据"))
+          transaction.onerror = () => reject(new Error(t('data.importErrorDescription')))
         }
-        db.onerror = () => reject(new Error("无法打开数据库"))
+        db.onerror = () => reject(new Error(t('data.importErrorDescription')))
       })
 
       const healthLogs = await request
@@ -568,7 +760,7 @@ function SettingsContent() {
         description: t('data.exportSuccessDescription'),
       })
     } catch (error) {
-      console.error("导出数据失败:", error)
+      console.error("Export data failed:", error)
       toast({
         title: t('data.exportErrorTitle'),
         description: t('data.exportErrorDescription'),
@@ -591,7 +783,7 @@ function SettingsContent() {
 
           // 验证导入的数据格式
           if (!importedData.userProfile || !importedData.healthLogs) {
-            throw new Error("无效的数据格式")
+            throw new Error(t('data.importErrorDescription'))
           }
 
           // 更新用户配置
@@ -651,8 +843,8 @@ function SettingsContent() {
 
                         memoryTransaction.oncomplete = () => {
                           toast({
-                            title: "导入成功",
-                            description: "您的健康数据和AI记忆已成功导入",
+                            title: t('data.importSuccessWithMemoryTitle'),
+                            description: t('data.importSuccessWithMemoryDescription'),
                           })
                         }
                       }
@@ -677,7 +869,7 @@ function SettingsContent() {
                     }
                   }
                 } catch (memoryError) {
-                  console.warn("导入AI记忆失败:", memoryError)
+                  console.warn("Import AI memory failed:", memoryError)
                   toast({
                     title: t('data.partialImportSuccessTitle'),
                     description: t('data.partialImportSuccessDescription'),
@@ -697,11 +889,11 @@ function SettingsContent() {
             }
 
             transaction.onerror = () => {
-              throw new Error("导入数据到数据库失败")
+              throw new Error(t('data.importErrorDescription'))
             }
           }
         } catch (error) {
-          console.error("导入数据失败:", error)
+          console.error("Import data failed:", error)
           toast({
             title: t('data.importErrorTitle'),
             description: t('data.importErrorDescription'),
@@ -724,7 +916,7 @@ function SettingsContent() {
         description: t('data.clearSuccessDescription'),
       })
     } catch (error) {
-      console.error("清除数据失败:", error)
+      console.error("Clear data failed:", error)
       toast({
         title: t('data.clearErrorTitle'),
         description: t('data.clearErrorDescription'),
@@ -735,7 +927,7 @@ function SettingsContent() {
 
   // 渲染模型选择器
   const renderModelSelector = useCallback(
-    (modelType: keyof AIConfig, models: OpenAIModel[], isLoading: boolean) => {
+    (modelType: ModelType, models: OpenAIModel[], isLoading: boolean) => {
       const modelConfig = aiFormData[modelType]
 
       return (
@@ -744,7 +936,7 @@ function SettingsContent() {
             <div className="flex-1">
               <Select
                 value={modelConfig.name}
-                onValueChange={(value) => handleAIConfigChange(modelType, "name", value)}
+                onValueChange={(value) => handleAIConfigUpdate(modelType, { name: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={t('ai.selectModel')} />
@@ -762,13 +954,13 @@ function SettingsContent() {
             <Input
               className="flex-1"
               value={modelConfig.name}
-              onChange={(e) => handleAIConfigChange(modelType, "name", e.target.value)}
+              onChange={(e) => handleAIConfigUpdate(modelType, { name: e.target.value })}
               placeholder={t('ai.modelNamePlaceholder')}
             />
           )}
           <Button
             variant="outline"
-            onClick={() => fetchModels(modelType)}
+            onClick={() => handleFetchModels(modelType)}
             disabled={isLoading || !modelConfig.baseUrl || !modelConfig.apiKey}
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -777,29 +969,58 @@ function SettingsContent() {
         </div>
       )
     },
-    [aiFormData, handleAIConfigChange, fetchModels],
+    [aiFormData, handleAIConfigUpdate, handleFetchModels, t],
   )
 
   return (
-    <div className="container mx-auto py-6 max-w-8xl">
-      <h1 className="text-3xl font-bold mb-6">{t('title')}</h1>
+    <div className="container mx-auto py-6 px-6 md:px-8 lg:px-12 max-w-8xl">
+      <h1 className="text-2xl md:text-3xl font-bold mb-6">{t('title')}</h1>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="profile">{t('tabs.profile')}</TabsTrigger>
-          <TabsTrigger value="goals">{t('tabs.goals')}</TabsTrigger>
-          <TabsTrigger value="ai">{t('tabs.ai')}</TabsTrigger>
-          <TabsTrigger value="data">{t('tabs.data')}</TabsTrigger>
+        {/* 移动端：水平滚动布局 */}
+        <TabsList className="md:hidden flex h-auto p-1 bg-muted rounded-lg overflow-x-auto w-full">
+          <TabsTrigger
+            value="profile"
+            className="flex-shrink-0 text-sm px-3 py-2 whitespace-nowrap"
+          >
+            {t('tabs.profile')}
+          </TabsTrigger>
+          <TabsTrigger
+            value="goals"
+            className="flex-shrink-0 text-sm px-3 py-2 whitespace-nowrap"
+          >
+            {t('tabs.goals')}
+          </TabsTrigger>
+          <TabsTrigger
+            value="ai"
+            className="flex-shrink-0 text-sm px-3 py-2 whitespace-nowrap"
+          >
+            {t('tabs.ai')}
+          </TabsTrigger>
+          <TabsTrigger
+            value="data"
+            className="flex-shrink-0 text-sm px-3 py-2 whitespace-nowrap"
+          >
+            {t('tabs.data')}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* 桌面端：网格布局 */}
+        <TabsList className="hidden md:grid w-full grid-cols-4">
+          <TabsTrigger value="profile" className="text-base px-4">{t('tabs.profile')}</TabsTrigger>
+          <TabsTrigger value="goals" className="text-base px-4">{t('tabs.goals')}</TabsTrigger>
+          <TabsTrigger value="ai" className="text-base px-4">{t('tabs.ai')}</TabsTrigger>
+          <TabsTrigger value="data" className="text-base px-4">{t('tabs.data')}</TabsTrigger>
         </TabsList>
 
         {/* 个人信息 */}
         <TabsContent value="profile">
           <Card>
-            <CardHeader>
+            <CardHeader className="px-4 md:px-6">
               <CardTitle>{t('profile.title')}</CardTitle>
               <CardDescription>{t('profile.description')}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-4 md:px-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="weight">{t('profile.weight')}</Label>
@@ -914,7 +1135,7 @@ function SettingsContent() {
                 </div>
               )}
             </CardContent>
-            <CardFooter>
+            <CardFooter className="px-4 md:px-6">
               <Button onClick={handleSaveProfile}>{t('profile.saveProfile')}</Button>
             </CardFooter>
           </Card>
@@ -923,11 +1144,11 @@ function SettingsContent() {
         {/* 健康目标 */}
         <TabsContent value="goals">
           <Card>
-            <CardHeader>
+            <CardHeader className="px-4 md:px-6">
               <CardTitle>{t('goals.title')}</CardTitle>
               <CardDescription>{t('goals.description')}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-4 md:px-6">
               <div className="space-y-2">
                 <Label htmlFor="goal">{t('goals.goalType')}</Label>
                 <Select value={formData.goal} onValueChange={(value) => handleSelectChange("goal", value)}>
@@ -1045,7 +1266,7 @@ function SettingsContent() {
                 )}
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="px-4 md:px-6">
               <Button onClick={handleSaveProfile}>{t('goals.saveGoals')}</Button>
             </CardFooter>
           </Card>
@@ -1054,133 +1275,265 @@ function SettingsContent() {
         {/* AI 配置 */}
         <TabsContent value="ai">
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* 工作模型/Agents模型 */}
               <Card>
-                <CardHeader>
+                <CardHeader className="px-4 md:px-6">
                   <CardTitle>{t('ai.agentModel')}</CardTitle>
                   <CardDescription>{t('ai.agentModelDescription')}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="agent-base-url">{t('ai.baseUrl')}</Label>
-                      <Input
-                        id="agent-base-url"
-                        value={aiFormData.agentModel.baseUrl}
-                        onChange={(e) => handleAIConfigChange("agentModel", "baseUrl", e.target.value)}
-                        placeholder={t('ai.baseUrlPlaceholder')}
-                      />
+                <CardContent className="space-y-4 px-4 md:px-6">
+                  <RadioGroup
+                    value={aiFormData.agentModel.source}
+                    onValueChange={(value) => handleAIConfigUpdate("agentModel", { source: value as any })}
+                    className="grid grid-cols-2 gap-4"
+                  >
+                    <div>
+                      <RadioGroupItem value="private" id="agent-private" className="peer sr-only" />
+                      <Label htmlFor="agent-private" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                        {t('ai.privateConfig')}
+                      </Label>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="agent-api-key">{t('ai.apiKey')}</Label>
-                      <Input
-                        id="agent-api-key"
-                        type="password"
-                        value={aiFormData.agentModel.apiKey}
-                        onChange={(e) => handleAIConfigChange("agentModel", "apiKey", e.target.value)}
-                        placeholder={t('ai.apiKeyPlaceholder')}
-                      />
+                    <div>
+                      <RadioGroupItem value="shared" id="agent-shared" className="peer sr-only" />
+                      <Label htmlFor="agent-shared" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                        {t('ai.sharedPool')}
+                      </Label>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="agent-model-name">{t('ai.modelName')}</Label>
-                    {renderModelSelector("agentModel", agentModels, loadingAgentModels)}
-                    {agentModels.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">{t('ai.modelsFound', { count: agentModels.length })}</p>
-                    )}
-                  </div>
+                  </RadioGroup>
+
+                  {/* 私有配置UI */}
+                  {aiFormData.agentModel.source === 'private' && (
+                    <div className="space-y-4 pt-4 mt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="agent-base-url">{t('ai.baseUrl')}</Label>
+                          <Input
+                            id="agent-base-url"
+                            value={aiFormData.agentModel.baseUrl}
+                            onChange={(e) => handleAIConfigUpdate("agentModel", { baseUrl: e.target.value })}
+                            placeholder={t('ai.baseUrlPlaceholder')}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="agent-api-key">{t('ai.apiKey')}</Label>
+                          <Input
+                            id="agent-api-key"
+                            type="password"
+                            value={aiFormData.agentModel.apiKey}
+                            onChange={(e) => handleAIConfigUpdate("agentModel", { apiKey: e.target.value })}
+                            placeholder={t('ai.apiKeyPlaceholder')}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="agent-model-name">{t('ai.modelName')}</Label>
+                        {renderModelSelector("agentModel", agentModels, loadingAgentModels)}
+                        {agentModels.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">{t('ai.modelsFound', { count: agentModels.length })}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 共享池配置UI */}
+                  {aiFormData.agentModel.source === 'shared' && (
+                     <SharedPoolConfigurator
+                        modelType="agentModel"
+                        config={aiFormData.agentModel}
+                        publicSharedKeys={publicSharedKeys}
+                        onConfigChange={handleAIConfigUpdate}
+                      />
+                  )}
                 </CardContent>
-                <CardFooter>
-                  <Button variant="outline" onClick={() => handleTestAIConfig("agentModel")}>
-                    {t('ai.testConnection')}
-                  </Button>
+                <CardFooter className="flex justify-between px-4 md:px-6">
+                  {aiFormData.agentModel.source === 'private' && (
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => handleTestAIConfig("agentModel")}>
+                        {t('ai.testConnection')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowDiagnostic(true)}
+                        title={t('ai.networkDiagnostic')}
+                      >
+                        <Network className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </CardFooter>
               </Card>
 
               {/* 对话模型 */}
               <Card>
-                <CardHeader>
+                <CardHeader className="px-4 md:px-6">
                   <CardTitle>{t('ai.chatModel')}</CardTitle>
                   <CardDescription>{t('ai.chatModelDescription')}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="chat-base-url">{t('ai.baseUrl')}</Label>
-                      <Input
-                        id="chat-base-url"
-                        value={aiFormData.chatModel.baseUrl}
-                        onChange={(e) => handleAIConfigChange("chatModel", "baseUrl", e.target.value)}
-                        placeholder={t('ai.baseUrlPlaceholder')}
-                      />
+                <CardContent className="space-y-4 px-4 md:px-6">
+                   <RadioGroup
+                    value={aiFormData.chatModel.source}
+                    onValueChange={(value) => handleAIConfigUpdate("chatModel", { source: value as any })}
+                    className="grid grid-cols-2 gap-4"
+                  >
+                    <div>
+                      <RadioGroupItem value="private" id="chat-private" className="peer sr-only" />
+                      <Label htmlFor="chat-private" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                        {t('ai.privateConfig')}
+                      </Label>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="chat-api-key">{t('ai.apiKey')}</Label>
-                      <Input
-                        id="chat-api-key"
-                        type="password"
-                        value={aiFormData.chatModel.apiKey}
-                        onChange={(e) => handleAIConfigChange("chatModel", "apiKey", e.target.value)}
-                        placeholder={t('ai.apiKeyPlaceholder')}
-                      />
+                    <div>
+                      <RadioGroupItem value="shared" id="chat-shared" className="peer sr-only" />
+                      <Label htmlFor="chat-shared" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                        {t('ai.sharedPool')}
+                      </Label>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="chat-model-name">{t('ai.modelName')}</Label>
-                    {renderModelSelector("chatModel", chatModels, loadingChatModels)}
-                    {chatModels.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">{t('ai.modelsFound', { count: chatModels.length })}</p>
-                    )}
-                  </div>
+                  </RadioGroup>
+
+                  {aiFormData.chatModel.source === 'private' && (
+                    <div className="space-y-4 pt-4 mt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="chat-base-url">{t('ai.baseUrl')}</Label>
+                          <Input
+                            id="chat-base-url"
+                            value={aiFormData.chatModel.baseUrl}
+                            onChange={(e) => handleAIConfigUpdate("chatModel", { baseUrl: e.target.value })}
+                            placeholder={t('ai.baseUrlPlaceholder')}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="chat-api-key">{t('ai.apiKey')}</Label>
+                          <Input
+                            id="chat-api-key"
+                            type="password"
+                            value={aiFormData.chatModel.apiKey}
+                            onChange={(e) => handleAIConfigUpdate("chatModel", { apiKey: e.target.value })}
+                            placeholder={t('ai.apiKeyPlaceholder')}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="chat-model-name">{t('ai.modelName')}</Label>
+                        {renderModelSelector("chatModel", chatModels, loadingChatModels)}
+                        {chatModels.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">{t('ai.modelsFound', { count: chatModels.length })}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {aiFormData.chatModel.source === 'shared' && (
+                     <SharedPoolConfigurator
+                        modelType="chatModel"
+                        config={aiFormData.chatModel}
+                        publicSharedKeys={publicSharedKeys}
+                        onConfigChange={handleAIConfigUpdate}
+                      />
+                  )}
                 </CardContent>
-                <CardFooter>
-                  <Button variant="outline" onClick={() => handleTestAIConfig("chatModel")}>
-                    {t('ai.testConnection')}
-                  </Button>
+                <CardFooter className="flex justify-between px-4 md:px-6">
+                  {aiFormData.chatModel.source === 'private' && (
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => handleTestAIConfig("chatModel")}>
+                        {t('ai.testConnection')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowDiagnostic(true)}
+                        title={t('ai.networkDiagnostic')}
+                      >
+                        <Network className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </CardFooter>
               </Card>
 
               {/* 视觉模型 */}
               <Card>
-                <CardHeader>
+                <CardHeader className="px-4 md:px-6">
                   <CardTitle>{t('ai.visionModel')}</CardTitle>
                   <CardDescription>{t('ai.visionModelDescription')}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="vision-base-url">{t('ai.baseUrl')}</Label>
-                      <Input
-                        id="vision-base-url"
-                        value={aiFormData.visionModel.baseUrl}
-                        onChange={(e) => handleAIConfigChange("visionModel", "baseUrl", e.target.value)}
-                        placeholder={t('ai.baseUrlPlaceholder')}
-                      />
+                <CardContent className="space-y-4 px-4 md:px-6">
+                  <RadioGroup
+                    value={aiFormData.visionModel.source}
+                    onValueChange={(value) => handleAIConfigUpdate("visionModel", { source: value as any })}
+                    className="grid grid-cols-2 gap-4"
+                  >
+                    <div>
+                      <RadioGroupItem value="private" id="vision-private" className="peer sr-only" />
+                      <Label htmlFor="vision-private" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                        {t('ai.privateConfig')}
+                      </Label>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="vision-api-key">{t('ai.apiKey')}</Label>
-                      <Input
-                        id="vision-api-key"
-                        type="password"
-                        value={aiFormData.visionModel.apiKey}
-                        onChange={(e) => handleAIConfigChange("visionModel", "apiKey", e.target.value)}
-                        placeholder={t('ai.apiKeyPlaceholder')}
-                      />
+                    <div>
+                      <RadioGroupItem value="shared" id="vision-shared" className="peer sr-only" />
+                      <Label htmlFor="vision-shared" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                        {t('ai.sharedPool')}
+                      </Label>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vision-model-name">{t('ai.modelName')}</Label>
-                    {renderModelSelector("visionModel", visionModels, loadingVisionModels)}
-                    {visionModels.length > 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">{t('ai.modelsFound', { count: visionModels.length })}</p>
-                    )}
-                  </div>
+                  </RadioGroup>
+
+                  {aiFormData.visionModel.source === 'private' && (
+                    <div className="space-y-4 pt-4 mt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="vision-base-url">{t('ai.baseUrl')}</Label>
+                          <Input
+                            id="vision-base-url"
+                            value={aiFormData.visionModel.baseUrl}
+                            onChange={(e) => handleAIConfigUpdate("visionModel", { baseUrl: e.target.value })}
+                            placeholder={t('ai.baseUrlPlaceholder')}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="vision-api-key">{t('ai.apiKey')}</Label>
+                          <Input
+                            id="vision-api-key"
+                            type="password"
+                            value={aiFormData.visionModel.apiKey}
+                            onChange={(e) => handleAIConfigUpdate("visionModel", { apiKey: e.target.value })}
+                            placeholder={t('ai.apiKeyPlaceholder')}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vision-model-name">{t('ai.modelName')}</Label>
+                        {renderModelSelector("visionModel", visionModels, loadingVisionModels)}
+                        {visionModels.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">{t('ai.modelsFound', { count: visionModels.length })}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {aiFormData.visionModel.source === 'shared' && (
+                     <SharedPoolConfigurator
+                        modelType="visionModel"
+                        config={aiFormData.visionModel}
+                        publicSharedKeys={publicSharedKeys}
+                        onConfigChange={handleAIConfigUpdate}
+                      />
+                  )}
                 </CardContent>
-                <CardFooter>
-                  <Button variant="outline" onClick={() => handleTestAIConfig("visionModel")}>
-                    {t('ai.testConnection')}
-                  </Button>
+                <CardFooter className="flex justify-between px-4 md:px-6">
+                  {aiFormData.visionModel.source === 'private' && (
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => handleTestAIConfig("visionModel")}>
+                        {t('ai.testConnection')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowDiagnostic(true)}
+                        title={t('ai.networkDiagnostic')}
+                      >
+                        <Network className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </CardFooter>
               </Card>
             </div>
@@ -1252,12 +1605,12 @@ function SettingsContent() {
                                 <div className="text-xs text-muted-foreground">
                                   {(editingMemories[expertId] || "").length > 400 && (
                                     <span className="text-amber-600">
-                                      即将达到上限
+                                      {t('data.approachingLimit')}
                                     </span>
                                   )}
                                   {hasUnsavedChanges(expertId) && (
                                     <span className="text-amber-600">
-                                      3秒后自动保存
+                                      {t('data.autoSaveIn3Seconds')}
                                     </span>
                                   )}
                                 </div>
@@ -1285,7 +1638,7 @@ function SettingsContent() {
                                         }))
                                         toast({
                                           title: t('ai.memoryManagement.allMemoriesCleared'),
-                                          description: `${getExpertName(expertId)}的记忆已清空`,
+                                          description: t('ai.expertMemoryCleared', { expertName: getExpertName(expertId) }),
                                         })
                                       }).catch((error) => {
                                         toast({
@@ -1358,11 +1711,192 @@ function SettingsContent() {
         {/* 数据管理 */}
         <TabsContent value="data">
           <Card>
-            <CardHeader>
+            <CardHeader className="px-4 md:px-6">
               <CardTitle>{t('data.title')}</CardTitle>
               <CardDescription>{t('data.description')}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 px-4 md:px-6">
+              {/* 云同步功能 - 现代化设计 */}
+              <div className="health-card p-6 space-y-6">
+                {/* 标题区域 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                      <RefreshCw className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">{t('data.cloudSync')}</h3>
+                      <p className="text-sm text-muted-foreground">{t('data.crossDeviceSync')}</p>
+                    </div>
+                  </div>
+                  {lastSynced && (
+                    <div className="text-right">
+                      <div className="text-xs text-muted-foreground">{t('data.lastSync')}</div>
+                      <div className="text-sm font-medium">{lastSynced.toLocaleString('zh-CN', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 同步进度指示器 */}
+                {isSyncing && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                      <span>{t('data.syncingData')}</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{t('data.healthLogs')}</span>
+                        <span>{syncProgress.logs ? '✓' : '⏳'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{t('data.aiMemories')}</span>
+                        <span>{syncProgress.memories ? '✓' : '⏳'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{t('data.userProfile')}</span>
+                        <span>{syncProgress.profile ? '✓' : '⏳'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 主要操作按钮 */}
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => syncAll(true)}
+                    disabled={isSyncing}
+                    className="flex-1 h-11 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                  >
+                    {isSyncing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        {t('data.syncing')}
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        {t('data.syncNow')}
+                      </>
+                    )}
+                  </Button>
+
+                  {/* 高级选项按钮 */}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                    className={`h-11 w-11 transition-all duration-200 ${showAdvancedOptions ? 'bg-accent' : ''}`}
+                  >
+                    <svg
+                      className={`w-4 h-4 transition-transform duration-200 ${showAdvancedOptions ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </Button>
+                </div>
+
+                {/* 高级选项面板 */}
+                {showAdvancedOptions && (
+                  <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-medium mb-3 text-muted-foreground">{t('data.categorizedSync')}</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={pullMemories}
+                          disabled={isSyncing}
+                          className="text-xs h-9"
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          {t('data.pullMemories')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={pushMemories}
+                          disabled={isSyncing}
+                          className="text-xs h-9"
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          {t('data.pushMemories')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={pullProfile}
+                          disabled={isSyncing}
+                          className="text-xs h-9"
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          {t('data.pullProfile')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={pushProfile}
+                          disabled={isSyncing}
+                          className="text-xs h-9"
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          {t('data.pushProfile')}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 开发者选项 */}
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-medium mb-3 text-muted-foreground">{t('data.developerOptions')}</h4>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearThrottleState}
+                        className="text-xs h-9"
+                      >
+                        <Settings className="h-3 w-3 mr-1" />
+                        {t('data.clearThrottleState')}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {t('data.clearThrottleDescription')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 状态指示器 */}
+                {!isSyncing && (
+                  <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      {lastSynced ? (
+                        <>
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-sm text-muted-foreground">{t('data.dataSynced')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                          <span className="text-sm text-muted-foreground">{t('data.notSyncedYet')}</span>
+                        </>
+                      )}
+                    </div>
+                    {!shouldAutoSync() && (
+                      <div className="text-xs text-muted-foreground">
+                        {t('data.throttlingMinutes', { minutes: SYNC_THROTTLE_MINUTES })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <h3 className="text-lg font-medium">{t('data.exportData')}</h3>
                 <p className="text-sm text-muted-foreground">{t('data.exportDescription')}</p>
@@ -1431,13 +1965,28 @@ function SettingsContent() {
 
           <div>
             <h3 className="text-lg font-medium">{t('about.usageTitle')}</h3>
-            <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
-              <li>{t('about.usage1')}</li>
-              <li>{t('about.usage2')}</li>
-              <li>{t('about.usage3')}</li>
-              <li>{t('about.usage4')}</li>
-              <li>{t('about.usage5')}</li>
-            </ul>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {t('about.quotaInfo')}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t('about.modelOptions')}
+              </p>
+              <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+                <li>{t('about.usage1')}</li>
+                <li>{t('about.usage2')}</li>
+                <li>{t('about.usage3')}</li>
+                <li>{t('about.usage4')}</li>
+                <li>{t('about.usage5')}</li>
+              </ul>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-medium">{t('about.dataBackupTitle')}</h3>
+            <p className="text-sm text-muted-foreground">
+              {t('about.dataBackupDescription')}
+            </p>
           </div>
 
           <div>
@@ -1446,20 +1995,24 @@ function SettingsContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 网络诊断对话框 */}
+      {showDiagnostic && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <NetworkDiagnostic
+            baseUrl={aiFormData.agentModel.baseUrl}
+            apiKey={aiFormData.agentModel.apiKey}
+            onClose={() => setShowDiagnostic(false)}
+          />
+        </div>
+      )}
     </div>
   )
 }
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<div className="container mx-auto py-6 max-w-8xl">
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">加载设置...</p>
-        </div>
-      </div>
-    </div>}>
+    <Suspense fallback={<LoadingFallback />}>
       <SettingsContent />
     </Suspense>
   )

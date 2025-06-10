@@ -9,10 +9,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const userId = session.user.id;
 
-    console.log(`[API/SYNC/GET] Fetching logs for user: ${userId}`);
+
 
     const { data, error } = await supabase
       .from('daily_logs')
@@ -20,7 +20,6 @@ export async function GET(request: Request) {
       .eq('user_id', userId);
 
     if (error) {
-      console.error('[API/SYNC/GET] Supabase error:', error);
       throw error;
     }
 
@@ -40,7 +39,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const userId = session.user.id;
     const logsToSync = await request.json();
 
@@ -50,27 +49,37 @@ export async function POST(request: Request) {
 
     console.log(`[API/SYNC/POST] Attempting to upsert ${logsToSync.length} logs for user: ${userId}`);
 
-    // 为每条日志添加/覆盖 user_id
-    const dataToUpsert = logsToSync.map(log => ({
-      ...log,
-      user_id: userId,
-    }));
-
-    const { data, error } = await supabase
-      .from('daily_logs')
-      .upsert(dataToUpsert, {
-        onConflict: 'user_id, date', // 当 user_id 和 date 冲突时，执行更新
-      })
-      .select();
-
-    if (error) {
-      console.error('[API/SYNC/POST] Supabase upsert error:', error);
-      throw error;
+    const errors = [];
+    for (const log of logsToSync) {
+      // 检查是补丁更新还是完整更新
+      if (log.log_data_patch) {
+        // 调用RPC函数处理补丁
+        const { error: rpcError } = await supabase.rpc('upsert_log_patch', {
+          p_user_id: userId,
+          p_date: log.date,
+          p_log_data_patch: log.log_data_patch,
+          p_last_modified: log.last_modified,
+          p_based_on_modified: log.based_on_modified || null, // 新增参数
+        });
+        if (rpcError) errors.push(rpcError);
+      } else {
+        // 处理完整的日志对象（保持旧的逻辑作为备用）
+        const { error: upsertError } = await supabase
+          .from('daily_logs')
+          .upsert({ ...log, user_id: userId }, { onConflict: 'user_id, date' });
+        if (upsertError) errors.push(upsertError);
+      }
     }
 
-    console.log(`[API/SYNC/POST] Successfully upserted ${data.length} logs for user: ${userId}`);
+    if (errors.length > 0) {
+      console.error('[API/SYNC/POST] Supabase errors occurred during sync:', errors);
+      // 将第一个错误信息抛出，也可以选择更复杂的错误处理
+      throw errors[0];
+    }
 
-    return NextResponse.json({ message: 'Sync successful', count: data.length });
+    console.log(`[API/SYNC/POST] Successfully processed ${logsToSync.length} logs for user: ${userId}`);
+
+    return NextResponse.json({ message: 'Sync successful', count: logsToSync.length });
   } catch (error: any) {
     console.error('[API/SYNC/POST] An unexpected error occurred:', error);
     const errorMessage = error.message || 'An unexpected error occurred.';

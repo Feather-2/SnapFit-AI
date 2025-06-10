@@ -356,7 +356,7 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                       <XAxis
                         dataKey="date"
                         tick={{
-                          fontSize: 11,
+                          fontSize: window.innerWidth < 768 ? 9 : 11,
                           angle: dateRange === '90d' ? -90 : -45,
                           textAnchor: 'end'
                         }}
@@ -367,7 +367,7 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                         tickFormatter={formatXAxisLabel}
                       />
                       <YAxis
-                        tick={{ fontSize: 12 }}
+                        tick={{ fontSize: window.innerWidth < 768 ? 10 : 12 }}
                         tickLine={{ stroke: '#e2e8f0' }}
                         domain={[(dataMin: number) => Math.max(0, dataMin - 2), (dataMax: number) => dataMax + 2]}
                       />

@@ -123,6 +123,23 @@
       0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 
+  /* 移动端优化 */
+  @media (max-width: 768px) {
+    .health-card {
+      @apply rounded-xl;
+      box-shadow:
+        0 2px 4px -1px rgba(0, 0, 0, 0.1),
+        0 1px 2px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .health-card:hover {
+      box-shadow:
+        0 4px 6px -1px rgba(0, 0, 0, 0.1),
+        0 2px 4px -1px rgba(0, 0, 0, 0.06),
+        0 0 10px rgba(16, 185, 129, 0.1);
+    }
+  }
+
   .dark .health-card:hover {
     box-shadow:
       0 10px 15px -3px rgba(0, 0, 0, 0.4),
@@ -185,6 +202,30 @@
 
   .health-warning {
     @apply text-amber-500 dark:text-amber-400;
+  }
+
+  /* 移动端触摸优化 */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  /* 移动端特定样式 */
+  @media (max-width: 768px) {
+    .mobile-compact {
+      @apply text-sm leading-tight;
+    }
+
+    .mobile-button {
+      @apply min-h-[44px] px-4 text-sm;
+    }
+
+    .mobile-input {
+      @apply h-11 text-base;
+    }
+
+    .mobile-card-padding {
+      @apply p-4;
+    }
   }
 }
 
@@ -283,6 +324,18 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   @apply bg-slate-300 dark:bg-slate-600 rounded-full hover:bg-slate-400 dark:hover:bg-slate-500;
+}
+
+/* 移动端滚动条优化 */
+@media (max-width: 768px) {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
 }
 
 /* 日历记录指示器样式 */

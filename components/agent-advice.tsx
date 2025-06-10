@@ -1,50 +1,62 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { RefreshCw } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
+import { useUsageLimit } from "@/hooks/use-usage-limit"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { cn } from "@/lib/utils"
 import type { DailyLog, AIConfig } from "@/lib/types"
+import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useAgentAI } from "@/hooks/use-ai-service"
 
 interface AgentAdviceProps {
   dailyLog: DailyLog
   userProfile: any
-  aiConfig: AIConfig
 }
 
-const defaultAIConfigFromParent: AIConfig = {
-  agentModel: { name: "gpt-4o", baseUrl: "https://api.openai.com", apiKey: "" },
-  chatModel: { name: "gpt-4o", baseUrl: "https://api.openai.com", apiKey: "" },
-  visionModel: { name: "gpt-4o", baseUrl: "https://api.openai.com", apiKey: "" },
-};
+export function AgentAdvice({ dailyLog, userProfile }: AgentAdviceProps) {
+  // 获取AI配置
+  const [aiConfig] = useLocalStorage<AIConfig>("aiConfig", {
+    agentModel: {
+      name: "gpt-4o",
+      baseUrl: "https://api.openai.com",
+      apiKey: "",
+      source: "shared", // 默认使用共享模型
+    },
+    chatModel: {
+      name: "gpt-4o",
+      baseUrl: "https://api.openai.com",
+      apiKey: "",
+      source: "shared", // 默认使用共享模型
+    },
+    visionModel: {
+      name: "gpt-4o",
+      baseUrl: "https://api.openai.com",
+      apiKey: "",
+      source: "shared", // 默认使用共享模型
+    },
+    sharedKey: {
+      selectedKeyIds: [],
+    },
+  })
 
-export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProps) {
+  // 使用新的AI服务Hook
+  const aiService = useAgentAI(aiConfig)
+
   const [advice, setAdvice] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const { toast } = useToast()
+  const { refreshUsageInfo } = useUsageLimit()
   const abortControllerRef = useRef<AbortController | null>(null)
-  const [isClient, setIsClient] = useState(false)
 
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
 
-  const isAiReady = useMemo(() => {
-    const configToUse = isClient ? aiConfig : defaultAIConfigFromParent
-    const model = configToUse.agentModel
-    return !!(model && model.name && model.baseUrl && model.apiKey)
-  }, [isClient, aiConfig])
+
 
   const fetchAdvice = useCallback(async () => {
-    if (!isAiReady) {
-      setAdvice("请先在设置页面配置 AI 模型以获取个性化建议。")
-      return
-    }
-
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
@@ -55,46 +67,87 @@ export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProp
     setAdvice("")
 
     try {
-      const response = await fetch("/api/openai/advice-stream", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-ai-config": JSON.stringify(aiConfig),
-        },
-        body: JSON.stringify({
-          dailyLog,
-          userProfile,
-        }),
-        signal: abortControllerRef.current.signal,
-      })
-      
-      if (!response.ok) {
-        throw new Error(`获取建议失败: ${response.statusText || response.status}`)
+      // 检查配置是否有效
+      if (!aiService.isConfigValid) {
+        throw new Error(aiService.configError || '配置无效')
       }
-      if (!response.body) {
-        throw new Error("响应体为空")
-      }
-      
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          
-          const chunk = decoder.decode(value, { stream: true })
-          setAdvice((prev) => prev + chunk)
+
+      // 构建提示词
+      const prompt = `
+        用户档案:
+        年龄: ${userProfile.age || '未知'}
+        性别: ${userProfile.gender || '未知'}
+        身高: ${userProfile.height || '未知'}cm
+        体重: ${userProfile.weight || '未知'}kg
+        健康目标: ${userProfile.goal || '未知'}
+
+        今日数据:
+        食物记录:
+        ${dailyLog.foodEntries
+          .map(
+            (entry) =>
+              `- ${entry.food_name}: ${entry.total_nutritional_info_consumed?.calories?.toFixed(0) || 0} kcal`,
+          )
+          .join("\n")}
+
+        运动记录:
+        ${dailyLog.exerciseEntries
+          .map(
+            (entry) =>
+              `- ${entry.exercise_name} (${entry.duration_minutes}分钟): ${entry.calories_burned_estimated.toFixed(
+                0,
+              )} kcal`,
+          )
+          .join("\n")}
+
+        请提供个性化、可操作的健康建议，包括饮食和运动方面的具体建议。建议应该是积极、鼓励性的，并且与用户的健康目标相符。
+        请用中文回答，不超过300字，不需要分段，直接给出建议内容。
+      `
+
+      if (aiService.isPrivateMode) {
+        // 私有模式：使用前端直接调用（非流式）
+        const { text, source } = await aiService.generateText({ prompt })
+        setAdvice(text)
+        console.log(`[AgentAdvice] Generated advice using ${source} mode`)
+      } else {
+        // 共享模式：使用流式API
+        const { stream, source } = await aiService.streamText({
+          messages: [{ role: "user", content: prompt }]
+        })
+
+        if (!stream.body) {
+          throw new Error("响应体为空")
         }
-      } finally {
-        reader.releaseLock()
-        setIsStreaming(false)
+
+        const reader = stream.body.getReader()
+        const decoder = new TextDecoder('utf-8')
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = decoder.decode(value, { stream: true })
+            setAdvice((prev) => prev + chunk)
+          }
+        } finally {
+          reader.releaseLock()
+          console.log(`[AgentAdvice] Generated advice using ${source} mode`)
+        }
+      }
+
+      setIsStreaming(false)
+
+      // 🔄 只有共享模式才需要刷新使用量信息
+      if (!aiService.isPrivateMode) {
+        console.log('[AgentAdvice] Refreshing usage info after successful advice generation')
+        refreshUsageInfo()
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         return
       }
-      
+
       toast({
         title: "获取建议失败",
         description: error instanceof Error ? error.message : "无法获取个性化建议，请稍后重试",
@@ -105,7 +158,7 @@ export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProp
       setIsLoading(false)
       setIsStreaming(false)
     }
-  }, [isAiReady, aiConfig, dailyLog, userProfile, toast])
+  }, [dailyLog, userProfile, aiService, toast, refreshUsageInfo])
 
   useEffect(() => {
     return () => {
@@ -132,7 +185,7 @@ export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProp
             variant="outline"
             size="lg"
             onClick={fetchAdvice}
-            disabled={!isAiReady || isLoading}
+            disabled={isLoading}
             className={cn("h-12 px-6", isLoading && "animate-spin")}
           >
             <RefreshCw className="mr-2 h-5 w-5" />
@@ -157,9 +210,7 @@ export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProp
           ) : (
             <div className="text-center py-16">
               <p className="text-lg text-muted-foreground">
-                {isAiReady
-                  ? "点击获取建议按钮，AI 将为您提供个性化的健康建议"
-                  : "请先在设置页面配置 AI 模型以获取个性化建议"}
+                点击获取建议按钮，AI 将为您提供个性化的健康建议
               </p>
             </div>
           )}

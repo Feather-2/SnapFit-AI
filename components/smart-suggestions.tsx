@@ -5,11 +5,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useTranslation } from "@/hooks/use-i18n"
-import { 
-  Brain, 
-  ChevronDown, 
-  ChevronUp, 
-  RefreshCw, 
+import {
+  Brain,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
   Sparkles,
   AlertCircle,
   CheckCircle2,
@@ -87,6 +87,14 @@ export function SmartSuggestions({ suggestions, isLoading, onRefresh, currentDat
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  // 当建议数据更新时，自动展开所有分类
+  useEffect(() => {
+    if (suggestions && suggestions.suggestions.length > 0) {
+      const allKeys = new Set(suggestions.suggestions.map(category => category.key))
+      setExpandedCategories(allKeys)
+    }
+  }, [suggestions])
 
   const toggleCategory = (key: string) => {
     const newExpanded = new Set(expandedCategories)
@@ -228,6 +236,7 @@ export function SmartSuggestions({ suggestions, isLoading, onRefresh, currentDat
               key={category.key}
               open={expandedCategories.has(category.key)}
               onOpenChange={() => toggleCategory(category.key)}
+              defaultOpen={true}
             >
               <CollapsibleTrigger asChild>
                 <Button
@@ -314,7 +323,7 @@ export function SmartSuggestions({ suggestions, isLoading, onRefresh, currentDat
 
         {suggestions.generatedAt && (
           <div className="mt-3 pt-2 border-t text-xs text-muted-foreground text-center">
-            生成时间: {new Date(suggestions.generatedAt).toLocaleString('zh-CN')}
+            {t('generatedTime')}: {new Date(suggestions.generatedAt).toLocaleString()}
           </div>
         )}
       </CardContent>

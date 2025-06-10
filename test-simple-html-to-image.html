@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单html-to-image测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .test-element {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 400px;
+            margin: 20px auto;
+        }
+        
+        button {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        
+        button:hover {
+            background: #047857;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background: #e5e7eb;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>html-to-image 简单测试</h1>
+    
+    <div id="test-element" class="test-element">
+        <h2>测试内容</h2>
+        <p>这是一个简单的测试元素，用来验证html-to-image是否能正常工作。</p>
+        <div style="display: flex; justify-content: space-between;">
+            <span>左侧文本</span>
+            <span style="color: #059669; font-weight: bold;">右侧文本</span>
+        </div>
+    </div>
+    
+    <div style="text-align: center;">
+        <button onclick="testHtmlToImage()">测试 html-to-image</button>
+        <button onclick="testHtml2Canvas()">测试 html2canvas</button>
+    </div>
+    
+    <div id="result" class="result" style="display: none;">
+        <h3>测试结果：</h3>
+        <div id="result-content"></div>
+    </div>
+
+    <!-- 加载库 -->
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    
+    <script>
+        function showResult(message, success = true) {
+            const resultDiv = document.getElementById('result');
+            const contentDiv = document.getElementById('result-content');
+            
+            resultDiv.style.display = 'block';
+            contentDiv.innerHTML = `
+                <p style="color: ${success ? '#059669' : '#dc2626'};">
+                    ${message}
+                </p>
+            `;
+        }
+        
+        async function testHtmlToImage() {
+            const element = document.getElementById('test-element');
+            
+            try {
+                console.log('html-to-image 全局对象:', window.htmlToImage);
+                
+                if (!window.htmlToImage) {
+                    throw new Error('html-to-image 库未加载');
+                }
+                
+                const dataUrl = await window.htmlToImage.toPng(element, {
+                    backgroundColor: '#ffffff',
+                    pixelRatio: 2,
+                    cacheBust: true
+                });
+                
+                // 创建图片预览
+                const img = document.createElement('img');
+                img.src = dataUrl;
+                img.style.maxWidth = '100%';
+                img.style.border = '1px solid #ccc';
+                img.style.marginTop = '10px';
+                
+                showResult('html-to-image 测试成功！');
+                document.getElementById('result-content').appendChild(img);
+                
+                // 提供下载
+                const link = document.createElement('a');
+                link.download = 'html-to-image-test.png';
+                link.href = dataUrl;
+                link.textContent = '下载图片';
+                link.style.display = 'block';
+                link.style.marginTop = '10px';
+                document.getElementById('result-content').appendChild(link);
+                
+            } catch (error) {
+                console.error('html-to-image 测试失败:', error);
+                showResult(`html-to-image 测试失败: ${error.message}`, false);
+            }
+        }
+        
+        async function testHtml2Canvas() {
+            const element = document.getElementById('test-element');
+            
+            try {
+                console.log('html2canvas 全局对象:', window.html2canvas);
+                
+                if (!window.html2canvas) {
+                    throw new Error('html2canvas 库未加载');
+                }
+                
+                const canvas = await window.html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                const dataUrl = canvas.toDataURL('image/png');
+                
+                // 创建图片预览
+                const img = document.createElement('img');
+                img.src = dataUrl;
+                img.style.maxWidth = '100%';
+                img.style.border = '1px solid #ccc';
+                img.style.marginTop = '10px';
+                
+                showResult('html2canvas 测试成功！');
+                document.getElementById('result-content').appendChild(img);
+                
+                // 提供下载
+                const link = document.createElement('a');
+                link.download = 'html2canvas-test.png';
+                link.href = dataUrl;
+                link.textContent = '下载图片';
+                link.style.display = 'block';
+                link.style.marginTop = '10px';
+                document.getElementById('result-content').appendChild(link);
+                
+            } catch (error) {
+                console.error('html2canvas 测试失败:', error);
+                showResult(`html2canvas 测试失败: ${error.message}`, false);
+            }
+        }
+        
+        // 页面加载完成后检查库是否正确加载
+        window.addEventListener('load', () => {
+            console.log('页面加载完成');
+            console.log('html-to-image 可用:', !!window.htmlToImage);
+            console.log('html2canvas 可用:', !!window.html2canvas);
+            
+            if (window.htmlToImage) {
+                console.log('html-to-image 方法:', Object.keys(window.htmlToImage));
+            }
+        });
+    </script>
+</body>
+</html>

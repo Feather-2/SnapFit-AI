@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useIndexedDB } from "./use-indexed-db"
+import { useAIMemorySync } from "./use-ai-memory-sync"
 import type { AIMemory, AIMemoryUpdateRequest } from "@/lib/types"
 
 interface AIMemoryHook {
@@ -18,8 +19,9 @@ export function useAIMemory(): AIMemoryHook {
   const [memories, setMemories] = useState<Record<string, AIMemory>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
-  
+
   const { getData, saveData, deleteData, clearAllData } = useIndexedDB("aiMemories")
+  const { syncSingleMemory } = useAIMemorySync()
 
   // 加载所有记忆
   const loadMemories = useCallback(async () => {
@@ -119,19 +121,31 @@ export function useAIMemory(): AIMemoryHook {
         version: existingMemory ? existingMemory.version + 1 : 1
       }
 
+      // 先保存到本地
       await saveData(request.expertId, newMemory)
 
+      // 更新本地状态
       setMemories(prev => ({
         ...prev,
         [request.expertId]: newMemory
       }))
+
+      // 异步同步到云端（不阻塞用户操作）
+      try {
+        await syncSingleMemory(request.expertId, newMemory)
+        console.log(`[AIMemory] Successfully synced memory for expert: ${request.expertId}`)
+      } catch (syncError) {
+        console.warn(`[AIMemory] Failed to sync memory for expert ${request.expertId}:`, syncError)
+        // 同步失败不影响本地操作，只记录警告
+      }
+
     } catch (err) {
       setError(err instanceof Error ? err : new Error("更新AI记忆失败"))
       throw err
     } finally {
       setIsLoading(false)
     }
-  }, [memories, saveData])
+  }, [memories, saveData, syncSingleMemory])
 
   // 清空特定专家的记忆
   const clearMemory = useCallback(async (expertId: string) => {
@@ -140,7 +154,7 @@ export function useAIMemory(): AIMemoryHook {
       setError(null)
 
       await deleteData(expertId)
-      
+
       setMemories(prev => {
         const newMemories = { ...prev }
         delete newMemories[expertId]

@@ -35,6 +35,7 @@ export interface ExerciseEntry {
   exercise_name: string
   exercise_type: "cardio" | "strength" | "flexibility" | "other"
   duration_minutes: number
+  time_period?: string // 时间段：morning, noon, afternoon, evening
   distance_km?: number // 适用于有氧运动
   sets?: number // 适用于力量训练
   reps?: number // 适用于力量训练
@@ -118,6 +119,8 @@ export interface DailyLog {
   tefAnalysis?: TEFAnalysis // 新增：TEF分析结果
   dailyStatus?: DailyStatus // 新增：每日状态记录
   last_modified?: string // ISO 8601 格式的日期时间字符串，用于同步
+  deletedFoodIds?: string[] // 新增：已删除的食物条目ID列表（逻辑删除）
+  deletedExerciseIds?: string[] // 新增：已删除的运动条目ID列表（逻辑删除）
 }
 
 // 用户配置类型
@@ -146,13 +149,22 @@ export interface ModelConfig {
   name: string
   baseUrl: string
   apiKey: string
+  source: 'private' | 'shared'; // 新增：数据源选择
+  sharedKeyConfig?: {
+    mode: 'auto' | 'manual';
+    selectedModel?: string;
+    selectedKeyIds?: string[];
+  }
 }
 
 // AI 配置类型
 export interface AIConfig {
-  agentModel: ModelConfig // 工作模型/Agents模型
-  chatModel: ModelConfig // 对话模型
-  visionModel: ModelConfig // 视觉模型
+  agentModel: ModelConfig
+  chatModel: ModelConfig
+  visionModel: ModelConfig
+  sharedKey: {
+    selectedKeyIds: string[];
+  }
 }
 
 // AI助手记忆类型
@@ -170,12 +182,13 @@ export interface AIMemoryUpdateRequest {
   reason?: string // 更新原因
 }
 
-// 扩展的消息类型，支持思考过程
+// 扩展的消息类型，支持思考过程和图片
 export interface ExtendedMessage {
   id: string
   role: "user" | "assistant" | "system"
   content: string
   reasoning_content?: string // 思考过程内容
+  images?: string[] // 图片数据URI数组
   timestamp?: string
 }
 
@@ -186,7 +199,7 @@ export interface SharedKeyConfig {
   name: string
   baseUrl: string
   apiKey: string
-  modelName: string
+  availableModels: string[]
   dailyLimit: number
   description?: string
   tags: string[]
@@ -267,4 +280,8 @@ export interface UserAuth {
   email?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface AppState {
+  // ... existing code ...
 }

@@ -20,8 +20,14 @@ export interface Database {
           id: string
           linux_do_id: string | null
           username: string | null
+          display_name: string | null
           avatar_url: string | null
           email: string | null
+          trust_level: number
+          is_active: boolean
+          is_silenced: boolean
+          last_login_at: string | null
+          login_count: number
           created_at: string
           updated_at: string
         }
@@ -29,8 +35,14 @@ export interface Database {
           id?: string
           linux_do_id?: string | null
           username?: string | null
+          display_name?: string | null
           avatar_url?: string | null
           email?: string | null
+          trust_level?: number
+          is_active?: boolean
+          is_silenced?: boolean
+          last_login_at?: string | null
+          login_count?: number
           created_at?: string
           updated_at?: string
         }
@@ -38,8 +50,14 @@ export interface Database {
           id?: string
           linux_do_id?: string | null
           username?: string | null
+          display_name?: string | null
           avatar_url?: string | null
           email?: string | null
+          trust_level?: number
+          is_active?: boolean
+          is_silenced?: boolean
+          last_login_at?: string | null
+          login_count?: number
           created_at?: string
           updated_at?: string
         }
@@ -110,7 +128,7 @@ export interface Database {
           name: string
           base_url: string
           api_key_encrypted: string
-          model_name: string
+          available_models: string[]
           daily_limit: number
           description: string | null
           tags: string[] | null
@@ -127,7 +145,7 @@ export interface Database {
           name: string
           base_url: string
           api_key_encrypted: string
-          model_name: string
+          available_models: string[]
           daily_limit?: number
           description?: string | null
           tags?: string[] | null
@@ -144,7 +162,7 @@ export interface Database {
           name?: string
           base_url?: string
           api_key_encrypted?: string
-          model_name?: string
+          available_models?: string[]
           daily_limit?: number
           description?: string | null
           tags?: string[] | null
@@ -233,6 +251,35 @@ export interface Database {
           is_public?: boolean
           created_at?: string
           updated_at?: string
+        }
+      }
+      ai_memories: {
+        Row: {
+          id: string
+          user_id: string
+          expert_id: string
+          content: string
+          version: number
+          last_updated: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          expert_id: string
+          content: string
+          version?: number
+          last_updated?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          expert_id?: string
+          content?: string
+          version?: number
+          last_updated?: string
+          created_at?: string
         }
       }
       snapshot_ratings: {

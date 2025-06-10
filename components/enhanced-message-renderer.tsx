@@ -12,6 +12,7 @@ interface EnhancedMessageRendererProps {
   className?: string
   isMobile?: boolean
   isStreaming?: boolean // 新增：是否正在流式传输
+  isExportMode?: boolean // 新增：是否为导出模式
   onMemoryUpdateRequest?: (request: { newContent: string; reason: string }) => void // 记忆更新回调
 }
 
@@ -21,10 +22,26 @@ export function EnhancedMessageRenderer({
   className,
   isMobile = false,
   isStreaming = false,
+  isExportMode = false,
   onMemoryUpdateRequest
 }: EnhancedMessageRendererProps) {
-  const [showReasoning, setShowReasoning] = useState(false)
-  const [showMemoryRequest, setShowMemoryRequest] = useState(true) // 默认展开记忆更新请求
+  // 根据导出模式和内容类型设置默认展开状态
+  const [showReasoning, setShowReasoning] = useState(() => {
+    if (isExportMode) {
+      // 导出模式下：如果有思考过程，默认展开
+      return !!(content.includes('<think>') || content.includes('[思考过程]') || reasoningContent)
+    }
+    return false
+  })
+
+  const [showMemoryRequest, setShowMemoryRequest] = useState(() => {
+    if (isExportMode) {
+      // 导出模式下：AI记忆更新请求默认不展开
+      return false
+    }
+    return true // 正常模式下默认展开记忆更新请求
+  })
+
   const [editableMemoryContent, setEditableMemoryContent] = useState("")
   const [editableMemoryReason, setEditableMemoryReason] = useState("")
   const [isEditing, setIsEditing] = useState(false)
@@ -53,11 +70,26 @@ export function EnhancedMessageRenderer({
     if (memoryMatch) {
       hasCompleteMemoryRequest = content.includes("[/MEMORY_UPDATE_REQUEST]")
 
-      if (memoryContentMatch && hasCompleteMemoryRequest) {
+      // 尝试解析记忆内容，无论是否完成
+      if (memoryContentMatch) {
         const [, newContent, reason] = memoryContentMatch
         memoryRequest = {
           newContent: newContent?.trim() || "",
           reason: reason?.trim() || ""
+        }
+      } else {
+        // 如果没有找到完整的记忆内容格式，尝试提取部分内容
+        const partialContentMatch = content.match(/\[MEMORY_UPDATE_REQUEST\]([\s\S]*?)(?:\[\/MEMORY_UPDATE_REQUEST\]|$)/i)
+        if (partialContentMatch) {
+          const partialContent = partialContentMatch[1].trim()
+          // 尝试提取新内容和原因的部分信息
+          const newContentMatch = partialContent.match(/新内容[：:]\s*([\s\S]*?)(?=\n原因[：:]|$)/i)
+          const reasonMatch = partialContent.match(/原因[：:]\s*([\s\S]*?)$/i)
+
+          memoryRequest = {
+            newContent: newContentMatch ? newContentMatch[1].trim() : partialContent,
+            reason: reasonMatch ? reasonMatch[1].trim() : ""
+          }
         }
       }
 
@@ -148,18 +180,18 @@ export function EnhancedMessageRenderer({
       // 如果不是JSON，尝试解析特殊标记格式
       const reasoningMatch = rawContent.match(/\[REASONING\]([\s\S]*?)\[\/REASONING\]/i)
       const contentMatch = rawContent.match(/\[CONTENT\]([\s\S]*?)\[\/CONTENT\]/i)
-      
+
       if (reasoningMatch && contentMatch) {
         return {
           reasoning: reasoningMatch[1].trim(),
           main: contentMatch[1].trim()
         }
       }
-      
+
       // 检查是否有思考过程标记
       const thinkingMatch = rawContent.match(/\[思考过程\]([\s\S]*?)\[\/思考过程\]/i)
       const answerMatch = rawContent.match(/\[回答\]([\s\S]*?)\[\/回答\]/i)
-      
+
       if (thinkingMatch && answerMatch) {
         return {
           reasoning: thinkingMatch[1].trim(),
@@ -167,7 +199,7 @@ export function EnhancedMessageRenderer({
         }
       }
     }
-    
+
     return null
   }
 
@@ -184,17 +216,20 @@ export function EnhancedMessageRenderer({
     contentAfterMemory
   } = parseStreamingContent
 
-  // 当记忆请求完成时，设置可编辑内容
+  // 当有记忆请求时，设置可编辑内容（无论是否完成）
   useEffect(() => {
-    if (hasCompleteMemoryRequest && memoryRequest) {
+    if (memoryRequest) {
       // 确保内容不为空且有效
       const content = memoryRequest.newContent?.trim() || ""
       const reason = memoryRequest.reason?.trim() || ""
 
-      setEditableMemoryContent(content)
-      setEditableMemoryReason(reason)
+      // 只有当内容发生变化时才更新，避免覆盖用户的编辑
+      if (content !== editableMemoryContent || reason !== editableMemoryReason) {
+        setEditableMemoryContent(content)
+        setEditableMemoryReason(reason)
+      }
     }
-  }, [hasCompleteMemoryRequest, memoryRequest])
+  }, [memoryRequest])
 
   // 验证记忆内容是否有效
   const isMemoryContentValid = editableMemoryContent.trim().length > 0
@@ -213,19 +248,19 @@ export function EnhancedMessageRenderer({
           size="sm"
           onClick={() => setShowMemoryRequest(!showMemoryRequest)}
           className={cn(
-            "w-full justify-between p-4 h-auto bg-transparent hover:bg-blue-100/50 dark:hover:bg-blue-900/20 border-0 rounded-none",
-            isMobile ? "text-xs" : "text-sm"
+            "w-full justify-between h-auto bg-transparent hover:bg-blue-100/50 dark:hover:bg-blue-900/20 border-0 rounded-none",
+            isMobile ? "p-3 text-xs" : "p-4 text-sm"
           )}
         >
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+          <div className={cn("flex items-center", isMobile ? "space-x-2" : "space-x-3")}>
+            <div className={cn("bg-blue-100 dark:bg-blue-900/40 rounded-lg", isMobile ? "p-1.5" : "p-2")}>
               <Brain className={cn("text-blue-600 dark:text-blue-400", isMobile ? "h-4 w-4" : "h-5 w-5")} />
             </div>
             <div className="text-left">
-              <div className="font-semibold text-blue-900 dark:text-blue-100">
+              <div className={cn("font-semibold text-blue-900 dark:text-blue-100", isMobile ? "text-sm" : "")}>
                 {isStreaming && !hasCompleteMemoryRequest ? "🧠 AI正在整理记忆..." : "🧠 AI记忆更新请求"}
               </div>
-              <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+              <div className={cn("text-blue-600 dark:text-blue-400 mt-0.5", isMobile ? "text-xs" : "text-xs")}>
                 {isStreaming && !hasCompleteMemoryRequest ? "正在生成个性化记忆内容" : "点击查看并确认记忆更新"}
               </div>
             </div>
@@ -238,25 +273,34 @@ export function EnhancedMessageRenderer({
         </Button>
 
         {showMemoryRequest && (
-          <div className="p-6 bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-950/20 dark:to-indigo-950/20 border-t border-blue-200/50 dark:border-blue-800/50">
-            {!hasCompleteMemoryRequest ? (
-              // 流式渲染中的状态
-              <div className="space-y-4">
+          <div className={cn(
+            "bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-950/20 dark:to-indigo-950/20 border-t border-blue-200/50 dark:border-blue-800/50",
+            isMobile ? "p-4" : "p-6"
+          )}>
+            {!hasCompleteMemoryRequest && isStreaming ? (
+              // 流式渲染中的状态 - 只有在正在流式传输时才显示
+              <div className={cn("space-y-4", isMobile ? "space-y-3" : "")}>
                 <div className="flex items-center justify-center space-x-2 py-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-                  <span className="text-blue-600 dark:text-blue-400 font-medium ml-3">AI正在整理记忆内容...</span>
+                  <span className={cn("text-blue-600 dark:text-blue-400 font-medium ml-3", isMobile ? "text-sm" : "")}>AI正在整理记忆内容...</span>
                 </div>
                 {memoryRequest && (
-                  <div className="bg-white/70 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200/50 dark:border-blue-800/50 shadow-sm">
+                  <div className={cn(
+                    "bg-white/70 dark:bg-blue-900/20 rounded-xl border border-blue-200/50 dark:border-blue-800/50 shadow-sm",
+                    isMobile ? "p-3" : "p-4"
+                  )}>
                     <div className="space-y-3">
                       <div>
                         <div className="flex items-center space-x-2 mb-2">
                           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">记忆内容</span>
+                          <span className={cn("font-semibold text-blue-800 dark:text-blue-200", isMobile ? "text-sm" : "text-sm")}>记忆内容</span>
                         </div>
-                        <div className="text-sm text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-900/30 p-3 rounded-lg">
+                        <div className={cn(
+                          "text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-900/30 rounded-lg",
+                          isMobile ? "text-sm p-3" : "text-sm p-3"
+                        )}>
                           {memoryRequest.newContent}
                         </div>
                       </div>
@@ -264,9 +308,12 @@ export function EnhancedMessageRenderer({
                         <div>
                           <div className="flex items-center space-x-2 mb-2">
                             <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                            <span className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">更新原因</span>
+                            <span className={cn("font-semibold text-indigo-800 dark:text-indigo-200", isMobile ? "text-sm" : "text-sm")}>更新原因</span>
                           </div>
-                          <div className="text-sm text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 p-3 rounded-lg">
+                          <div className={cn(
+                            "text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 rounded-lg",
+                            isMobile ? "text-sm p-3" : "text-sm p-3"
+                          )}>
                             {memoryRequest.reason}
                           </div>
                         </div>
@@ -276,30 +323,124 @@ export function EnhancedMessageRenderer({
                 )}
               </div>
             ) : (
-              // 完成状态，精炼的确认界面
+              // 完成状态或非流式状态，精炼的确认界面
               <div className="space-y-3">
                 {!isEditing ? (
                   // 只读模式 - 精简卡片设计
                   <div className="space-y-2">
-                    <div className="bg-white/70 dark:bg-blue-900/20 p-2.5 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
-                      <div className="flex items-start justify-between">
-                        {/* 动态计算宽度比例 */}
-                        {(() => {
-                          const contentLength = editableMemoryContent.length
-                          const reasonLength = editableMemoryReason?.length || 0
-                          const totalLength = contentLength + reasonLength
+                    <div className={cn(
+                      "bg-white/70 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50",
+                      isMobile ? "p-3" : "p-2.5"
+                    )}>
+                      {isMobile ? (
+                        // 移动端：垂直布局
+                        <div className="space-y-3">
+                          {/* 记忆内容 */}
+                          <div>
+                            <div className="flex items-center space-x-2 mb-2">
+                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                              <span className="text-xs font-medium text-blue-800 dark:text-blue-200">记忆内容</span>
+                            </div>
+                            <div className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed bg-blue-50/50 dark:bg-blue-900/30 p-3 rounded-lg">
+                              {editableMemoryContent}
+                            </div>
+                          </div>
 
-                          // 如果没有更新原因，记忆内容占满整行
-                          if (!editableMemoryReason) {
+                          {/* 更新原因 */}
+                          {editableMemoryReason && (
+                            <div>
+                              <div className="flex items-center space-x-2 mb-2">
+                                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
+                                <span className="text-xs font-medium text-indigo-800 dark:text-indigo-200">更新原因</span>
+                              </div>
+                              <div className="text-sm text-indigo-700 dark:text-indigo-300 leading-relaxed bg-indigo-50/50 dark:bg-indigo-900/30 p-3 rounded-lg">
+                                {editableMemoryReason}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 编辑按钮 */}
+                          <div className="flex justify-end pt-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setIsEditing(true)}
+                              className="p-2 h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        // 桌面端：水平布局（保持原有逻辑）
+                        <div className="flex items-start justify-between">
+                          {/* 动态计算宽度比例 */}
+                          {(() => {
+                            const contentLength = editableMemoryContent.length
+                            const reasonLength = editableMemoryReason?.length || 0
+                            const totalLength = contentLength + reasonLength
+
+                            // 如果没有更新原因，记忆内容占满整行
+                            if (!editableMemoryReason) {
+                              return (
+                                <>
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2 mb-1.5">
+                                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                                      <span className="text-xs font-medium text-blue-800 dark:text-blue-200">记忆内容</span>
+                                    </div>
+                                    <div className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
+                                      {editableMemoryContent}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setIsEditing(true)}
+                                    className="ml-2 p-1 h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                                  >
+                                    <Edit3 className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              )
+                            }
+
+                            // 有更新原因时，计算宽度比例
+                            let contentWidth, reasonWidth
+                            if (totalLength === 0) {
+                              contentWidth = "w-7/12"
+                              reasonWidth = "w-3/12"
+                            } else {
+                              const ratio = Math.abs(contentLength - reasonLength) / totalLength
+                              if (ratio < 0.3) {
+                                // 字数相近，使用 5:5
+                                contentWidth = "w-5/12"
+                                reasonWidth = "w-5/12"
+                              } else {
+                                // 字数差异较大，使用 7:3
+                                contentWidth = "w-7/12"
+                                reasonWidth = "w-3/12"
+                              }
+                            }
+
                             return (
                               <>
-                                <div className="flex-1">
+                                <div className={`${contentWidth} pr-3`}>
                                   <div className="flex items-center space-x-2 mb-1.5">
                                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
                                     <span className="text-xs font-medium text-blue-800 dark:text-blue-200">记忆内容</span>
                                   </div>
                                   <div className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
                                     {editableMemoryContent}
+                                  </div>
+                                </div>
+                                <div className={`${reasonWidth} pl-3 border-l border-blue-200/50 dark:border-blue-700/50`}>
+                                  <div className="flex items-center space-x-2 mb-1.5">
+                                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
+                                    <span className="text-xs font-medium text-indigo-800 dark:text-indigo-200">更新原因</span>
+                                  </div>
+                                  <div className="text-sm text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                                    {editableMemoryReason}
                                   </div>
                                 </div>
                                 <Button
@@ -312,61 +453,15 @@ export function EnhancedMessageRenderer({
                                 </Button>
                               </>
                             )
-                          }
-
-                          // 有更新原因时，计算宽度比例
-                          let contentWidth, reasonWidth
-                          if (totalLength === 0) {
-                            contentWidth = "w-7/12"
-                            reasonWidth = "w-3/12"
-                          } else {
-                            const ratio = Math.abs(contentLength - reasonLength) / totalLength
-                            if (ratio < 0.3) {
-                              // 字数相近，使用 5:5
-                              contentWidth = "w-5/12"
-                              reasonWidth = "w-5/12"
-                            } else {
-                              // 字数差异较大，使用 7:3
-                              contentWidth = "w-7/12"
-                              reasonWidth = "w-3/12"
-                            }
-                          }
-
-                          return (
-                            <>
-                              <div className={`${contentWidth} pr-3`}>
-                                <div className="flex items-center space-x-2 mb-1.5">
-                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                                  <span className="text-xs font-medium text-blue-800 dark:text-blue-200">记忆内容</span>
-                                </div>
-                                <div className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
-                                  {editableMemoryContent}
-                                </div>
-                              </div>
-                              <div className={`${reasonWidth} pl-3 border-l border-blue-200/50 dark:border-blue-700/50`}>
-                                <div className="flex items-center space-x-2 mb-1.5">
-                                  <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
-                                  <span className="text-xs font-medium text-indigo-800 dark:text-indigo-200">更新原因</span>
-                                </div>
-                                <div className="text-sm text-indigo-700 dark:text-indigo-300 leading-relaxed">
-                                  {editableMemoryReason}
-                                </div>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setIsEditing(true)}
-                                className="ml-2 p-1 h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                              >
-                                <Edit3 className="h-3 w-3" />
-                              </Button>
-                            </>
-                          )
-                        })()}
-                      </div>
+                          })()}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex space-x-2 pt-2">
+                    <div className={cn(
+                      "flex pt-2",
+                      isMobile ? "space-x-3" : "space-x-2"
+                    )}>
                       <Button
                         size="sm"
                         onClick={() => {
@@ -378,7 +473,10 @@ export function EnhancedMessageRenderer({
                             setShowMemoryRequest(false)
                           }
                         }}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-1"
+                        className={cn(
+                          "flex-1 bg-blue-600 hover:bg-blue-700 text-white",
+                          isMobile ? "text-sm py-2" : "text-xs py-1"
+                        )}
                       >
                         ✓ 确认
                       </Button>
@@ -386,7 +484,10 @@ export function EnhancedMessageRenderer({
                         size="sm"
                         variant="outline"
                         onClick={() => setShowMemoryRequest(false)}
-                        className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50 text-xs py-1"
+                        className={cn(
+                          "flex-1 border-blue-300 text-blue-700 hover:bg-blue-50",
+                          isMobile ? "text-sm py-2" : "text-xs py-1"
+                        )}
                       >
                         ✕ 取消
                       </Button>
@@ -394,34 +495,46 @@ export function EnhancedMessageRenderer({
                   </div>
                 ) : (
                   // 编辑模式
-                  <div className="space-y-3">
-                    <div className="bg-white/70 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                  <div className={cn("space-y-3", isMobile ? "space-y-4" : "")}>
+                    <div className={cn(
+                      "bg-white/70 dark:bg-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50",
+                      isMobile ? "p-4" : "p-3"
+                    )}>
                       <div className="flex items-center space-x-2 mb-2">
                         <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                        <span className="text-xs font-medium text-blue-800 dark:text-blue-200">记忆内容</span>
-                        <span className="text-xs text-blue-600 dark:text-blue-400">({editableMemoryContent.length}/500)</span>
+                        <span className={cn("font-medium text-blue-800 dark:text-blue-200", isMobile ? "text-sm" : "text-xs")}>记忆内容</span>
+                        <span className={cn("text-blue-600 dark:text-blue-400", isMobile ? "text-sm" : "text-xs")}>({editableMemoryContent.length}/500)</span>
                       </div>
                       <textarea
                         value={editableMemoryContent}
                         onChange={(e) => setEditableMemoryContent(e.target.value)}
-                        className="w-full p-2 text-sm border border-blue-200 dark:border-blue-700 rounded bg-white dark:bg-blue-950/30 text-blue-900 dark:text-blue-100 resize-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                        rows={3}
+                        className={cn(
+                          "w-full border border-blue-200 dark:border-blue-700 rounded bg-white dark:bg-blue-950/30 text-blue-900 dark:text-blue-100 resize-none focus:ring-1 focus:ring-blue-500 focus:border-transparent",
+                          isMobile ? "p-3 text-base" : "p-2 text-sm"
+                        )}
+                        rows={isMobile ? 4 : 3}
                         maxLength={500}
                         placeholder="请输入要记住的重要信息..."
                       />
                     </div>
 
-                    <div className="bg-white/70 dark:bg-indigo-900/20 p-3 rounded-lg border border-indigo-200/50 dark:border-indigo-800/50">
+                    <div className={cn(
+                      "bg-white/70 dark:bg-indigo-900/20 rounded-lg border border-indigo-200/50 dark:border-indigo-800/50",
+                      isMobile ? "p-4" : "p-3"
+                    )}>
                       <div className="flex items-center space-x-2 mb-2">
                         <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
-                        <span className="text-xs font-medium text-indigo-800 dark:text-indigo-200">更新原因</span>
-                        <span className="text-xs text-indigo-600 dark:text-indigo-400">({editableMemoryReason.length}/200)</span>
+                        <span className={cn("font-medium text-indigo-800 dark:text-indigo-200", isMobile ? "text-sm" : "text-xs")}>更新原因</span>
+                        <span className={cn("text-indigo-600 dark:text-indigo-400", isMobile ? "text-sm" : "text-xs")}>({editableMemoryReason.length}/200)</span>
                       </div>
                       <textarea
                         value={editableMemoryReason}
                         onChange={(e) => setEditableMemoryReason(e.target.value)}
-                        className="w-full p-2 text-sm border border-indigo-200 dark:border-indigo-700 rounded bg-white dark:bg-indigo-950/30 text-indigo-900 dark:text-indigo-100 resize-none focus:ring-1 focus:ring-indigo-500 focus:border-transparent"
-                        rows={2}
+                        className={cn(
+                          "w-full border border-indigo-200 dark:border-indigo-700 rounded bg-white dark:bg-indigo-950/30 text-indigo-900 dark:text-indigo-100 resize-none focus:ring-1 focus:ring-indigo-500 focus:border-transparent",
+                          isMobile ? "p-3 text-base" : "p-2 text-sm"
+                        )}
+                        rows={isMobile ? 3 : 2}
                         maxLength={200}
                         placeholder="说明为什么需要记住这些信息..."
                       />
@@ -429,8 +542,14 @@ export function EnhancedMessageRenderer({
 
                     {/* 验证提示 */}
                     {(hasSpecialChars || isContentTooLong || isReasonTooLong) && (
-                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2">
-                        <div className="text-xs text-red-700 dark:text-red-300 space-y-1">
+                      <div className={cn(
+                        "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded",
+                        isMobile ? "p-3" : "p-2"
+                      )}>
+                        <div className={cn(
+                          "text-red-700 dark:text-red-300 space-y-1",
+                          isMobile ? "text-sm" : "text-xs"
+                        )}>
                           {hasSpecialChars && <div>• 不能包含特殊符号</div>}
                           {isContentTooLong && <div>• 记忆内容超出500字</div>}
                           {isReasonTooLong && <div>• 更新原因超出200字</div>}
@@ -438,7 +557,10 @@ export function EnhancedMessageRenderer({
                       </div>
                     )}
 
-                    <div className="flex space-x-2 pt-2">
+                    <div className={cn(
+                      "flex pt-2",
+                      isMobile ? "space-x-3" : "space-x-2"
+                    )}>
                       <Button
                         size="sm"
                         onClick={() => {
@@ -447,7 +569,10 @@ export function EnhancedMessageRenderer({
                           }
                         }}
                         disabled={!isMemoryContentValid || hasSpecialChars || isContentTooLong || isReasonTooLong}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs py-1 disabled:opacity-50"
+                        className={cn(
+                          "flex-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50",
+                          isMobile ? "text-sm py-2" : "text-xs py-1"
+                        )}
                       >
                         ✓ 保存
                       </Button>
@@ -455,7 +580,10 @@ export function EnhancedMessageRenderer({
                         size="sm"
                         variant="outline"
                         onClick={() => setIsEditing(false)}
-                        className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 text-xs py-1"
+                        className={cn(
+                          "flex-1 border-gray-300 text-gray-700 hover:bg-gray-50",
+                          isMobile ? "text-sm py-2" : "text-xs py-1"
+                        )}
                       >
                         取消
                       </Button>

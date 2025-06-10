@@ -10,12 +10,39 @@ export class TEFCacheManager {
   private readonly CACHE_DURATION = 24 * 60 * 60 * 1000; // 24小时
   private readonly STORAGE_KEY = 'tef-analysis-cache';
   private isInitialized = false;
+  private listeners = new Set<() => void>();
+
+  /**
+   * 订阅缓存变化。
+   * 当缓存通过 setCachedAnalysis 或 clearCache 等方法更改时，将通知侦听器。
+   * @param listener - 当缓存发生变化时调用的回调函数。
+   * @returns 返回一个函数，调用该函数可取消订阅。
+   */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    // 返回一个取消订阅的函数
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /**
+   * 通知所有监听器缓存已发生变化
+   */
+  private notifyListeners(): void {
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
 
   /**
    * 生成食物条目的稳定哈希
    * 排除易变字段如时间戳、log_id等
    */
   generateFoodEntriesHash(foodEntries: FoodEntry[]): string {
+    if (!Array.isArray(foodEntries) || foodEntries.length === 0) {
+      return '[]'; // 返回一个代表空的稳定哈希
+    }
     const stableData = foodEntries
       .map(entry => ({
         name: entry.food_name.trim().toLowerCase(),
@@ -34,7 +61,7 @@ export class TEFCacheManager {
         const nameCompare = a.name.localeCompare(b.name);
         return nameCompare !== 0 ? nameCompare : a.grams - b.grams;
       });
-    
+
     return JSON.stringify(stableData);
   }
 
@@ -85,7 +112,9 @@ export class TEFCacheManager {
   getCachedAnalysis(foodEntries: FoodEntry[]): TEFAnalysis | null {
     this.initializeCache();
 
-    if (foodEntries.length === 0) return null;
+    if (!Array.isArray(foodEntries) || foodEntries.length === 0) {
+      return null;
+    }
 
     const hash = this.generateFoodEntriesHash(foodEntries);
     const cached = this.cache.get(hash);
@@ -97,6 +126,7 @@ export class TEFCacheManager {
       // 清除过期缓存
       this.cache.delete(hash);
       this.saveToStorage();
+      this.notifyListeners();
       return null;
     }
 
@@ -122,6 +152,7 @@ export class TEFCacheManager {
 
     // 保存到本地存储
     this.saveToStorage();
+    this.notifyListeners();
   }
 
   /**
@@ -130,7 +161,9 @@ export class TEFCacheManager {
   shouldAnalyzeTEF(foodEntries: FoodEntry[], previousHash: string): boolean {
     this.initializeCache();
 
-    if (foodEntries.length === 0) return false;
+    if (!Array.isArray(foodEntries) || foodEntries.length === 0) {
+      return false;
+    }
 
     const currentHash = this.generateFoodEntriesHash(foodEntries);
 
@@ -158,16 +191,29 @@ export class TEFCacheManager {
 
     if (hasChanges) {
       this.saveToStorage();
+      this.notifyListeners();
     }
+  }
+
+  /**
+   * 强制刷新缓存，例如在从云端同步数据后调用。
+   * 这将清除所有本地缓存的TEF分析结果，以确保使用最新的数据重新计算。
+   */
+  forceRefresh(): void {
+    this.clearCache();
   }
 
   /**
    * 清空所有缓存
    */
   clearCache(): void {
+    const needsNotification = this.cache.size > 0;
     this.cache.clear();
     if (typeof window !== 'undefined') {
       localStorage.removeItem(this.STORAGE_KEY);
+    }
+    if (needsNotification) {
+      this.notifyListeners();
     }
   }
 
@@ -176,7 +222,7 @@ export class TEFCacheManager {
    */
   getCacheStats(): { size: number; oldestEntry: number | null } {
     let oldestTimestamp: number | null = null;
-    
+
     for (const cached of this.cache.values()) {
       if (oldestTimestamp === null || cached.timestamp < oldestTimestamp) {
         oldestTimestamp = cached.timestamp;

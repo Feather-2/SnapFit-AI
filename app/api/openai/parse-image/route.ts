@@ -1,5 +1,7 @@
-import { OpenAICompatibleClient } from "@/lib/openai-client"
+import { SharedOpenAIClient } from "@/lib/shared-openai-client"
 import { v4 as uuidv4 } from "uuid"
+import type { AIConfig } from "@/lib/types"
+import { checkApiAuth, rollbackUsageIfNeeded } from '@/lib/api-auth-helper'
 
 export async function POST(req: Request) {
   try {
@@ -18,24 +20,51 @@ export async function POST(req: Request) {
     }
 
     const aiConfig = JSON.parse(aiConfigStr)
-    const modelConfig = aiConfig.visionModel
 
-    // 创建客户端
-    const client = new OpenAICompatibleClient(modelConfig.baseUrl, modelConfig.apiKey)
+    // 🔒 统一的身份验证和限制检查（只对共享模式进行限制）
+    const authResult = await checkApiAuth(aiConfig, 'conversation_count')
+
+    if (!authResult.success) {
+      return Response.json({
+        error: authResult.error!.message,
+        code: authResult.error!.code
+      }, { status: authResult.error!.status })
+    }
+
+    const { session, usageManager } = authResult
+
+    // 获取用户选择的视觉模型（仅支持共享模式）
+    let selectedModel = "gpt-4o" // 默认视觉模型
+
+    if (aiConfig?.visionModel?.sharedKeyConfig?.selectedModel) {
+      selectedModel = aiConfig.visionModel.sharedKeyConfig.selectedModel
+    }
+
+    console.log('🔍 Using selected vision model:', selectedModel)
+
+    // 创建共享客户端（仅共享模式）
+    const sharedClient = new SharedOpenAIClient({
+      userId: session.user.id,
+      preferredModel: selectedModel
+    })
 
     // 将图片转换为 base64
     const imageBuffer = await image.arrayBuffer()
     const imageBase64 = Buffer.from(imageBuffer).toString("base64")
     const dataURI = `data:${image.type};base64,${imageBase64}`
 
+    // 🐛 调试日志 - 只显示前50个字符避免控制台污染
+    console.log(`📸 Single Image: ${image.name} (${image.type}, ${Math.round(image.size / 1024)}KB)`)
+    console.log(`📸 Base64 preview: ${dataURI.substring(0, 50)}...`)
+
     // 根据类型选择不同的提示词和解析逻辑
     if (type === "food") {
       // 食物图片解析提示词
       const prompt = `
         请分析这张食物图片，识别图中的食物，并将其转换为结构化的 JSON 格式。
-        
+
         请直接输出 JSON，不要有额外文本。如果无法确定数值，请给出合理估算，并在相应字段标记 is_estimated: true。
-        
+
         每个食物项应包含以下字段:
         - log_id: 唯一标识符
         - food_name: 食物名称
@@ -45,7 +74,7 @@ export async function POST(req: Request) {
         - nutritional_info_per_100g: 每100克的营养成分，包括 calories, carbohydrates, protein, fat 等
         - total_nutritional_info_consumed: 基于消耗克数计算的总营养成分
         - is_estimated: 是否为估算值
-        
+
         示例输出格式:
         {
           "food": [
@@ -75,8 +104,8 @@ export async function POST(req: Request) {
         }
       `
 
-      const { text: resultText } = await client.generateText({
-        model: modelConfig.name,
+      const { text: resultText, keyInfo } = await sharedClient.generateText({
+        model: selectedModel,
         prompt,
         images: [dataURI],
         response_format: { type: "json_object" },
@@ -92,20 +121,24 @@ export async function POST(req: Request) {
         })
       }
 
-      return Response.json(result)
+      return Response.json({
+        ...result,
+        keyInfo // 包含使用的Key信息
+      })
     } else if (type === "exercise") {
       // 运动图片解析提示词
       const prompt = `
         请分析这张运动相关的图片，识别图中的运动类型，并将其转换为结构化的 JSON 格式。
         用户体重: ${userWeight || 70} kg
-        
+
         请直接输出 JSON，不要有额外文本。如果无法确定数值，请给出合理估算，并在相应字段标记 is_estimated: true。
-        
+
         每个运动项应包含以下字段:
         - log_id: 唯一标识符
         - exercise_name: 运动名称
         - exercise_type: 运动类型 (cardio, strength, flexibility, other)
         - duration_minutes: 持续时间(分钟)
+        - time_period: 时间段 (morning, noon, afternoon, evening，可选)
         - distance_km: 距离(公里，仅适用于有氧运动)
         - sets: 组数(仅适用于力量训练)
         - reps: 次数(仅适用于力量训练)
@@ -115,7 +148,7 @@ export async function POST(req: Request) {
         - calories_burned_estimated: 估算的卡路里消耗
         - muscle_groups: 锻炼的肌肉群
         - is_estimated: 是否为估算值
-        
+
         示例输出格式:
         {
           "exercise": [
@@ -124,6 +157,7 @@ export async function POST(req: Request) {
               "exercise_name": "跑步",
               "exercise_type": "cardio",
               "duration_minutes": 30,
+              "time_period": "morning",
               "distance_km": 5,
               "estimated_mets": 8.3,
               "user_weight": 70,
@@ -135,8 +169,8 @@ export async function POST(req: Request) {
         }
       `
 
-      const { text: resultText } = await client.generateText({
-        model: modelConfig.name,
+      const { text: resultText, keyInfo } = await sharedClient.generateText({
+        model: selectedModel,
         prompt,
         images: [dataURI],
         response_format: { type: "json_object" },
@@ -152,12 +186,18 @@ export async function POST(req: Request) {
         })
       }
 
-      return Response.json(result)
+      return Response.json({
+        ...result,
+        keyInfo // 包含使用的Key信息
+      })
     } else {
       return Response.json({ error: "Invalid type" }, { status: 400 })
     }
   } catch (error) {
-    console.error("Error:", error)
-    return Response.json({ error: "Failed to process request" }, { status: 500 })
+    console.error('Parse image API error:', error)
+    return Response.json({
+      error: "Failed to process request",
+      code: "AI_SERVICE_ERROR"
+    }, { status: 500 })
   }
 }

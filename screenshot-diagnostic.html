@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>截图问题诊断工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .diagnostic-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .test-element {
+            background: linear-gradient(45deg, #e3f2fd, #bbdefb);
+            border: 2px solid #2196f3;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            position: relative;
+            width: 600px;
+            height: 400px;
+        }
+        
+        .corner-marker {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #f44336;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .top-left { top: 0; left: 0; }
+        .top-right { top: 0; right: 0; }
+        .bottom-left { bottom: 0; left: 0; }
+        .bottom-right { bottom: 0; right: 0; }
+        
+        .content-area {
+            background: rgba(255,255,255,0.8);
+            border: 1px dashed #666;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px;
+            height: calc(100% - 80px);
+            overflow: hidden;
+        }
+        
+        .measurement-line {
+            position: absolute;
+            background: #ff9800;
+            font-size: 10px;
+            color: white;
+            text-align: center;
+            line-height: 20px;
+        }
+        
+        .width-line {
+            top: -25px;
+            left: 0;
+            right: 0;
+            height: 20px;
+        }
+        
+        .height-line {
+            left: -25px;
+            top: 0;
+            bottom: 0;
+            width: 20px;
+            writing-mode: vertical-rl;
+        }
+        
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #1976d2;
+        }
+        
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .result-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .result-item img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        
+        .info-table th,
+        .info-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        .info-table th {
+            background: #f5f5f5;
+        }
+        
+        .problem {
+            color: #f44336;
+            font-weight: bold;
+        }
+        
+        .good {
+            color: #4caf50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 截图问题诊断工具</h1>
+    
+    <div class="diagnostic-panel">
+        <h2>🎯 测试元素</h2>
+        <p>这个元素有明确的尺寸标记，用来诊断截图偏移问题：</p>
+        
+        <div id="test-element" class="test-element">
+            <div class="corner-marker top-left">1</div>
+            <div class="corner-marker top-right">2</div>
+            <div class="corner-marker bottom-left">3</div>
+            <div class="corner-marker bottom-right">4</div>
+            
+            <div class="measurement-line width-line">600px 宽度</div>
+            <div class="measurement-line height-line">400px 高度</div>
+            
+            <div class="content-area">
+                <h3>测试内容区域</h3>
+                <p>如果截图正确，你应该能看到：</p>
+                <ul>
+                    <li>四个角的红色标记 (1,2,3,4)</li>
+                    <li>完整的蓝色边框</li>
+                    <li>橙色的尺寸标记</li>
+                    <li>这个白色内容区域</li>
+                </ul>
+                <p><strong>如果有内容被截断或偏移，说明存在定位问题。</strong></p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="diagnostic-panel">
+        <h2>🔧 测试操作</h2>
+        <button onclick="runDiagnostic()">🔍 运行完整诊断</button>
+        <button onclick="testHtml2Canvas()">📸 html2canvas</button>
+        <button onclick="testHtmlToImage()">🖼️ html-to-image</button>
+        <button onclick="clearResults()">🗑️ 清除结果</button>
+    </div>
+    
+    <div id="info-panel" class="diagnostic-panel" style="display: none;">
+        <h2>📋 元素信息</h2>
+        <table id="info-table" class="info-table">
+            <tr><th>属性</th><th>值</th><th>状态</th></tr>
+        </table>
+    </div>
+    
+    <div id="results" class="results"></div>
+
+    <!-- 加载库 -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.min.js"></script>
+    
+    <script>
+        function getElementInfo(element) {
+            const rect = element.getBoundingClientRect();
+            const computedStyle = window.getComputedStyle(element);
+            
+            return {
+                'getBoundingClientRect': {
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height),
+                    left: Math.round(rect.left),
+                    top: Math.round(rect.top),
+                    right: Math.round(rect.right),
+                    bottom: Math.round(rect.bottom)
+                },
+                'scroll尺寸': {
+                    scrollWidth: element.scrollWidth,
+                    scrollHeight: element.scrollHeight
+                },
+                'offset尺寸': {
+                    offsetWidth: element.offsetWidth,
+                    offsetHeight: element.offsetHeight,
+                    offsetLeft: element.offsetLeft,
+                    offsetTop: element.offsetTop
+                },
+                'client尺寸': {
+                    clientWidth: element.clientWidth,
+                    clientHeight: element.clientHeight
+                },
+                'computed样式': {
+                    width: computedStyle.width,
+                    height: computedStyle.height,
+                    position: computedStyle.position,
+                    transform: computedStyle.transform,
+                    margin: computedStyle.margin,
+                    padding: computedStyle.padding
+                },
+                '页面信息': {
+                    scrollX: window.scrollX,
+                    scrollY: window.scrollY,
+                    innerWidth: window.innerWidth,
+                    innerHeight: window.innerHeight
+                }
+            };
+        }
+        
+        function analyzeInfo(info) {
+            const analysis = [];
+            
+            // 检查尺寸一致性
+            const rect = info['getBoundingClientRect'];
+            const offset = info['offset尺寸'];
+            
+            if (Math.abs(rect.width - offset.offsetWidth) > 1) {
+                analysis.push({
+                    type: 'problem',
+                    message: `宽度不一致: getBoundingClientRect(${rect.width}) vs offsetWidth(${offset.offsetWidth})`
+                });
+            } else {
+                analysis.push({
+                    type: 'good',
+                    message: '宽度一致性检查通过'
+                });
+            }
+            
+            if (Math.abs(rect.height - offset.offsetHeight) > 1) {
+                analysis.push({
+                    type: 'problem',
+                    message: `高度不一致: getBoundingClientRect(${rect.height}) vs offsetHeight(${offset.offsetHeight})`
+                });
+            } else {
+                analysis.push({
+                    type: 'good',
+                    message: '高度一致性检查通过'
+                });
+            }
+            
+            // 检查位置
+            if (rect.left < 0 || rect.top < 0) {
+                analysis.push({
+                    type: 'problem',
+                    message: `元素位置异常: left(${rect.left}), top(${rect.top})`
+                });
+            }
+            
+            // 检查滚动
+            const page = info['页面信息'];
+            if (page.scrollX !== 0 || page.scrollY !== 0) {
+                analysis.push({
+                    type: 'problem',
+                    message: `页面有滚动: scrollX(${page.scrollX}), scrollY(${page.scrollY})`
+                });
+            } else {
+                analysis.push({
+                    type: 'good',
+                    message: '页面滚动位置正常'
+                });
+            }
+            
+            return analysis;
+        }
+        
+        function displayInfo(info, analysis) {
+            const table = document.getElementById('info-table');
+            table.innerHTML = '<tr><th>属性</th><th>值</th><th>状态</th></tr>';
+            
+            // 显示关键信息
+            const keyInfo = [
+                ['元素宽度', `${info['getBoundingClientRect'].width}px`, ''],
+                ['元素高度', `${info['getBoundingClientRect'].height}px`, ''],
+                ['元素位置', `left: ${info['getBoundingClientRect'].left}px, top: ${info['getBoundingClientRect'].top}px`, ''],
+                ['滚动位置', `scrollX: ${info['页面信息'].scrollX}px, scrollY: ${info['页面信息'].scrollY}px`, ''],
+                ['窗口尺寸', `${info['页面信息'].innerWidth}x${info['页面信息'].innerHeight}px`, '']
+            ];
+            
+            keyInfo.forEach(([key, value, status]) => {
+                const row = table.insertRow();
+                row.insertCell(0).textContent = key;
+                row.insertCell(1).textContent = value;
+                row.insertCell(2).textContent = status;
+            });
+            
+            // 显示分析结果
+            analysis.forEach(item => {
+                const row = table.insertRow();
+                row.insertCell(0).textContent = '分析';
+                row.insertCell(1).textContent = item.message;
+                row.insertCell(2).className = item.type;
+                row.insertCell(2).textContent = item.type === 'problem' ? '⚠️ 问题' : '✅ 正常';
+            });
+            
+            document.getElementById('info-panel').style.display = 'block';
+        }
+        
+        function addResult(title, dataUrl, info) {
+            const resultsContainer = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result-item';
+            
+            resultDiv.innerHTML = `
+                <h3>${title}</h3>
+                <img src="${dataUrl}" alt="${title}">
+                <p>
+                    <a href="${dataUrl}" download="${title.replace(/\s+/g, '-')}.png">📥 下载图片</a>
+                </p>
+                <details>
+                    <summary>📊 详细信息</summary>
+                    <pre style="font-size: 12px; overflow: auto;">${JSON.stringify(info, null, 2)}</pre>
+                </details>
+            `;
+            
+            resultsContainer.appendChild(resultDiv);
+        }
+        
+        function runDiagnostic() {
+            const element = document.getElementById('test-element');
+            const info = getElementInfo(element);
+            const analysis = analyzeInfo(info);
+            
+            displayInfo(info, analysis);
+            
+            console.log('🔍 诊断信息:', info);
+            console.log('📋 分析结果:', analysis);
+        }
+        
+        async function testHtml2Canvas() {
+            const element = document.getElementById('test-element');
+            const info = getElementInfo(element);
+            
+            try {
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 1,
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: true
+                });
+                
+                const dataUrl = canvas.toDataURL('image/png');
+                addResult('html2canvas 测试', dataUrl, {
+                    method: 'html2canvas',
+                    canvasSize: { width: canvas.width, height: canvas.height },
+                    elementInfo: info
+                });
+                
+            } catch (error) {
+                console.error('html2canvas 测试失败:', error);
+                alert('html2canvas 测试失败: ' + error.message);
+            }
+        }
+        
+        async function testHtmlToImage() {
+            const element = document.getElementById('test-element');
+            const info = getElementInfo(element);
+            
+            try {
+                const dataUrl = await htmlToImage.toPng(element, {
+                    backgroundColor: '#ffffff',
+                    pixelRatio: 1,
+                    cacheBust: true
+                });
+                
+                addResult('html-to-image 测试', dataUrl, {
+                    method: 'html-to-image',
+                    elementInfo: info
+                });
+                
+            } catch (error) {
+                console.error('html-to-image 测试失败:', error);
+                alert('html-to-image 测试失败: ' + error.message);
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('info-panel').style.display = 'none';
+        }
+        
+        // 页面加载完成后自动运行诊断
+        window.addEventListener('load', () => {
+            console.log('📋 页面加载完成，可以开始测试');
+            runDiagnostic();
+        });
+    </script>
+</body>
+</html>

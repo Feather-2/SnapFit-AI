@@ -35,7 +35,46 @@
     "settings": "Settings",
     "signIn": "Sign In",
     "signOut": "Sign Out",
-    "toggleTheme": "Toggle theme"
+    "toggleTheme": "Toggle theme",
+    "theme": "Theme",
+    "language": "Language",
+    "sharedServices": "Shared Services",
+    "loginRequired": "Please login to view your configurations",
+    "canUseSharedService": "Can use shared services",
+    "usageToday": "Today's Usage",
+    "totalUsage": "Total Usage",
+    "userMenu": {
+      "settings": "Settings",
+      "sharedServices": "Shared Services",
+      "signOut": "Sign Out",
+      "signIn": "Sign In"
+    },
+    "insufficientPermission": "Insufficient Permission",
+    "usage": {
+      "dailyQuota": "Daily Conversation Quota",
+      "updatedAt": "Updated at",
+      "remaining": "Remaining",
+      "times": "times",
+      "loading": "Loading...",
+      "loadingUsage": "Loading usage...",
+      "quotaSufficient": "Quota sufficient",
+      "quotaRunningLow": "Quota running low",
+      "quotaAlmostExhausted": "Quota almost exhausted",
+      "quotaExhausted": "Daily quota exhausted",
+      "todayConversation": "Today's conversation",
+      "usedPercentage": "Used",
+      "canConverse": "You can still have",
+      "conversationsLeft": "conversations",
+      "quotaExhaustedMessage": "Daily conversation quota exhausted. Please come back tomorrow or upgrade your trust level for more quota",
+      "refreshUsage": "Refresh usage",
+      "retry": "Retry",
+      "cannotLoadUsage": "Cannot load usage",
+      "weeklyStats": "7-day Stats",
+      "totalConversations": "Total conversations",
+      "averageDaily": "Daily average",
+      "upgradePrompt": "Running low on quota? Upgrade your trust level for more quota!",
+      "nextLevelQuota": "Next level provides"
+    }
   },
   "app": {
     "title": "SnapFit AI",
@@ -100,6 +139,62 @@
       "invalidWeight": "Invalid Weight",
       "invalidWeightDesc": "Please enter a valid positive number for weight."
     },
+    "handleSaveDailyWeight": {
+      "success": {
+        "title": "Weight Saved",
+        "description": "Weight has been recorded as {weight} kg"
+      },
+      "error": {
+        "title": "Invalid Weight",
+        "description": "Please enter a valid positive number for weight."
+      }
+    },
+    "handleDeleteEntry": {
+      "success": {
+        "title": "Deletion Successful",
+        "description": "The entry has been deleted"
+      }
+    },
+    "handleUpdateEntry": {
+      "success": {
+        "title": "Update Successful",
+        "description": "The entry has been updated"
+      }
+    },
+    "handleSubmit": {
+      "success": {
+        "title": "Record Successful",
+        "description": "Added {foodCount} food items and {exerciseCount} exercise items"
+      },
+      "error": {
+        "title": "Processing Failed",
+        "description": "{error}"
+      }
+    },
+    "handleDailyActivityLevelChange": {
+      "success": {
+        "title": "Activity Level Updated",
+        "description": "Activity level has been set to {level}"
+      }
+    },
+    "smartSuggestions": {
+      "noData": {
+        "title": "Insufficient Data",
+        "description": "Not enough data for {date} to generate suggestions."
+      },
+      "error": {
+        "title": "Suggestion Generation Failed",
+        "description": "Unable to generate smart suggestions, please try again later."
+      },
+      "unknownError": {
+        "title": "Unknown Error",
+        "description": "An unknown error occurred while generating suggestions."
+      },
+      "success": {
+        "title": "Suggestions Updated",
+        "description": "New smart suggestions have been generated for {date}."
+      }
+    },
     "ui": {
       "subtitle": "Record your health data and get smart recommendations",
       "todayWeight": "Today's Weight (Kg)",
@@ -127,7 +222,18 @@
       "quickConfig": "Quick Config",
       "dataExport": "Data Export",
       "neverExported": "Backup recommended",
-      "exportReminder": "{days} days since backup"
+      "exportReminder": "{days} days since backup",
+      "generatePrompt": "Record more data to get personalized suggestions.",
+      "addMoreData": "Add more data to get personalized advice",
+      "todayRecords": "Today's Records",
+      "todayData": "Today's Data",
+      "dataCharts": "Data Charts",
+      "diet": "Diet",
+      "exercise": "Exercise",
+      "status": "Status",
+      "healthDisclaimer": "This application is powered by AI technology and is intended solely as a reference tool for health management. Please note: AI analysis may contain inaccuracies, especially regarding nutritional data. Your health is important. Before making significant dietary or exercise decisions, we recommend consulting with professional doctors, nutritionists, or fitness trainers.",
+      "refreshing": "Syncing",
+      "refresh": "Refresh"
     },
     "dailyStatus": {
       "stress": "Stress Level",
@@ -229,7 +335,7 @@
       "fat": "Fat",
       "micronutrients": "Key Micronutrients",
       "tef": {
-        "title": "Thermic Effect of Food (TEF)",
+        "title": "TEF (Thermic Effect of Food)",
         "enhancementFactors": "Enhancement Factors",
         "caffeine": "Caffeine",
         "spicyFood": "Spicy Food",
@@ -248,10 +354,13 @@
     },
     "suggestions": {
       "title": "Smart Suggestions",
-      "description": "Personalized recommendations based on your data",
-      "loading": "Loading...",
-      "noSuggestions": "No smart suggestions available",
-      "addMoreData": "Add more data to get personalized recommendations"
+      "description": "Personalized suggestions based on your data",
+      "loading": "Generating suggestions...",
+      "refresh": "Regenerate",
+      "noSuggestions": "No suggestions available",
+      "generatePrompt": "Record more data to get personalized suggestions.",
+      "addMoreData": "Add more data to get personalized advice",
+      "generatedTime": "Generated Time"
     },
     "foodCard": {
       "foodName": "Food Name",
@@ -274,13 +383,15 @@
         "dinner": "Dinner",
         "snack": "Snack"
       },
+      "unknown": "Unknown",
       "timePeriods": {
         "morning": "Morning",
         "noon": "Noon",
         "afternoon": "Afternoon",
         "evening": "Evening",
         "unknown": "Unknown Period"
-      }
+      },
+      "description": "Added {foodCount} food items and {exerciseCount} exercise items"
     },
     "exerciseCard": {
       "exerciseName": "Exercise Name",
@@ -294,7 +405,19 @@
       "reps": "reps",
       "distance": "km",
       "weight": "kg",
-      "muscleGroups": "Muscle Groups"
+      "muscleGroups": "Muscle Groups",
+      "timePeriod": "Time Period",
+      "selectTimePeriod": "Select Time Period",
+      "timePeriods": {
+        "morning": "Morning",
+        "noon": "Noon",
+        "afternoon": "Afternoon",
+        "evening": "Evening"
+      }
+    },
+    "error": {
+      "title": "Processing Failed",
+      "description": "{error}"
     }
   },
 
@@ -322,13 +445,29 @@
     "smartSuggestions": "Smart Suggestions",
     "noFoodEntries": "No food entries for today",
     "noExerciseEntries": "No exercise entries for today",
+    "generatedTime": "Generated Time",
     "screenshot": {
       "capture": "Save as Image",
       "capturing": "Capturing...",
       "success": "Screenshot Successful",
       "successDescription": "Health summary saved as image",
       "failed": "Screenshot Failed",
-      "failedDescription": "Please try again later or use a different browser"
+      "failedDescription": "Please try again later or use a different browser",
+      "preparing": "Preparing screenshot...",
+      "preparingDescription": "Generating high-quality screenshot with html-to-image",
+      "savedAs": "Screenshot saved as",
+      "failedRetry": "Screenshot failed, please refresh and try again"
+    },
+    "priorities": {
+      "high": "High Priority",
+      "medium": "Medium Priority",
+      "low": "Low Priority"
+    },
+    "actionable": "Actionable",
+    "loading": "Loading...",
+    "branding": {
+      "tagline": "AI Health Assistant",
+      "slogan": "Smart health management made simple"
     }
   },
   "food": {
@@ -386,6 +525,7 @@
     "selectExpert": "Select Expert",
     "includeHealthData": "Include Health Data",
     "clearHistory": "Clear History",
+    "exportConversation": "Export Chat",
     "inputPlaceholder": "Enter your question...",
     "aiThinking": "AI is thinking...",
     "loading": "Loading...",
@@ -667,15 +807,19 @@
     "about": {
       "title": "About & Help",
       "privacyTitle": "Privacy Statement",
-      "privacyDescription": "All data in this application is stored locally in your browser and will not be uploaded to any server. Communication with AI models is only used to process your input and generate recommendations, and will not store your personal data.",
+      "privacyDescription": "We value your privacy protection. This application stores your basic personal information (such as username, avatar), weight records, diet and exercise data, and API keys you voluntarily share with the community in the cloud to provide cross-device synchronization and community features. However, your personal private API keys and conversations with AI are always kept locally in your browser and will not be uploaded to our servers. Communication with AI models is only used to process your input and generate recommendations, and we do not store these conversation contents.",
       "usageTitle": "Usage Instructions",
+      "quotaInfo": "After logging in via Linux.do OAuth2, you will receive daily usage quotas based on your trust level. We encourage users to share quality model configurations to build a community ecosystem.",
+      "modelOptions": "You can use community shared models or configure private models.",
+      "dataBackupTitle": "Data Backup",
+      "dataBackupDescription": "The application uses cloud database storage. To ensure data safety, regular data export is strongly recommended as backup.",
       "usage1": "Record your diet and exercise on the homepage",
       "usage2": "Use text input or upload images to add records",
       "usage3": "Chat with AI assistant on the intelligent conversation page to get health advice",
       "usage4": "Set your model parameters on the AI configuration page",
       "usage5": "Regularly export your data to prevent data loss",
       "versionTitle": "Version Information",
-      "versionInfo": "SnapFit AI"
+      "versionInfo": "SnapFit AI Community Edition"
     },
     "ai": {
       "title": "AI Configuration",
@@ -716,6 +860,30 @@
       "modelNamePlaceholder": "e.g., gpt-4o",
       "fetchModels": "Fetch Models",
       "testConnection": "Test Connection",
+      "privateConfig": "Private Configuration",
+      "sharedPool": "Community Shared Pool",
+      "networkDiagnostic": "Network Diagnostic",
+      "cannotFetchModels": "Cannot Fetch Models",
+      "fillApiUrlAndKey": "Please fill in API URL and Key first",
+      "fetchModelsSuccess": "Fetch Models Success",
+      "foundModels": "Found {count} available models",
+      "fetchModelsFailed": "Fetch Models Failed",
+      "networkErrorOrApiUnavailable": "Network error or API unavailable",
+      "privateConfigIncomplete": "Private Configuration Incomplete",
+      "sharedPoolConfigIncomplete": "Shared Pool Configuration Incomplete",
+      "fillAllFieldsForModel": "Please fill in all fields for {modelType}",
+      "selectSharedModelForModel": "Please select a shared model for {modelType}",
+      "selectSharedKeysForModel": "Please select at least one shared key for {modelType} in manual mode",
+      "testConnectionFailed": "Test Connection Failed",
+      "selectSharedModel": "Step 1: Select Shared Model",
+      "pleaseSelectModel": "Please select a model...",
+      "selectRunMode": "Step 2: Select Run Mode",
+      "autoBalance": "Auto Balance",
+      "manualSpecify": "Manual Specify",
+      "autoBalanceDescription": "The system will automatically select from all available keys that support {model}.",
+      "selectSpecificKeys": "Select Specific Keys (Multiple Selection)",
+      "selectSharedKeysPlaceholder": "Select one or more specific shared keys",
+      "expertMemoryCleared": "{expertName}'s memory has been cleared",
       "memoryManagement": {
         "title": "AI Assistant Memory Management",
         "description": "View and manage the memory content of each AI assistant. AI assistants remember important user information to provide more personalized recommendations.",
@@ -776,24 +944,243 @@
       "clearSuccessDescription": "All health log data has been cleared",
       "clearErrorTitle": "Clear Failed",
       "clearErrorDescription": "Unable to clear your health data",
-      "selectFile": "Select File"
+      "selectFile": "Select File",
+      "cloudSync": "Cloud Sync",
+      "crossDeviceSync": "Cross-device data synchronization",
+      "lastSync": "Last Sync",
+      "syncingData": "Syncing data...",
+      "syncNow": "Sync Now",
+      "syncing": "Syncing...",
+      "healthLogs": "Health Logs",
+      "aiMemories": "AI Memories",
+      "userProfile": "User Profile",
+      "categorizedSync": "Categorized Sync",
+      "pullMemories": "Pull Memories",
+      "pushMemories": "Push Memories",
+      "pullProfile": "Pull Profile",
+      "pushProfile": "Push Profile",
+      "developerOptions": "Developer Options",
+      "clearThrottleState": "Clear Throttle State",
+      "clearThrottleDescription": "Clear sync throttle state to allow immediate automatic sync",
+      "dataSynced": "Data Synced",
+      "notSyncedYet": "Not synced yet",
+      "throttling": "Throttling",
+      "throttlingMinutes": "Throttling ({minutes} minutes)",
+      "fetchSharedKeysListFailed": "Failed to fetch shared keys list",
+      "localSavedCloudSyncRetry": "Saved locally, cloud sync will retry later",
+      "approachingLimit": "Approaching limit",
+      "autoSaveIn3Seconds": "Auto-save in 3 seconds",
+      "loadingSettings": "Loading settings..."
     }
   },
   "sync": {
     "info": {
-      "title": "Syncing Data"
+      "title": "Syncing data"
     },
     "success": {
-      "title": "Sync Successful"
+      "title": "Sync Successful",
+      "syncTitle": "Sync Successful",
+      "pullTitle": "Sync Successful",
+      "pullDescription": "{count} records have been synced from the cloud.",
+      "pushTitle": "Push Successful"
     },
     "error": {
-      "title": "Sync Failed"
+      "title": "Sync Failed",
+      "syncTitle": "Sync Failed",
+      "unauthorized": {
+        "title": "Unauthorized",
+        "description": "You need to be logged in to sync data."
+      },
+      "pullFailed": "Failed to pull data from the cloud.",
+      "pushFailed": "Failed to push data to the cloud.",
+      "pullTitle": "Data Pull Error",
+      "pushTitle": "Data Push Error"
     },
     "pullStarted": "Pulling latest data from the cloud...",
     "pullFinished": "Successfully pulled {count} records from the cloud.",
-    "pullFailed": "Failed to pull data from the cloud: {error}",
     "pushStarted": "Pushing local changes to the cloud...",
     "pushFinished": "Successfully pushed changes to the cloud.",
     "pushFailed": "Failed to push data to the cloud: {error}"
+  },
+  "smartSuggestions": {
+    "noData": {
+      "title": "Insufficient Data",
+      "description": "Not enough data for {date} to generate suggestions."
+    },
+    "error": {
+      "title": "Suggestion Generation Failed",
+      "description": "Unable to generate smart suggestions, please try again later."
+    },
+    "unknownError": {
+      "title": "Unknown Error",
+      "description": "An unknown error occurred while generating suggestions."
+    },
+    "success": {
+      "title": "Suggestions Updated",
+      "description": "New smart suggestions have been generated for {date}."
+    }
+  },
+  "sharedKeys": {
+    "title": "Shared Key Pool",
+    "subtitle": "Contribute your API Keys and share AI computing power with the community",
+    "tabs": {
+      "leaderboard": "Usage Leaderboard",
+      "myConfigs": "My Configurations",
+      "share": "Share API Key"
+    },
+    "trustLevel": {
+      "loginRequired": "Login Required",
+      "loginDescription": "Please login with your Linux.do account to use shared services",
+      "loginButton": "Login to Linux.do",
+      "insufficientTrust": "Insufficient Trust Level",
+      "requiresLevel": "Shared services require trust level {level} or above",
+      "currentLevel": "Your current trust level: {level}",
+      "howToImprove": "How to improve trust level:",
+      "improveTip1": "Actively participate in Linux.do community discussions",
+      "improveTip2": "Post high-quality content and replies",
+      "improveTip3": "Maintain good community behavior record",
+      "visitCommunity": "Visit Linux.do Community"
+    },
+    "security": {
+      "title": "Security & Control",
+      "feature1": "API Keys encrypted storage for data security",
+      "feature2": "Custom daily call limits for precise usage control",
+      "feature3": "Real-time usage statistics with transparent call records",
+      "feature4": "Edit or withdraw your configurations anytime"
+    },
+    "upload": {
+      "title": "Share Your API Key",
+      "keyName": "Configuration Name",
+      "keyNamePlaceholder": "Give your configuration a name",
+      "baseUrl": "Base URL",
+      "baseUrlPlaceholder": "e.g., https://api.openai.com",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "Enter your API Key",
+      "dailyLimit": "Daily Limit",
+      "dailyLimitDescription": "Set maximum daily calls",
+      "description": "Description",
+      "descriptionPlaceholder": "Briefly describe this configuration's features",
+      "tags": "Tags",
+      "tagsPlaceholder": "Add tags",
+      "addTag": "Add Tag",
+      "detectModels": "Detect Models",
+      "detecting": "Detecting...",
+      "availableModels": "Available Models",
+      "modelFilter": "Filter Models",
+      "selectModels": "Select models to share",
+      "testConnection": "Test Connection",
+      "testing": "Testing...",
+      "uploadKey": "Upload Configuration",
+      "uploading": "Uploading...",
+      "selectAll": "Select All",
+      "deselectAll": "Deselect All",
+      "selectedCount": "Selected {count} models",
+      "noModelsDetected": "No models detected",
+      "pleaseDetectFirst": "Please detect available models first",
+      "pleaseSelectModel": "Please select at least one model",
+      "readyToShare": "Ready to share, your API Key will be securely encrypted",
+      "sharing": "Sharing...",
+      "shareToComm": "Share to Community",
+      "shareDescription": "After sharing, your configuration will help community users better use AI services",
+      "networkError": "Network error, please try again later",
+      "retryLater": "Please try again later",
+      "unlimited": "Unlimited",
+      "quickSelect": "Quick Select:",
+      "customTags": "Custom Tags:",
+      "selected": "Selected:",
+      "cautionUse": "(Use with caution)",
+      "supportUsers": "Can support approximately",
+      "usersCount": "users",
+      "completeShare": "Complete Sharing",
+      "basicConfig": "Basic Configuration",
+      "basicConfigDesc": "Fill in your API basic information",
+      "configDetails": "Configuration Details",
+      "configDetailsDesc": "Set usage limits and description information",
+      "testRequiredFields": "Please fill in API URL and Key first",
+      "testSuccessWithModels": "API connection successful! Found {count} available models, please select models to share below.",
+      "testSuccessNoModels": "Connection successful, but unable to automatically detect model list.",
+      "apiConnectionFailed": "API connection failed",
+      "fillRequiredFields": "Please fill in all required fields",
+      "authFailed": "Authentication failed",
+      "sessionInvalid": "Session invalid, please login again",
+      "errors": {
+        "invalidBaseUrl": "Invalid API URL format",
+        "missingFields": "Missing required fields: API URL, API Key, model name",
+        "missingUploadFields": "Missing required fields: configuration name, API URL, API Key and available models",
+        "invalidDailyLimit": "Daily limit must be between 150-99999, or 999999 for unlimited",
+        "serverError": "Internal server error"
+      },
+      "messages": {
+        "testSuccess": "Connection test successful",
+        "testFailed": "Connection test failed",
+        "uploadSuccess": "Upload successful",
+        "uploadSuccessDesc": "Thank you for sharing your API Key!",
+        "uploadFailed": "Upload failed",
+        "detectSuccess": "Detection successful",
+        "detectSuccessDesc": "Found {count} available models",
+        "detectFailed": "Detection failed",
+        "detectFailedDesc": "Unable to get model list, please check configuration"
+      }
+    },
+    "benefits": {
+      "title": "Benefits of Sharing",
+      "benefit1": "Share API costs with other users, reducing personal expenses",
+      "benefit2": "Fully utilize API quotas, avoiding resource waste",
+      "benefit3": "Flexible usage control, can adjust or disable anytime",
+      "benefit4": "Get detailed usage statistics and cost analysis"
+    },
+    "thanksBoard": {
+      "title": "Thanks Board - API Key Contributors",
+      "currentlyUsing": "Currently Using",
+      "contributorSharing": "{contributor} shared {model}",
+      "stats": {
+        "contributors": "Contributors",
+        "totalCalls": "calls",
+        "activeKeys": "Active Keys"
+      },
+      "loading": "Loading...",
+      "loadFailed": "Load Failed",
+      "loadFailedDesc": "Unable to load thanks board",
+      "networkError": "Network error, please try again later"
+    },
+    "leaderboard": {
+      "title": "Usage Leaderboard",
+      "description": "View available API configurations, sorted by usage, with real-time model health status",
+      "configName": "Configuration Name",
+      "contributor": "Contributor",
+      "model": "Model",
+      "dailyUsage": "Daily Usage",
+      "totalUsage": "Total Usage",
+      "status": "Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "loading": "Loading leaderboard data...",
+      "noData": "No configurations available",
+      "noDataDesc": "Be the first to share an API configuration",
+      "refreshData": "Refresh Data",
+      "perDay": "day"
+    },
+    "myConfigs": {
+      "title": "My Configurations",
+      "description": "Manage all your shared API configurations, including disabled ones",
+      "noConfigs": "You don't have any configurations yet",
+      "shareFirst": "Click 'Share API Key' to create your first configuration",
+      "configName": "Configuration Name",
+      "model": "Model",
+      "dailyLimit": "Daily Limit",
+      "todayUsage": "Today",
+      "totalUsage": "times used",
+      "status": "Status",
+      "actions": "Actions",
+      "edit": "Edit",
+      "delete": "Delete",
+      "active": "Active",
+      "inactive": "Disabled",
+      "confirmDelete": "Confirm Delete",
+      "deleteWarning": "Are you sure you want to delete configuration \"{name}\"? This action cannot be undone.",
+      "deleteSuccess": "Delete successful",
+      "deleteSuccessDesc": "Configuration deleted",
+      "deleteFailed": "Delete failed"
+    }
   }
 }

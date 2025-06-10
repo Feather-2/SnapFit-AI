@@ -16,7 +16,6 @@ export async function POST(req: Request) {
 
     return Response.json(modelList)
   } catch (error) {
-    console.error("Error fetching models:", error)
     return Response.json(
       { error: "Failed to fetch models", details: error instanceof Error ? error.message : String(error) },
       { status: 500 },

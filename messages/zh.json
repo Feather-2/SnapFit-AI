@@ -35,7 +35,46 @@
     "settings": "设置",
     "signIn": "登录",
     "signOut": "退出",
-    "toggleTheme": "切换主题"
+    "toggleTheme": "切换主题",
+    "theme": "主题",
+    "language": "语言",
+    "sharedServices": "共享服务",
+    "loginRequired": "请先登录查看您的配置",
+    "canUseSharedService": "可使用共享服务",
+    "usageToday": "今日使用",
+    "totalUsage": "总使用次数",
+    "userMenu": {
+      "settings": "设置",
+      "sharedServices": "共享服务",
+      "signOut": "登出",
+      "signIn": "登录"
+    },
+    "insufficientPermission": "权限不足",
+    "usage": {
+      "dailyQuota": "今日对话额度",
+      "updatedAt": "更新于",
+      "remaining": "剩余",
+      "times": "次",
+      "loading": "加载中...",
+      "loadingUsage": "加载使用情况...",
+      "quotaSufficient": "额度充足",
+      "quotaRunningLow": "额度使用较多",
+      "quotaAlmostExhausted": "额度即将用完",
+      "quotaExhausted": "今日额度已用完",
+      "todayConversation": "今日对话",
+      "usedPercentage": "已使用",
+      "canConverse": "您还可以进行",
+      "conversationsLeft": "次对话",
+      "quotaExhaustedMessage": "今日对话额度已用完，请明天再来或提升信任等级获得更多额度",
+      "refreshUsage": "刷新使用情况",
+      "retry": "重试",
+      "cannotLoadUsage": "无法加载使用情况",
+      "weeklyStats": "7日统计",
+      "totalConversations": "总对话",
+      "averageDaily": "日均对话",
+      "upgradePrompt": "额度使用较多？提升信任等级获得更多额度！",
+      "nextLevelQuota": "下一等级可获得"
+    }
   },
   "app": {
     "title": "SnapFit AI",
@@ -95,6 +134,62 @@
       "weightCleared": "体重已清除",
       "weightClearedDesc": "已清除 {date} 的体重记录。"
     },
+    "handleSaveDailyWeight": {
+      "success": {
+        "title": "体重已保存",
+        "description": "已将体重记录为 {weight} kg"
+      },
+      "error": {
+        "title": "体重无效",
+        "description": "请输入一个有效的正数作为体重。"
+      }
+    },
+    "handleDeleteEntry": {
+      "success": {
+        "title": "删除成功",
+        "description": "已删除该条记录"
+      }
+    },
+    "handleUpdateEntry": {
+      "success": {
+        "title": "更新成功",
+        "description": "已更新该条记录"
+      }
+    },
+    "handleSubmit": {
+      "success": {
+        "title": "记录成功",
+        "description": "已添加 {foodCount} 项食物和 {exerciseCount} 项运动记录"
+      },
+      "error": {
+        "title": "处理失败",
+        "description": "{error}"
+      }
+    },
+    "handleDailyActivityLevelChange": {
+      "success": {
+        "title": "活动水平已更新",
+        "description": "已将活动水平设置为 {level}"
+      }
+    },
+    "smartSuggestions": {
+      "noData": {
+        "title": "数据不足",
+        "description": "日期 {date} 没有足够的数据来生成建议。"
+      },
+      "error": {
+        "title": "建议生成失败",
+        "description": "无法生成智能建议，请稍后重试。"
+      },
+      "unknownError": {
+        "title": "未知错误",
+        "description": "生成建议时发生未知错误。"
+      },
+      "success": {
+        "title": "建议已更新",
+        "description": "已为日期 {date} 生成新的智能建议。"
+      }
+    },
     "validation": {
       "invalidWeight": "体重无效",
       "invalidWeightDesc": "请输入一个有效的正数作为体重。"
@@ -126,7 +221,16 @@
       "quickConfig": "快速配置",
       "dataExport": "数据导出",
       "neverExported": "建议备份数据",
-      "exportReminder": "已{days}天未备份"
+      "exportReminder": "已{days}天未备份",
+      "todayRecords": "今日记录",
+      "todayData": "今日数据",
+      "dataCharts": "数据图表",
+      "diet": "饮食",
+      "exercise": "运动",
+      "status": "状态",
+      "refreshing": "同步中",
+      "refresh": "刷新",
+      "healthDisclaimer": "本应用基于AI技术，仅为您提供健康管理参考。请注意：AI分析可能存在偏差，特别是营养数据方面。您的健康很重要，在做出重要的饮食或运动决策前，建议咨询专业的医生、营养师或健身教练。"
     },
     "dailyStatus": {
       "stress": "压力水平",
@@ -248,9 +352,12 @@
     "suggestions": {
       "title": "智能建议",
       "description": "基于您的数据生成的个性化建议",
-      "loading": "加载中...",
-      "noSuggestions": "暂无智能建议",
-      "addMoreData": "添加更多数据后将获得个性化建议"
+      "loading": "正在生成建议...",
+      "refresh": "重新生成",
+      "noSuggestions": "暂无建议",
+      "addMoreData": "记录更多数据以获得建议。",
+      "generatePrompt": "记录更多数据以获得个性化建议。",
+      "generatedTime": "生成时间"
     },
     "foodCard": {
       "foodName": "食物名称",
@@ -273,6 +380,7 @@
         "dinner": "晚餐",
         "snack": "加餐"
       },
+      "unknown": "未知",
       "timePeriods": {
         "morning": "上午",
         "noon": "中午",
@@ -293,7 +401,15 @@
       "reps": "次",
       "distance": "公里",
       "weight": "kg",
-      "muscleGroups": "锻炼部位"
+      "muscleGroups": "锻炼部位",
+      "timePeriod": "时间段",
+      "selectTimePeriod": "选择时间段",
+      "timePeriods": {
+        "morning": "上午",
+        "noon": "中午",
+        "afternoon": "下午",
+        "evening": "晚上"
+      }
     }
   },
 
@@ -352,6 +468,7 @@
     "selectExpert": "选择专家",
     "includeHealthData": "包含健康数据",
     "clearHistory": "清除记录",
+    "exportConversation": "导出对话",
     "inputPlaceholder": "输入您的问题...",
     "aiThinking": "AI正在思考...",
     "loading": "加载中...",
@@ -567,9 +684,13 @@
       "bmrBasisDescription": "选择计算BMR时是使用总体重还是去脂体重。选择后者通常更准确，但需要您提供体脂率。",
       "bodyFatPercentage": "体脂率 (%)",
       "bodyFatPlaceholder": "例如: 15",
-      "bodyFatDescription": "请输入您的体脂百分比。例如，输入15代表15%。"
+      "bodyFatDescription": "请输入您的体脂百分比。例如，输入15代表15%。",
+      "greeting": "您好"
     },
-
+    "sharedKeys": {
+      "title": "共享密钥池",
+      "description": "贡献您的API Key，与社区共享AI算力"
+    },
     "buttons": {
       "save": "保存",
       "test": "测试",
@@ -585,7 +706,9 @@
       "saveAIConfig": "保存 AI 配置",
       "exportAllData": "导出所有数据",
       "clearAllData": "清空所有数据",
-      "confirmClear": "确认清空"
+      "confirmClear": "确认清空",
+      "saveFailed": "保存失败",
+      "saveFailedDescription": "记忆保存失败，请重试"
     },
     "actions": {
       "getModels": "获取模型",
@@ -678,20 +801,50 @@
       "clearSuccessDescription": "所有健康日志数据已清除",
       "clearErrorTitle": "清除失败",
       "clearErrorDescription": "无法清除您的健康数据",
-      "selectFile": "选择文件"
+      "selectFile": "选择文件",
+      "cloudSync": "云同步",
+      "crossDeviceSync": "跨设备数据同步",
+      "lastSync": "最后同步",
+      "syncingData": "正在同步数据...",
+      "syncNow": "立即同步",
+      "syncing": "同步中...",
+      "healthLogs": "健康日志",
+      "aiMemories": "AI记忆",
+      "userProfile": "用户档案",
+      "categorizedSync": "分类同步",
+      "pullMemories": "拉取记忆",
+      "pushMemories": "推送记忆",
+      "pullProfile": "拉取档案",
+      "pushProfile": "推送档案",
+      "developerOptions": "开发者选项",
+      "clearThrottleState": "清除节流状态",
+      "clearThrottleDescription": "清除同步节流状态，允许立即进行自动同步",
+      "dataSynced": "数据已同步",
+      "notSyncedYet": "尚未同步",
+      "throttling": "节流中",
+      "throttlingMinutes": "节流中 ({minutes}分钟)",
+      "fetchSharedKeysListFailed": "获取共享Key列表失败",
+      "localSavedCloudSyncRetry": "本地已保存，云端同步将稍后重试",
+      "approachingLimit": "即将达到上限",
+      "autoSaveIn3Seconds": "3秒后自动保存",
+      "loadingSettings": "加载设置..."
     },
     "about": {
       "title": "关于与帮助",
       "privacyTitle": "隐私声明",
-      "privacyDescription": "本应用所有数据均存储在您的浏览器本地，不会上传到任何服务器。与 AI 模型的通信仅用于处理您的输入并生成建议，不会存储您的个人数据。",
+      "privacyDescription": "我们重视您的隐私保护。本应用会在云端存储您的基础个人信息（如用户名、头像等）、体重记录、饮食和运动数据，以及您主动分享给社群的API密钥，以提供跨设备同步和社群功能。但是，您的个人私有API密钥和与AI的对话记录始终保存在您的浏览器本地，不会上传到我们的服务器。与AI模型的通信仅用于处理您的输入并生成建议，我们不会存储这些对话内容。",
       "usageTitle": "使用说明",
+      "quotaInfo": "通过 Linux.do OAuth2 登录后，您将根据信任等级获得相应的每日使用额度。我们鼓励用户分享优质模型配置，共建社区生态。",
+      "modelOptions": "您可以使用社区共享模型或配置私有模型。",
+      "dataBackupTitle": "数据备份",
+      "dataBackupDescription": "应用使用云数据库存储。为确保数据安全，强烈建议定期导出数据作为备份。",
       "usage1": "在主页记录您的饮食和运动",
       "usage2": "使用文本输入或上传图片来添加记录",
       "usage3": "在智能对话页面与 AI 助手交流获取健康建议",
       "usage4": "在 AI 配置页面设置您的模型参数",
       "usage5": "定期导出您的数据以防数据丢失",
       "versionTitle": "版本信息",
-      "versionInfo": "SnapFit AI"
+      "versionInfo": "SnapFit AI 社区版"
     },
     "ai": {
       "title": "AI 配置",
@@ -732,6 +885,29 @@
       "modelNamePlaceholder": "例如: gpt-4o",
       "fetchModels": "获取模型",
       "testConnection": "测试连接",
+      "privateConfig": "私有配置",
+      "sharedPool": "社区共享池",
+      "networkDiagnostic": "网络诊断",
+      "cannotFetchModels": "无法获取模型",
+      "fillApiUrlAndKey": "请先填写API URL和Key",
+      "fetchModelsSuccess": "获取模型成功",
+      "foundModels": "发现了 {count} 个可用模型",
+      "networkErrorOrApiUnavailable": "网络错误或API不可用",
+      "privateConfigIncomplete": "私有配置不完整",
+      "sharedPoolConfigIncomplete": "共享池配置不完整",
+      "fillAllFieldsForModel": "请为 {modelType} 填写所有字段",
+      "selectSharedModelForModel": "请为 {modelType} 选择一个共享模型",
+      "selectSharedKeysForModel": "请为 {modelType} 在手动模式下至少选择一个共享Key",
+      "testConnectionFailed": "测试失败",
+      "selectSharedModel": "第一步：选择共享模型",
+      "pleaseSelectModel": "请选择一个模型...",
+      "selectRunMode": "第二步：选择运行模式",
+      "autoBalance": "自动均衡",
+      "manualSpecify": "手动指定",
+      "autoBalanceDescription": "系统将在所有支持 {model} 的可用密钥中自动选择。",
+      "selectSpecificKeys": "选择特定的Key (可多选)",
+      "selectSharedKeysPlaceholder": "选择一个或多个特定的共享Key",
+      "expertMemoryCleared": "{expertName}的记忆已清空",
       "memoryManagement": {
         "title": "AI助手记忆管理",
         "description": "查看和管理每个AI助手的记忆内容。AI助手会记住重要的用户信息以提供更个性化的建议。",
@@ -786,13 +962,29 @@
     "smartSuggestions": "智能建议",
     "noFoodEntries": "今日暂无饮食记录",
     "noExerciseEntries": "今日暂无运动记录",
+    "generatedTime": "生成时间",
     "screenshot": {
       "capture": "保存为图片",
       "capturing": "截图中...",
       "success": "截图成功",
       "successDescription": "健康汇总已保存为图片",
       "failed": "截图失败",
-      "failedDescription": "请稍后重试或尝试其他浏览器"
+      "failedDescription": "请稍后重试或尝试其他浏览器",
+      "preparing": "准备截图中...",
+      "preparingDescription": "正在使用html-to-image生成高质量截图",
+      "savedAs": "截图已保存为",
+      "failedRetry": "截图失败，请刷新页面后重试"
+    },
+    "priorities": {
+      "high": "高优先级",
+      "medium": "中优先级",
+      "low": "低优先级"
+    },
+    "actionable": "可执行建议",
+    "loading": "加载中...",
+    "branding": {
+      "tagline": "智能健康管理助手",
+      "slogan": "让健康生活更简单 · 数据驱动的个性化健康建议"
     }
   },
   "sync": {
@@ -800,16 +992,191 @@
       "title": "正在同步数据"
     },
     "success": {
-      "title": "同步成功"
+      "title": "同步成功",
+      "syncTitle": "同步成功",
+      "pullTitle": "同步成功",
+      "pullDescription": "已从云端同步 {count} 条更新记录。",
+      "pushTitle": "推送成功"
     },
     "error": {
-      "title": "同步失败"
+      "title": "同步失败",
+      "syncTitle": "同步失败",
+      "unauthorized": {
+        "title": "未授权",
+        "description": "您需要登录才能同步数据。"
+      },
+      "pullFailed": "从云端拉取数据失败。",
+      "pushFailed": "推送数据到云端失败。",
+      "pullTitle": "数据拉取错误",
+      "pushTitle": "数据推送错误"
     },
     "pullStarted": "正在从云端拉取最新数据...",
     "pullFinished": "成功从云端拉取 {count} 条记录。",
-    "pullFailed": "从云端拉取数据失败: {error}",
     "pushStarted": "正在将本地更改推送到云端...",
     "pushFinished": "成功将更改推送到云端。",
     "pushFailed": "将数据推送到云端失败: {error}"
+  },
+  "sharedKeys": {
+    "title": "共享密钥池",
+    "subtitle": "贡献您的API Key，与社区共享AI算力",
+    "tabs": {
+      "leaderboard": "使用排行榜",
+      "myConfigs": "我的配置",
+      "share": "分享 API Key"
+    },
+    "trustLevel": {
+      "loginRequired": "需要登录",
+      "loginDescription": "请先登录您的Linux.do账号以使用共享服务",
+      "loginButton": "登录 Linux.do",
+      "insufficientTrust": "信任等级不足",
+      "requiresLevel": "使用共享服务需要信任等级 {level} 或以上",
+      "currentLevel": "您当前的信任等级：{level}",
+      "howToImprove": "如何提升信任等级：",
+      "improveTip1": "积极参与Linux.do社区讨论",
+      "improveTip2": "发布高质量的内容和回复",
+      "improveTip3": "保持良好的社区行为记录",
+      "visitCommunity": "访问 Linux.do 社区"
+    },
+    "security": {
+      "title": "安全与控制",
+      "feature1": "API Key加密存储，确保数据安全",
+      "feature2": "自定义每日调用限制，精确控制使用量",
+      "feature3": "实时使用统计，透明的调用记录",
+      "feature4": "随时可以编辑或撤回您的配置"
+    },
+    "upload": {
+      "title": "分享您的API Key",
+      "keyName": "配置名称",
+      "keyNamePlaceholder": "为您的配置起个名字",
+      "baseUrl": "Base URL",
+      "baseUrlPlaceholder": "例如: https://api.openai.com",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "输入您的API Key",
+      "dailyLimit": "每日限制",
+      "dailyLimitDescription": "设置每日最大调用次数",
+      "description": "描述",
+      "descriptionPlaceholder": "简单描述这个配置的特点",
+      "tags": "标签",
+      "tagsPlaceholder": "添加标签",
+      "addTag": "添加标签",
+      "detectModels": "检测模型",
+      "detecting": "检测中...",
+      "availableModels": "可用模型",
+      "modelFilter": "筛选模型",
+      "selectModels": "选择要分享的模型",
+      "testConnection": "测试连接",
+      "testing": "测试中...",
+      "uploadKey": "上传配置",
+      "uploading": "上传中...",
+      "selectAll": "全选",
+      "deselectAll": "取消全选",
+      "selectedCount": "已选择 {count} 个模型",
+      "noModelsDetected": "未检测到模型",
+      "pleaseDetectFirst": "请先检测可用模型再提交",
+      "pleaseSelectModel": "请至少选择一个模型",
+      "readyToShare": "准备就绪，您的 API Key 将被安全加密存储",
+      "sharing": "分享中...",
+      "shareToComm": "分享给社区",
+      "shareDescription": "分享后，您的配置将帮助社区用户更好地使用 AI 服务",
+      "networkError": "网络错误，请稍后重试",
+      "retryLater": "请稍后重试",
+      "unlimited": "无限",
+      "quickSelect": "快速选择：",
+      "customTags": "自定义标签：",
+      "selected": "已选择：",
+      "cautionUse": "（谨慎使用）",
+      "supportUsers": "可支持约",
+      "usersCount": "人使用",
+      "completeShare": "完成分享",
+      "basicConfig": "基础配置",
+      "basicConfigDesc": "填写您的 API 基本信息",
+      "configDetails": "配置详情",
+      "configDetailsDesc": "设置使用限制和描述信息",
+      "testRequiredFields": "请先填写API URL和Key",
+      "testSuccessWithModels": "API连接正常！发现 {count} 个可用模型，请在下方选择要分享的模型。",
+      "testSuccessNoModels": "连接正常，但未能自动检测到模型列表。",
+      "apiConnectionFailed": "API连接失败",
+      "fillRequiredFields": "请填写所有必填字段",
+      "authFailed": "认证失败",
+      "sessionInvalid": "会话无效，请重新登录",
+      "errors": {
+        "invalidBaseUrl": "API地址格式不正确",
+        "missingFields": "缺少必填字段：API地址、API密钥、模型名称",
+        "missingUploadFields": "缺少必填字段：配置名称、API地址、API密钥和可用模型",
+        "invalidDailyLimit": "每日限制必须在150-99999之间，或设为999999表示无限制",
+        "serverError": "服务器内部错误"
+      },
+      "messages": {
+        "testSuccess": "连接测试成功",
+        "testFailed": "连接测试失败",
+        "uploadSuccess": "上传成功",
+        "uploadSuccessDesc": "感谢您分享API Key！",
+        "uploadFailed": "上传失败",
+        "detectSuccess": "检测成功",
+        "detectSuccessDesc": "发现 {count} 个可用模型",
+        "detectFailed": "检测失败",
+        "detectFailedDesc": "无法获取模型列表，请检查配置"
+      }
+    },
+    "benefits": {
+      "title": "分享的好处",
+      "benefit1": "与其他用户共享API成本，降低个人开支",
+      "benefit2": "充分利用API配额，避免资源浪费",
+      "benefit3": "灵活控制使用量，可随时调整或停用",
+      "benefit4": "获得详细的使用统计和成本分析"
+    },
+    "thanksBoard": {
+      "title": "感谢榜 - API Key 贡献者",
+      "currentlyUsing": "正在使用",
+      "contributorSharing": "{contributor} 分享的 {model}",
+      "stats": {
+        "contributors": "贡献者",
+        "totalCalls": "次调用",
+        "activeKeys": "活跃Key"
+      },
+      "loading": "加载中...",
+      "loadFailed": "加载失败",
+      "loadFailedDesc": "无法加载感谢榜",
+      "networkError": "网络错误，请稍后重试"
+    },
+    "leaderboard": {
+      "title": "使用排行榜",
+      "description": "查看可用的API配置，按使用量排序，实时显示模型健康状态",
+      "configName": "配置名称",
+      "contributor": "贡献者",
+      "model": "模型",
+      "dailyUsage": "今日使用",
+      "totalUsage": "总使用",
+      "status": "状态",
+      "active": "活跃",
+      "inactive": "不活跃",
+      "loading": "加载排行榜数据...",
+      "noData": "暂无可用的配置",
+      "noDataDesc": "成为第一个分享API配置的用户",
+      "refreshData": "刷新数据",
+      "perDay": "天"
+    },
+    "myConfigs": {
+      "title": "我的配置",
+      "description": "管理您分享的所有API配置，包括已停用的配置",
+      "noConfigs": "您还没有任何配置",
+      "shareFirst": "点击\"分享 API Key\"来创建您的第一个配置",
+      "configName": "配置名称",
+      "model": "模型",
+      "dailyLimit": "每日限制",
+      "todayUsage": "今日",
+      "totalUsage": "次使用",
+      "status": "状态",
+      "actions": "操作",
+      "edit": "编辑",
+      "delete": "删除",
+      "active": "活跃",
+      "inactive": "已停用",
+      "confirmDelete": "确认删除",
+      "deleteWarning": "确定要删除配置\"{name}\"吗？此操作不可撤销。",
+      "deleteSuccess": "删除成功",
+      "deleteSuccessDesc": "配置已删除",
+      "deleteFailed": "删除失败"
+    }
   }
 }

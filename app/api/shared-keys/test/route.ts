@@ -9,9 +9,9 @@ export async function POST(request: NextRequest) {
     // 验证必填字段
     if (!baseUrl || !apiKey || !modelName) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Missing required fields: baseUrl, apiKey, modelName' 
+        {
+          success: false,
+          error: 'Missing required fields: baseUrl, apiKey, modelName'
         },
         { status: 400 }
       )
@@ -22,9 +22,9 @@ export async function POST(request: NextRequest) {
       new URL(baseUrl)
     } catch {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Invalid base URL format' 
+        {
+          success: false,
+          error: 'Invalid base URL format'
         },
         { status: 400 }
       )
@@ -37,9 +37,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Test API key error:', error)
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Internal server error' 
+      {
+        success: false,
+        error: 'Internal server error'
       },
       { status: 500 }
     )
