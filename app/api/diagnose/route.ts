@@ -1,5 +1,11 @@
 import { NextRequest } from 'next/server'
 
+// 超时配置常量
+const TIMEOUT_CONFIG = {
+  CONNECTION_TEST: 15000,    // 连接测试：15秒
+  DIAGNOSTIC: 10000          // 诊断测试：10秒
+} as const
+
 export async function POST(req: NextRequest) {
   try {
     const { baseUrl, apiKey, testType = 'basic' } = await req.json()
@@ -17,7 +23,7 @@ export async function POST(req: NextRequest) {
     // 1. 基础连接测试
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10秒超时
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_CONFIG.DIAGNOSTIC)
 
       const testUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl
       const pingUrl = testUrl.includes('/v1') ? testUrl : `${testUrl}/v1/models`

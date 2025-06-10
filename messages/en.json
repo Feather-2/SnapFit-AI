@@ -27,7 +27,8 @@
     "optional": "Optional",
     "required": "Required",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "blockedDomain": "Blocked Domain"
   },
   "navigation": {
     "home": "Home",
@@ -1108,7 +1109,22 @@
         "missingFields": "Missing required fields: API URL, API Key, model name",
         "missingUploadFields": "Missing required fields: configuration name, API URL, API Key and available models",
         "invalidDailyLimit": "Daily limit must be between 150-99999, or 999999 for unlimited",
-        "serverError": "Internal server error"
+        "serverError": "Internal server error",
+        "urlBlocked": "URL blocked: Official API addresses or sensitive domains not allowed",
+        "urlInvalid": "Invalid URL format: Please check URL format"
+      },
+      "urlValidation": {
+        "passed": "URL validation passed",
+        "blocked": "This URL is blocked and not allowed",
+        "invalid": "Invalid URL format",
+        "localAddress": "Local addresses not allowed",
+        "invalidProtocol": "Only HTTP and HTTPS protocols supported",
+        "empty": "URL cannot be empty",
+        "tips": {
+          "support": "Third-party API proxy services supported",
+          "security": "Official API addresses blocked for community security"
+        },
+        "placeholder": "Enter API service URL"
       },
       "messages": {
         "testSuccess": "Connection test successful",

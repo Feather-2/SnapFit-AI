@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { auth } from '@/lib/auth';
+import { syncRateLimiter } from '@/lib/sync-rate-limiter';
+import { logSecurityEvent } from '@/lib/security-monitor';
+import { getClientIP } from '@/lib/ip-utils';
 
 export async function GET(request: Request) {
   try {
@@ -47,15 +50,49 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
     const userId = session.user.id;
+    const ip = getClientIP(request);
+
+    // 🔒 检查同步速率限制
+    const limitCheck = syncRateLimiter.checkSyncLimit(userId, ip);
+    if (!limitCheck.allowed) {
+      await logSecurityEvent({
+        userId,
+        ipAddress: ip,
+        userAgent: request.headers.get('user-agent') || 'unknown',
+        eventType: 'rate_limit_exceeded',
+        severity: 'medium',
+        description: `Memories sync rate limit exceeded: ${limitCheck.reason}`,
+        metadata: {
+          api: 'sync/memories',
+          retryAfter: limitCheck.retryAfter
+        }
+      });
+
+      return NextResponse.json(
+        {
+          error: limitCheck.reason,
+          code: 'SYNC_RATE_LIMIT_EXCEEDED',
+          retryAfter: limitCheck.retryAfter
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': limitCheck.retryAfter?.toString() || '10',
+            'X-RateLimit-Type': 'sync'
+          }
+        }
+      );
+    }
+
+    const supabase = await createClient();
     const memoriesToSync = await request.json();
 
     if (!memoriesToSync || typeof memoriesToSync !== 'object') {

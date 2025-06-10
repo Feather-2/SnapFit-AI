@@ -1,6 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { auth } from '@/lib/auth';
+import { syncRateLimiter } from '@/lib/sync-rate-limiter';
+import { logSecurityEvent } from '@/lib/security-monitor';
+import { getClientIP } from '@/lib/ip-utils';
+import { securityEventEnhancer } from '@/lib/security-event-enhancer';
 
 export async function GET(request: Request) {
   try {
@@ -32,19 +36,175 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
     const userId = session.user.id;
+    const ip = getClientIP(request);
+
+    // 🔒 检查同步速率限制
+    const limitCheck = syncRateLimiter.checkSyncLimit(userId, ip);
+    if (!limitCheck.allowed) {
+      // 记录速率限制违规
+      await logSecurityEvent({
+        userId,
+        ipAddress: ip,
+        userAgent: request.headers.get('user-agent') || 'unknown',
+        eventType: 'rate_limit_exceeded',
+        severity: 'medium',
+        description: `Sync rate limit exceeded: ${limitCheck.reason}`,
+        metadata: {
+          api: 'sync/logs',
+          retryAfter: limitCheck.retryAfter
+        }
+      });
+
+      return NextResponse.json(
+        {
+          error: limitCheck.reason,
+          code: 'SYNC_RATE_LIMIT_EXCEEDED',
+          retryAfter: limitCheck.retryAfter,
+          limitType: limitCheck.limitType,
+          details: {
+            message: 'Sync rate limit exceeded',
+            limitType: limitCheck.limitType,
+            retryAfter: limitCheck.retryAfter,
+            limits: {
+              perSecond: 3,
+              perMinute: 30,
+              perHour: 300
+            }
+          }
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': limitCheck.retryAfter?.toString() || '10',
+            'X-RateLimit-Type': 'sync',
+            'X-RateLimit-Limit-Type': limitCheck.limitType || 'unknown'
+          }
+        }
+      );
+    }
+
+    const supabase = await createClient();
     const logsToSync = await request.json();
+
+    // 🔗 增强最近的安全事件，关联用户ID
+    // 这样可以将之前缺少用户ID的安全事件与当前用户关联
+    setImmediate(async () => {
+      try {
+        await securityEventEnhancer.enhanceRecentEvents(userId, ip, 5);
+      } catch (error) {
+        console.error('Error enhancing security events:', error);
+      }
+    });
 
     if (!Array.isArray(logsToSync) || logsToSync.length === 0) {
       return NextResponse.json({ error: 'Invalid or empty data provided.' }, { status: 400 });
+    }
+
+    // 🔍 验证日志数据
+    const maxLogsPerRequest = 100; // 限制每次同步的日志数量
+    if (logsToSync.length > maxLogsPerRequest) {
+      await logSecurityEvent({
+        userId,
+        ipAddress: ip,
+        userAgent: request.headers.get('user-agent') || 'unknown',
+        eventType: 'invalid_input',
+        severity: 'medium',
+        description: `Too many logs in sync request: ${logsToSync.length} (max: ${maxLogsPerRequest})`,
+        metadata: {
+          logCount: logsToSync.length,
+          maxAllowed: maxLogsPerRequest,
+          api: 'sync/logs'
+        }
+      });
+
+      return NextResponse.json({
+        error: 'Too many logs in single request',
+        details: {
+          provided: logsToSync.length,
+          maximum: maxLogsPerRequest
+        }
+      }, { status: 400 });
+    }
+
+    // 验证每个日志条目的内容大小
+    for (let i = 0; i < logsToSync.length; i++) {
+      const log = logsToSync[i];
+      const logSize = JSON.stringify(log).length;
+      const maxLogSize = 50 * 1024; // 50KB per log entry
+
+      if (logSize > maxLogSize) {
+        await logSecurityEvent({
+          userId,
+          ipAddress: ip,
+          userAgent: request.headers.get('user-agent') || 'unknown',
+          eventType: 'invalid_input',
+          severity: 'medium',
+          description: `Log entry too large: ${logSize} bytes (max: ${maxLogSize} bytes)`,
+          metadata: {
+            logIndex: i,
+            logSize,
+            maxLogSize,
+            api: 'sync/logs'
+          }
+        });
+
+        return NextResponse.json({
+          error: 'Log entry too large',
+          details: {
+            logIndex: i,
+            size: logSize,
+            maximum: maxLogSize
+          }
+        }, { status: 400 });
+      }
+
+      // 验证文本字段长度
+      if (log.log_data) {
+        const validateTextFields = (data: any, path = '') => {
+          if (typeof data === 'string' && data.length > 10000) {
+            throw new Error(`Text field too long at ${path}: ${data.length} characters (max: 10000)`);
+          }
+          if (typeof data === 'object' && data !== null) {
+            for (const [key, value] of Object.entries(data)) {
+              validateTextFields(value, path ? `${path}.${key}` : key);
+            }
+          }
+        };
+
+        try {
+          validateTextFields(log.log_data);
+        } catch (error) {
+          await logSecurityEvent({
+            userId,
+            ipAddress: ip,
+            userAgent: request.headers.get('user-agent') || 'unknown',
+            eventType: 'invalid_input',
+            severity: 'low',
+            description: `Invalid text field in log data: ${error.message}`,
+            metadata: {
+              logIndex: i,
+              error: error.message,
+              api: 'sync/logs'
+            }
+          });
+
+          return NextResponse.json({
+            error: 'Invalid text field in log data',
+            details: {
+              logIndex: i,
+              message: error.message
+            }
+          }, { status: 400 });
+        }
+      }
     }
 
     console.log(`[API/SYNC/POST] Attempting to upsert ${logsToSync.length} logs for user: ${userId}`);

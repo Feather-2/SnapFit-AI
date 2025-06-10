@@ -27,7 +27,8 @@
     "optional": "可选",
     "required": "必填",
     "yes": "是",
-    "no": "否"
+    "no": "否",
+    "blockedDomain": "被封禁域名"
   },
   "navigation": {
     "home": "主页",
@@ -1104,7 +1105,22 @@
         "missingFields": "缺少必填字段：API地址、API密钥、模型名称",
         "missingUploadFields": "缺少必填字段：配置名称、API地址、API密钥和可用模型",
         "invalidDailyLimit": "每日限制必须在150-99999之间，或设为999999表示无限制",
-        "serverError": "服务器内部错误"
+        "serverError": "服务器内部错误",
+        "urlBlocked": "URL被封禁：不允许使用官方API地址或敏感域名",
+        "urlInvalid": "URL格式无效：请检查URL格式"
+      },
+      "urlValidation": {
+        "passed": "URL验证通过",
+        "blocked": "此URL被封禁，不允许使用",
+        "invalid": "URL格式无效",
+        "localAddress": "不允许使用本地地址",
+        "invalidProtocol": "只支持HTTP和HTTPS协议",
+        "empty": "URL不能为空",
+        "tips": {
+          "support": "支持第三方API代理服务",
+          "security": "为出于管理方便，已屏蔽官方API地址"
+        },
+        "placeholder": "请输入API服务地址"
       },
       "messages": {
         "testSuccess": "连接测试成功",

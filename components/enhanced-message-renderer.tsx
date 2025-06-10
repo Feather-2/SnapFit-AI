@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { MarkdownRenderer } from "./markdown-renderer"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, Brain, Edit3 } from "lucide-react"
@@ -16,7 +16,7 @@ interface EnhancedMessageRendererProps {
   onMemoryUpdateRequest?: (request: { newContent: string; reason: string }) => void // 记忆更新回调
 }
 
-export function EnhancedMessageRenderer({
+const EnhancedMessageRenderer = React.memo(({
   content,
   reasoningContent,
   className,
@@ -24,7 +24,7 @@ export function EnhancedMessageRenderer({
   isStreaming = false,
   isExportMode = false,
   onMemoryUpdateRequest
-}: EnhancedMessageRendererProps) {
+}: EnhancedMessageRendererProps) => {
   // 根据导出模式和内容类型设置默认展开状态
   const [showReasoning, setShowReasoning] = useState(() => {
     if (isExportMode) {
@@ -679,4 +679,8 @@ export function EnhancedMessageRenderer({
       )}
     </div>
   )
-}
+})
+
+EnhancedMessageRenderer.displayName = 'EnhancedMessageRenderer'
+
+export { EnhancedMessageRenderer }

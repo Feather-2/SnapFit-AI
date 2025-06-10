@@ -1,3 +1,13 @@
+// 超时配置常量
+const TIMEOUT_CONFIG = {
+  CONNECTION_TEST: 15000,    // 连接测试：15秒
+  SIMPLE_CHAT: 60000,        // 简单对话：60秒
+  COMPLEX_ANALYSIS: 90000,   // 复杂分析：90秒
+  STREAM_RESPONSE: 120000,   // 流式响应：120秒
+  IMAGE_PROCESSING: 75000,   // 图像处理：75秒
+  DEFAULT: 60000             // 默认：60秒
+} as const
+
 // 通用的 OpenAI 兼容客户端
 export class OpenAICompatibleClient {
   private baseUrl: string
@@ -73,7 +83,18 @@ export class OpenAICompatibleClient {
     try {
       // 创建 AbortController 用于超时控制
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30秒超时
+
+      // 根据请求类型选择合适的超时时间
+      let timeout: number = TIMEOUT_CONFIG.DEFAULT
+      if (params.stream) {
+        timeout = TIMEOUT_CONFIG.STREAM_RESPONSE
+      } else if (requestBody.messages.some((msg: any) =>
+        Array.isArray(msg.content) && msg.content.some((item: any) => item.type === 'image_url')
+      )) {
+        timeout = TIMEOUT_CONFIG.IMAGE_PROCESSING
+      }
+
+      const timeoutId = setTimeout(() => controller.abort(), timeout)
 
       const response = await fetch(url, {
         method: "POST",
@@ -104,7 +125,7 @@ export class OpenAICompatibleClient {
       // 提供更详细的错误信息
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new Error(`请求超时：连接到 ${this.baseUrl} 超过30秒未响应。请检查网络连接或API服务状态。`)
+          throw new Error(`请求超时：连接到 ${this.baseUrl} 未在预期时间内响应。请检查网络连接或API服务状态。`)
         } else if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
           throw new Error(`网络连接失败：无法连接到 ${this.baseUrl}。请检查网络连接和API地址是否正确。`)
         } else if (error.message.includes('CERT') || error.message.includes('certificate')) {
@@ -217,7 +238,7 @@ export class OpenAICompatibleClient {
     try {
       // 创建 AbortController 用于超时控制
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15秒超时
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_CONFIG.CONNECTION_TEST)
 
       const response = await fetch(url, {
         method: "GET",
@@ -246,7 +267,7 @@ export class OpenAICompatibleClient {
       // 提供更详细的错误信息
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new Error(`获取模型列表超时：连接到 ${this.baseUrl} 超过15秒未响应。`)
+          throw new Error(`获取模型列表超时：连接到 ${this.baseUrl} 超过${TIMEOUT_CONFIG.CONNECTION_TEST/1000}秒未响应。`)
         } else if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
           throw new Error(`网络连接失败：无法连接到 ${this.baseUrl}。请检查网络连接和API地址。`)
         }

@@ -199,15 +199,15 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     loadDailyLog(selectedDate);
   }, [selectedDate, loadDailyLog]);
 
-  // 监听强制数据刷新事件（删除操作后触发）
+  // 监听强制数据刷新事件（删除操作和云同步后触发）
   useEffect(() => {
     const handleForceRefresh = (event: CustomEvent) => {
-      const { date } = event.detail;
+      const { date, source } = event.detail;
       const eventDate = format(new Date(date), "yyyy-MM-dd");
       const currentDate = format(selectedDate, "yyyy-MM-dd");
 
       if (eventDate === currentDate) {
-        console.log(`[Page] Force refreshing data for ${currentDate}`);
+        console.log(`[Page] Force refreshing data for ${currentDate} (source: ${source || 'unknown'})`);
         loadDailyLog(selectedDate);
       }
     };
@@ -809,18 +809,13 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       const dateString = format(selectedDate, "yyyy-MM-dd");
       await removeEntry(dateString, type, id);
 
-      // 本地立即更新UI（removeEntry已经处理了本地删除）
-      const updatedLog = { ...dailyLog };
-
-      if (type === "food") {
-        updatedLog.foodEntries = updatedLog.foodEntries.filter((entry) => entry.log_id !== id);
-      } else {
-        updatedLog.exerciseEntries = updatedLog.exerciseEntries.filter((entry) => entry.log_id !== id);
-      }
-
-      // 重新计算汇总并更新本地状态
-      const finalLog = recalculateSummary(updatedLog);
-      setDailyLog(finalLog);
+      // ✅ removeEntry 函数已经处理了：
+      // 1. 本地 IndexedDB 数据更新
+      // 2. 云端数据同步
+      // 3. 触发 forceDataRefresh 事件
+      //
+      // forceDataRefresh 事件监听器会自动调用 loadDailyLog()
+      // 来重新加载数据并重新计算汇总，无需手动操作
 
       // 🔄 删除成功后，延迟触发一次数据拉取，确保其他设备能同步
       setTimeout(() => {

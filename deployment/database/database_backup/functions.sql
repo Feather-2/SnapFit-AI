@@ -873,3 +873,188 @@ BEGIN
   RETURN QUERY SELECT cleaned_log_count, cleaned_memory_count, cleaned_event_count, table_count;
 END;
 $$;
+
+-- ========================================
+-- 8. 安全管理函数
+-- ========================================
+
+-- 记录限额违规的函数
+CREATE OR REPLACE FUNCTION log_limit_violation(
+  p_user_id UUID,
+  p_trust_level INTEGER,
+  p_attempted_usage INTEGER,
+  p_daily_limit INTEGER,
+  p_ip_address TEXT DEFAULT NULL,
+  p_user_agent TEXT DEFAULT NULL
+)
+RETURNS VOID AS $$
+BEGIN
+  INSERT INTO security_events (
+    user_id,
+    ip_address,
+    user_agent,
+    event_type,
+    severity,
+    description,
+    metadata
+  ) VALUES (
+    p_user_id,
+    COALESCE(p_ip_address::INET, '0.0.0.0'::INET),
+    p_user_agent,
+    'rate_limit_exceeded',
+    CASE
+      WHEN p_attempted_usage > p_daily_limit * 2 THEN 'high'
+      WHEN p_attempted_usage > p_daily_limit * 1.5 THEN 'medium'
+      ELSE 'low'
+    END,
+    FORMAT('User exceeded daily limit: attempted %s, limit %s (trust level %s)',
+           p_attempted_usage, p_daily_limit, p_trust_level),
+    jsonb_build_object(
+      'attempted_usage', p_attempted_usage,
+      'daily_limit', p_daily_limit,
+      'trust_level', p_trust_level,
+      'excess_amount', p_attempted_usage - p_daily_limit
+    )
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- 检查IP是否被封禁的函数
+CREATE OR REPLACE FUNCTION is_ip_banned(check_ip INET)
+RETURNS TABLE(
+  is_banned BOOLEAN,
+  ban_id UUID,
+  reason TEXT,
+  severity TEXT,
+  banned_at TIMESTAMP WITH TIME ZONE,
+  expires_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+  -- 首先自动解封过期的IP
+  PERFORM auto_unban_expired_ips();
+
+  -- 检查IP是否被封禁
+  RETURN QUERY
+  SELECT
+    TRUE as is_banned,
+    ib.id as ban_id,
+    ib.reason,
+    ib.severity,
+    ib.banned_at,
+    ib.expires_at
+  FROM ip_bans ib
+  WHERE ib.ip_address = check_ip
+    AND ib.is_active = TRUE
+  LIMIT 1;
+
+  -- 如果没有找到封禁记录，返回未封禁状态
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT FALSE, NULL::UUID, NULL::TEXT, NULL::TEXT, NULL::TIMESTAMP WITH TIME ZONE, NULL::TIMESTAMP WITH TIME ZONE;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 自动解封过期IP的函数
+CREATE OR REPLACE FUNCTION auto_unban_expired_ips()
+RETURNS INTEGER AS $$
+DECLARE
+  unbanned_count INTEGER;
+BEGIN
+  -- 自动解封过期的IP
+  UPDATE ip_bans
+  SET
+    is_active = FALSE,
+    unbanned_at = NOW(),
+    unban_reason = 'expired'
+  WHERE
+    is_active = TRUE
+    AND expires_at IS NOT NULL
+    AND expires_at < NOW();
+
+  GET DIAGNOSTICS unbanned_count = ROW_COUNT;
+
+  -- 记录解封事件到安全日志
+  IF unbanned_count > 0 THEN
+    INSERT INTO security_events (
+      ip_address,
+      event_type,
+      severity,
+      description,
+      metadata
+    )
+    SELECT
+      ip_address,
+      'suspicious_activity',
+      'low',
+      'IP automatically unbanned due to expiration',
+      jsonb_build_object('unban_reason', 'expired', 'unbanned_count', unbanned_count)
+    FROM ip_bans
+    WHERE unbanned_at = (SELECT MAX(unbanned_at) FROM ip_bans WHERE unban_reason = 'expired')
+    LIMIT 1;
+  END IF;
+
+  RETURN unbanned_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 获取安全统计信息的函数
+CREATE OR REPLACE FUNCTION get_security_stats(days_back INTEGER DEFAULT 7)
+RETURNS TABLE(
+  total_events BIGINT,
+  events_by_type JSONB,
+  events_by_severity JSONB,
+  top_suspicious_ips JSONB,
+  daily_trends JSONB
+) AS $$
+DECLARE
+  start_date TIMESTAMP WITH TIME ZONE;
+BEGIN
+  start_date := NOW() - (days_back || ' days')::INTERVAL;
+
+  -- 总事件数
+  SELECT COUNT(*) INTO total_events
+  FROM security_events
+  WHERE created_at >= start_date;
+
+  -- 按类型统计
+  SELECT jsonb_object_agg(event_type, event_count) INTO events_by_type
+  FROM (
+    SELECT event_type, COUNT(*) as event_count
+    FROM security_events
+    WHERE created_at >= start_date
+    GROUP BY event_type
+  ) t;
+
+  -- 按严重程度统计
+  SELECT jsonb_object_agg(severity, event_count) INTO events_by_severity
+  FROM (
+    SELECT severity, COUNT(*) as event_count
+    FROM security_events
+    WHERE created_at >= start_date
+    GROUP BY severity
+  ) t;
+
+  -- 可疑IP统计（前10名）
+  SELECT jsonb_object_agg(ip_address, event_count) INTO top_suspicious_ips
+  FROM (
+    SELECT ip_address::TEXT, COUNT(*) as event_count
+    FROM security_events
+    WHERE created_at >= start_date
+    GROUP BY ip_address
+    ORDER BY event_count DESC
+    LIMIT 10
+  ) t;
+
+  -- 每日趋势
+  SELECT jsonb_object_agg(event_date, event_count) INTO daily_trends
+  FROM (
+    SELECT DATE(created_at) as event_date, COUNT(*) as event_count
+    FROM security_events
+    WHERE created_at >= start_date
+    GROUP BY DATE(created_at)
+    ORDER BY event_date
+  ) t;
+
+  RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql;

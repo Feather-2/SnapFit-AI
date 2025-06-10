@@ -38,6 +38,41 @@ function mergeEntriesByLogId<T extends { log_id: string }>(
   return Array.from(merged.values());
 }
 
+// 🧮 重新计算汇总数据的辅助函数
+function recalculateSummary(log: DailyLog): DailyLog['summary'] {
+  let totalCaloriesConsumed = 0
+  let totalCarbs = 0
+  let totalProtein = 0
+  let totalFat = 0
+  let totalCaloriesBurned = 0
+  const micronutrients: Record<string, number> = {}
+
+  log.foodEntries?.forEach((entry) => {
+    if (entry.total_nutritional_info_consumed) {
+      totalCaloriesConsumed += entry.total_nutritional_info_consumed.calories || 0
+      totalCarbs += entry.total_nutritional_info_consumed.carbohydrates || 0
+      totalProtein += entry.total_nutritional_info_consumed.protein || 0
+      totalFat += entry.total_nutritional_info_consumed.fat || 0
+      Object.entries(entry.total_nutritional_info_consumed).forEach(([key, value]) => {
+        if (!["calories", "carbohydrates", "protein", "fat"].includes(key) && typeof value === "number") {
+          micronutrients[key] = (micronutrients[key] || 0) + value
+        }
+      })
+    }
+  })
+
+  log.exerciseEntries?.forEach((entry) => {
+    totalCaloriesBurned += entry.calories_burned_estimated || 0
+  })
+
+  return {
+    totalCaloriesConsumed,
+    totalCaloriesBurned,
+    macros: { carbs: totalCarbs, protein: totalProtein, fat: totalFat },
+    micronutrients,
+  }
+}
+
 export const useSync = () => {
   const { data: session } = useSession();
   const userId = session?.user?.id;
@@ -258,6 +293,16 @@ export const useSync = () => {
 
         await batchSave(filteredLogs);
         console.log(`[Sync] Successfully saved logs to IndexedDB (with deleted entries filtered)`);
+
+        // 🔄 触发数据刷新事件，确保UI及时更新
+        const updatedDates = new Set(logsToUpdate.map(log => log.date));
+        updatedDates.forEach(date => {
+          console.log(`[Sync] Triggering UI refresh for date: ${date}`);
+          window.dispatchEvent(new CustomEvent('forceDataRefresh', {
+            detail: { date, source: 'cloudSync' }
+          }));
+        });
+
         // 只在手动同步时显示toast，完整同步时静默处理
         if (!isPartOfFullSync) {
           toast({ title: t('success.pullTitle'), description: t('success.pullDescription', { count: logsToUpdate.length }) });
@@ -557,12 +602,16 @@ export const useSync = () => {
         }
       }
 
+      // 🔄 重新计算汇总数据
+      updatedLog.summary = recalculateSummary(updatedLog);
+
       await saveData(date, updatedLog);
 
-      // 3. 通过同步机制推送删除操作（包含逻辑删除信息）
+      // 3. 通过同步机制推送删除操作（包含逻辑删除信息和重新计算的汇总）
       const deletePatch: Partial<DailyLog> = {
         [entryType === 'food' ? 'foodEntries' : 'exerciseEntries']: updatedLog[entryType === 'food' ? 'foodEntries' : 'exerciseEntries'],
-        [entryType === 'food' ? 'deletedFoodIds' : 'deletedExerciseIds']: updatedLog[entryType === 'food' ? 'deletedFoodIds' : 'deletedExerciseIds']
+        [entryType === 'food' ? 'deletedFoodIds' : 'deletedExerciseIds']: updatedLog[entryType === 'food' ? 'deletedFoodIds' : 'deletedExerciseIds'],
+        summary: updatedLog.summary // 🔄 包含重新计算的汇总数据
       };
 
       // 使用现有的 pushData 机制而不是专门的删除API

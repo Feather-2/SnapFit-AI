@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Loader2, TestTube, Plus } from "lucide-react"
 import { useSession } from "next-auth/react"
 import { useTranslation } from "@/hooks/use-i18n"
+import { BaseURLInput } from "@/components/ui/base-url-input"
 
 interface SharedKeyConfig {
   name: string
@@ -41,7 +42,11 @@ export function KeyUploadForm({
       'Daily limit must be between 150 and 99999, or 999999 for unlimited': t('upload.errors.invalidDailyLimit'),
       'Internal server error': t('upload.errors.serverError'),
       'API连接失败': t('upload.apiConnectionFailed'),
-      'Network error': t('upload.networkError')
+      'Network error': t('upload.networkError'),
+      // 新增URL黑名单错误
+      '此URL被封禁，不允许使用': t('upload.errors.urlBlocked'),
+      'URL_BLOCKED': t('upload.errors.urlBlocked'),
+      'URL_INVALID': t('upload.errors.urlInvalid')
     }
 
     return errorMap[errorMessage] || errorMessage
@@ -63,6 +68,9 @@ export function KeyUploadForm({
     tags: []
   })
 
+  // URL验证状态
+  const [isUrlValid, setIsUrlValid] = useState(false)
+
   const handleRemoveTag = (tagToRemove: string) => {
     setConfig(prev => ({
       ...prev,
@@ -80,6 +88,15 @@ export function KeyUploadForm({
       toast({
         title: t('upload.messages.testFailed'),
         description: t('upload.testRequiredFields'),
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!isUrlValid) {
+      toast({
+        title: t('upload.messages.testFailed'),
+        description: t('upload.errors.urlBlocked'),
         variant: "destructive"
       })
       return
@@ -147,6 +164,15 @@ export function KeyUploadForm({
       toast({
         title: t('upload.messages.uploadFailed'),
         description: t('upload.fillRequiredFields'),
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!isUrlValid) {
+      toast({
+        title: t('upload.messages.uploadFailed'),
+        description: t('upload.errors.urlBlocked'),
         variant: "destructive"
       })
       return
@@ -278,16 +304,15 @@ export function KeyUploadForm({
                     <span>{t('upload.baseUrl')}</span>
                     <span className="text-destructive">*</span>
                   </Label>
-                  <Input
-                    id="baseUrl"
+                  <BaseURLInput
                     value={config.baseUrl}
-                    onChange={(e) => {
-                      setConfig(prev => ({ ...prev, baseUrl: e.target.value }))
+                    onChange={(value) => {
+                      setConfig(prev => ({ ...prev, baseUrl: value }))
                       setHasDetected(false)
                       setDetectedModels([])
                     }}
+                    onValidationChange={setIsUrlValid}
                     placeholder={t('upload.baseUrlPlaceholder')}
-                    required
                     className="h-11"
                   />
                 </div>
@@ -317,7 +342,7 @@ export function KeyUploadForm({
                 <Button
                   type="button"
                   onClick={handleTestKey}
-                  disabled={isTesting || !config.baseUrl || !config.apiKey}
+                  disabled={isTesting || !config.baseUrl || !config.apiKey || !isUrlValid}
                   className="h-11 px-8"
                 >
                   {isTesting ? (
@@ -668,7 +693,7 @@ export function KeyUploadForm({
 
                 <Button
                   type="submit"
-                  disabled={isLoading || !config.name || !config.baseUrl || !config.apiKey || config.availableModels.length === 0}
+                  disabled={isLoading || !config.name || !config.baseUrl || !config.apiKey || !isUrlValid || config.availableModels.length === 0}
                   className="h-12 px-8 text-base font-medium"
                   size="lg"
                 >

@@ -1,14 +1,36 @@
 import { NextRequest } from 'next/server'
 import { checkApiAuth, rollbackUsageIfNeeded } from '@/lib/api-auth-helper'
 import { SharedOpenAIClient } from '@/lib/shared-openai-client'
+import { InputValidator } from '@/lib/input-validator'
+import { logSecurityEvent } from '@/lib/security-monitor'
 
 export async function POST(req: NextRequest) {
+  const ip = req.ip || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+  const userAgent = req.headers.get('user-agent') || 'unknown';
+
   try {
     const { messages, system, modelType, aiConfig } = await req.json()
 
-    if (!messages || !Array.isArray(messages)) {
-      return Response.json({ error: "Messages array is required" }, { status: 400 })
+    // 🔒 输入验证
+    const messageValidation = InputValidator.validateAIMessages(messages);
+    if (!messageValidation.isValid) {
+      await logSecurityEvent({
+        ipAddress: ip,
+        userAgent,
+        eventType: 'invalid_input',
+        severity: 'medium',
+        description: `Invalid AI messages: ${messageValidation.errors.join(', ')}`,
+        metadata: { errors: messageValidation.errors }
+      });
+
+      return Response.json({
+        error: "Invalid messages format",
+        details: messageValidation.errors
+      }, { status: 400 });
     }
+
+    // 使用清理后的消息
+    const sanitizedMessages = messageValidation.sanitizedValue;
 
     // 🔒 统一的身份验证和限制检查（只对共享模式进行限制）
     const authResult = await checkApiAuth(aiConfig, 'conversation_count')
@@ -25,7 +47,7 @@ export async function POST(req: NextRequest) {
     // 获取用户选择的模型
     let selectedModel = "gpt-4o" // 默认模型
     let fallbackConfig: { baseUrl: string; apiKey: string } | undefined = undefined
-    
+
     const modelConfig = aiConfig?.[modelType]
     const isSharedMode = modelConfig?.source === 'shared'
 

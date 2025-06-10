@@ -102,18 +102,48 @@ CREATE TABLE IF NOT EXISTS public.ai_memories (
   CONSTRAINT ai_memories_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 
--- 安全事件表
+-- 安全事件表（完整版）
 CREATE TABLE IF NOT EXISTS public.security_events (
-  id bigint NOT NULL DEFAULT nextval('security_events_id_seq'::regclass),
-  event_type character varying NOT NULL,
-  user_id uuid,
-  shared_key_id uuid,
-  severity smallint DEFAULT 1,
-  details jsonb DEFAULT '{}'::jsonb,
-  ip_address inet,
-  user_agent text,
-  created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT security_events_pkey PRIMARY KEY (id)
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  ip_address INET NOT NULL,
+  user_agent TEXT,
+  event_type TEXT NOT NULL,
+  severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+  description TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+  -- 约束检查
+  CONSTRAINT valid_event_type CHECK (event_type IN (
+    'rate_limit_exceeded',
+    'invalid_input',
+    'unauthorized_access',
+    'suspicious_activity',
+    'brute_force_attempt',
+    'data_injection_attempt',
+    'file_upload_violation',
+    'api_abuse',
+    'privilege_escalation_attempt'
+  ))
+);
+
+-- IP封禁表
+CREATE TABLE IF NOT EXISTS public.ip_bans (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  ip_address INET NOT NULL,
+  reason TEXT NOT NULL,
+  severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+  banned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE, -- NULL表示永久封禁
+  is_active BOOLEAN DEFAULT TRUE,
+  ban_type TEXT NOT NULL CHECK (ban_type IN ('manual', 'automatic', 'temporary')),
+  metadata JSONB DEFAULT '{}',
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL, -- 管理员ID（手动封禁时）
+  unbanned_at TIMESTAMP WITH TIME ZONE,
+  unban_reason TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ========================================
@@ -162,8 +192,25 @@ CREATE INDEX IF NOT EXISTS idx_ai_memories_user_expert ON public.ai_memories(use
 CREATE INDEX IF NOT EXISTS idx_ai_memories_last_updated ON public.ai_memories(last_updated);
 
 -- 安全事件表索引
-CREATE INDEX IF NOT EXISTS idx_security_events_created ON public.security_events(created_at);
-CREATE INDEX IF NOT EXISTS idx_security_events_type ON public.security_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_security_events_created_at ON public.security_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_security_events_ip_address ON public.security_events(ip_address);
+CREATE INDEX IF NOT EXISTS idx_security_events_user_id ON public.security_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_security_events_event_type ON public.security_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_security_events_severity ON public.security_events(severity);
+CREATE INDEX IF NOT EXISTS idx_security_events_ip_created ON public.security_events(ip_address, created_at);
+CREATE INDEX IF NOT EXISTS idx_security_events_user_time ON public.security_events(user_id, created_at) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_security_events_type_severity ON public.security_events(event_type, severity);
+
+-- IP封禁表索引
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ip_bans_active_ip ON public.ip_bans(ip_address) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_ip_bans_ip_address ON public.ip_bans(ip_address);
+CREATE INDEX IF NOT EXISTS idx_ip_bans_banned_at ON public.ip_bans(banned_at);
+CREATE INDEX IF NOT EXISTS idx_ip_bans_expires_at ON public.ip_bans(expires_at) WHERE expires_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_ip_bans_is_active ON public.ip_bans(is_active);
+CREATE INDEX IF NOT EXISTS idx_ip_bans_ban_type ON public.ip_bans(ban_type);
+CREATE INDEX IF NOT EXISTS idx_ip_bans_severity ON public.ip_bans(severity);
+CREATE INDEX IF NOT EXISTS idx_ip_bans_active_expires ON public.ip_bans(is_active, expires_at);
+CREATE INDEX IF NOT EXISTS idx_ip_bans_type_severity ON public.ip_bans(ban_type, severity);
 
 -- ========================================
 -- 6. 禁用 RLS（适合 ANON_KEY 架构）
@@ -174,6 +221,7 @@ ALTER TABLE public.shared_keys DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_logs DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_memories DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.security_events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ip_bans DISABLE ROW LEVEL SECURITY;
 
 -- ========================================
 -- 7. 设置表权限
@@ -186,6 +234,7 @@ GRANT SELECT ON public.shared_keys TO anon;
 GRANT SELECT ON public.daily_logs TO anon;
 GRANT SELECT ON public.ai_memories TO anon;
 GRANT SELECT ON public.security_events TO anon;
+GRANT SELECT ON public.ip_bans TO anon;
 
 -- 授予 authenticated 角色权限
 GRANT SELECT ON public.users TO authenticated;
@@ -194,6 +243,7 @@ GRANT SELECT ON public.shared_keys TO authenticated;
 GRANT SELECT ON public.daily_logs TO authenticated;
 GRANT SELECT ON public.ai_memories TO authenticated;
 GRANT SELECT ON public.security_events TO authenticated;
+GRANT SELECT ON public.ip_bans TO authenticated;
 
 -- service_role 默认有所有权限
 
@@ -208,7 +258,8 @@ COMMENT ON TABLE public.user_profiles IS 'User health profiles and preferences';
 COMMENT ON TABLE public.shared_keys IS 'Community shared API keys for AI services';
 COMMENT ON TABLE public.daily_logs IS 'User daily health and activity logs';
 COMMENT ON TABLE public.ai_memories IS 'AI conversation memories and context';
-COMMENT ON TABLE public.security_events IS 'Security audit log';
+COMMENT ON TABLE public.security_events IS 'Security events and audit log for monitoring system activity';
+COMMENT ON TABLE public.ip_bans IS 'IP address bans for security protection against malicious users';
 
 -- ========================================
 -- 9. 初始化完成标记

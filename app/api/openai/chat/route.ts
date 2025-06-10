@@ -559,12 +559,13 @@ export async function POST(req: Request) {
                   const parsed = JSON.parse(data)
                   const content = parsed.choices?.[0]?.delta?.content
                   if (content) {
-                    // 发送文本块
+                    // 直接发送文本块，不使用缓冲
                     const textChunk = `0:"${content.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"\n`
                     enqueueData(encoder.encode(textChunk))
                   }
                 } catch (e) {
                   // 忽略解析错误
+                  console.warn('Failed to parse SSE data:', data)
                 }
               }
             }

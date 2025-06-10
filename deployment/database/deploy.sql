@@ -41,6 +41,11 @@ SELECT
 
 \i database/schema.sql
 
+-- Apply security upgrades
+\echo ''
+\echo '🔒 Applying security system upgrades...'
+\i database/security-upgrade.sql
+
 -- Verification
 \echo ''
 \echo '✅ Deployment completed!'

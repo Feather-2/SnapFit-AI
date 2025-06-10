@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { KeyManager } from '@/lib/key-manager'
+import { validateBaseURL } from '@/lib/url-validator'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,14 +18,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 验证URL格式
-    try {
-      new URL(baseUrl)
-    } catch {
+    // 🚫 验证URL格式和黑名单
+    const urlValidation = validateBaseURL(baseUrl)
+    if (!urlValidation.isValid) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Invalid base URL format'
+          error: urlValidation.reason,
+          blocked: urlValidation.isBlocked,
+          blockedDomain: urlValidation.blockedDomain
         },
         { status: 400 }
       )

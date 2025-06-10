@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { KeyManager } from '@/lib/key-manager'
 import { UserManager } from '@/lib/user-manager'
 import { auth } from '@/lib/auth' // 引入 next-auth 的 auth 方法
+import { validateBaseURL } from '@/lib/url-validator'
+import { logSecurityEvent } from '@/lib/security-monitor'
+import { getClientIP } from '@/lib/ip-utils'
 
 // 获取用户的共享Key列表
 export async function GET(request: NextRequest) {
@@ -67,14 +70,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 验证URL格式
-    try {
-      new URL(baseUrl)
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid base URL format' },
-        { status: 400 }
-      )
+    // 🚫 验证URL格式和黑名单
+    const urlValidation = validateBaseURL(baseUrl)
+    if (!urlValidation.isValid) {
+      // 记录安全事件
+      if (urlValidation.isBlocked) {
+        await logSecurityEvent({
+          userId,
+          ipAddress: getClientIP(request),
+          userAgent: request.headers.get('user-agent') || 'unknown',
+          eventType: 'invalid_input',
+          severity: 'medium',
+          description: `Attempted to use blocked official API URL: ${baseUrl}`,
+          metadata: {
+            blockedUrl: baseUrl,
+            blockedDomain: urlValidation.blockedDomain,
+            reason: urlValidation.reason,
+            api: 'shared-keys'
+          }
+        })
+      }
+
+      return NextResponse.json({
+        error: urlValidation.reason,
+        code: urlValidation.isBlocked ? 'URL_BLOCKED' : 'URL_INVALID',
+        details: {
+          blockedDomain: urlValidation.blockedDomain
+        }
+      }, { status: 400 })
     }
 
     // 验证每日限制
