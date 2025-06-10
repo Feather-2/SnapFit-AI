@@ -14,7 +14,8 @@ const nextConfig = {
     unoptimized: true,
   },
   // 启用standalone输出模式，用于Docker部署
-  output: 'standalone',
+  // 暂时禁用以避免Windows符号链接权限问题
+  // output: 'standalone',
 }
 
 export default withNextIntl(nextConfig);

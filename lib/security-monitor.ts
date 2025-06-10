@@ -75,7 +75,7 @@ export class SecurityMonitor {
       // 🚨 检查是否需要自动封禁IP和用户
       if (event.severity === 'medium' || event.severity === 'high' || event.severity === 'critical') {
         // 异步执行自动封禁检查，不阻塞主流程
-        setImmediate(async () => {
+        setTimeout(async () => {
           try {
             // 检查IP封禁
             await ipBanManager.checkAndAutoBan(event.ipAddress);
@@ -87,7 +87,7 @@ export class SecurityMonitor {
           } catch (error) {
             console.error('Error in auto-ban check:', error);
           }
-        });
+        }, 0);
       }
 
       console.warn(`[Security] ${event.eventType}: ${event.description}`, {

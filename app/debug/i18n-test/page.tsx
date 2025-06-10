@@ -58,7 +58,7 @@ export default function I18nTestPage() {
             <BaseURLInput
               value=""
               onChange={() => {}}
-              placeholder={t('sharedServices.upload.urlValidation.placeholder')}
+              placeholder={tShared('upload.urlValidation.placeholder')}
             />
           </CardContent>
         </Card>
