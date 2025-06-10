@@ -1,0 +1,91 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.ai_memories (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  expert_id character varying NOT NULL,
+  content text NOT NULL CHECK (char_length(content) <= 500),
+  version integer DEFAULT 1,
+  last_updated timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT ai_memories_pkey PRIMARY KEY (id),
+  CONSTRAINT ai_memories_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.daily_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  date date NOT NULL,
+  log_data jsonb NOT NULL,
+  last_modified timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT daily_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT daily_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.security_events (
+  id bigint NOT NULL DEFAULT nextval('security_events_id_seq'::regclass),
+  event_type character varying NOT NULL,
+  user_id uuid,
+  shared_key_id uuid,
+  severity smallint DEFAULT 1,
+  details jsonb DEFAULT '{}'::jsonb,
+  ip_address inet,
+  user_agent text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT security_events_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.shared_keys (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  name text NOT NULL,
+  base_url text NOT NULL,
+  api_key_encrypted text NOT NULL,
+  daily_limit integer DEFAULT 150,
+  description text,
+  tags ARRAY,
+  is_active boolean DEFAULT true,
+  usage_count_today integer DEFAULT 0,
+  total_usage_count integer DEFAULT 0,
+  last_used_at timestamp without time zone,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  available_models ARRAY NOT NULL,
+  CONSTRAINT shared_keys_pkey PRIMARY KEY (id),
+  CONSTRAINT shared_keys_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.user_profiles (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  weight numeric,
+  height numeric,
+  age integer,
+  gender character varying,
+  activity_level character varying,
+  goal character varying,
+  target_weight numeric,
+  target_calories integer,
+  notes text,
+  professional_mode boolean DEFAULT false,
+  medical_history text,
+  lifestyle text,
+  health_awareness text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT user_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  linux_do_id text UNIQUE,
+  username text,
+  avatar_url text,
+  email text,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  display_name text,
+  trust_level integer DEFAULT 0,
+  is_active boolean DEFAULT true,
+  is_silenced boolean DEFAULT false,
+  last_login_at timestamp without time zone,
+  login_count integer DEFAULT 0,
+  CONSTRAINT users_pkey PRIMARY KEY (id)
+);
