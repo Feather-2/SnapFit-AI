@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/update-models",
-      "schedule": "0 */4 * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
