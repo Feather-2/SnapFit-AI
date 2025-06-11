@@ -76,8 +76,24 @@ function recalculateSummary(log: DailyLog): DailyLog['summary'] {
 export const useSync = () => {
   const { data: session } = useSession();
   const userId = session?.user?.id;
-  const { getAllData, saveData, batchSave, getData, deleteData, isInitializing: healthLogsInitializing } = useIndexedDB("healthLogs");
-  const { getAllData: getAllMemories, saveData: saveMemory, batchSave: batchSaveMemories, isInitializing: memoriesInitializing } = useIndexedDB("aiMemories");
+  const {
+    getAllData,
+    saveData,
+    batchSave,
+    getData,
+    deleteData,
+    isInitializing: healthLogsInitializing,
+    waitForInitialization: waitForHealthLogsInit
+  } = useIndexedDB("healthLogs");
+
+  const {
+    getAllData: getAllMemories,
+    saveData: saveMemory,
+    batchSave: batchSaveMemories,
+    isInitializing: memoriesInitializing,
+    waitForInitialization: waitForMemoriesInit
+  } = useIndexedDB("aiMemories");
+
   const { toast } = useToast();
   const t = useTranslation('sync');
 
@@ -152,15 +168,16 @@ export const useSync = () => {
     }
     if (!isPartOfFullSync && isSyncingRef.current) return;
 
-    if (healthLogsInitializing) {
-      console.log("[Sync] IndexedDB for health logs is still initializing, skipping...");
-      return;
-    }
-
-    console.log("[Sync] Starting data pull from cloud...");
-    if (!isPartOfFullSync) setIsSyncing(true);
-
     try {
+      // 等待数据库初始化完成
+      await waitForHealthLogsInit().catch(err => {
+        console.error("[Sync] Failed to initialize IndexedDB for health logs:", err);
+        throw new Error("数据库初始化失败，请刷新页面重试");
+      });
+
+      console.log("[Sync] Starting data pull from cloud...");
+      if (!isPartOfFullSync) setIsSyncing(true);
+
       const response = await fetch('/api/sync/logs');
 
       if (response.status === 401) {
@@ -321,7 +338,7 @@ export const useSync = () => {
     } finally {
       if (!isPartOfFullSync) setIsSyncing(false);
     }
-  }, [userId, getAllData, batchSave, toast, t]);
+  }, [userId, getAllData, batchSave, toast, t, waitForHealthLogsInit]);
 
   const pushData = useCallback(async (date: string, patch: Partial<DailyLog>) => {
     if (!userId) {
@@ -329,24 +346,15 @@ export const useSync = () => {
         return;
     }
 
-    // 检查 IndexedDB 是否准备好，如果没有准备好就等待
-    if (healthLogsInitializing) {
-      console.log("[Sync] IndexedDB for health logs is still initializing, waiting for user operation...");
-      // 对于用户操作，我们等待而不是跳过
-      let attempts = 0;
-      while (healthLogsInitializing && attempts < 50) { // 最多等待5秒
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-      if (healthLogsInitializing) {
-        console.error("[Sync] IndexedDB initialization timeout, skipping push");
-        return;
-      }
-    }
-
-    console.log(`[Sync] Starting partial data push to cloud for date: ${date}`);
-
     try {
+      // 等待数据库初始化完成
+      await waitForHealthLogsInit().catch(err => {
+        console.error("[Sync] Failed to initialize IndexedDB for health logs:", err);
+        throw new Error("数据库初始化失败，请刷新页面重试");
+      });
+
+      console.log(`[Sync] Starting partial data push to cloud for date: ${date}`);
+
       // 1. 从本地获取当前日期的完整日志
       const currentLog = await getData(date) || { date, last_modified: null };
       console.log(`[Sync] Current log for ${date}:`, currentLog);
@@ -404,7 +412,7 @@ export const useSync = () => {
       toast({ title: t('error.pushTitle'), description: (error as Error).message, variant: 'destructive' });
     }
     // 不需要finally块，因为我们没有设置全局同步状态
-  }, [userId, getData, saveData, toast, t]);
+  }, [userId, getData, saveData, toast, t, waitForHealthLogsInit]);
 
   // AI记忆同步功能
   const pullMemories = useCallback(async (isPartOfFullSync = false) => {
@@ -413,14 +421,15 @@ export const useSync = () => {
       return;
     }
 
-    if (memoriesInitializing) {
-      console.log("[Sync] IndexedDB for memories is still initializing, skipping...");
-      return;
-    }
-
-    console.log("[Sync] Starting AI memories pull from cloud...");
-
     try {
+      // 等待数据库初始化完成
+      await waitForMemoriesInit().catch(err => {
+        console.error("[Sync] Failed to initialize IndexedDB for memories:", err);
+        throw new Error("AI记忆数据库初始化失败，请刷新页面重试");
+      });
+
+      console.log("[Sync] Starting AI memories pull from cloud...");
+
       const response = await fetch('/api/sync/memories');
 
       if (response.status === 401) {
@@ -470,7 +479,7 @@ export const useSync = () => {
       }
 
     } catch (error) {
-      console.error('[Sync] AI memories pull error:', error);
+      console.error('[Sync] Memories pull error:', error);
       if (!isPartOfFullSync) {
         toast({
           title: t('error.pullTitle'),
@@ -478,9 +487,9 @@ export const useSync = () => {
           variant: 'destructive'
         });
       }
-      throw error; // 重新抛出错误，让调用者处理
+      throw error;
     }
-  }, [userId, saveMemory, toast, t]);
+  }, [userId, getAllMemories, saveMemory, toast, t, waitForMemoriesInit]);
 
   const pushMemories = useCallback(async () => {
     if (!userId) {
@@ -767,13 +776,6 @@ export const useSync = () => {
       return;
     }
 
-    // 检查 IndexedDB 是否准备好
-    if (healthLogsInitializing || memoriesInitializing) {
-      console.log("[Sync] IndexedDB is still initializing, delaying sync...");
-      setTimeout(() => syncAll(isManual), 1000);
-      return;
-    }
-
     console.log(`[Sync] Starting ${isManual ? 'manual' : 'auto'} full sync...`);
     setIsSyncing(true);
 
@@ -781,6 +783,16 @@ export const useSync = () => {
     setSyncProgress({ logs: false, memories: false, profile: false });
 
     try {
+      // 初始化数据库
+      await Promise.all([
+        waitForHealthLogsInit().catch(err => {
+          console.error("[Sync] Failed to initialize IndexedDB for health logs:", err);
+        }),
+        waitForMemoriesInit().catch(err => {
+          console.error("[Sync] Failed to initialize IndexedDB for memories:", err);
+        })
+      ]);
+
       // 并行执行所有拉取操作，传递isPartOfFullSync=true参数
       const syncPromises = [
         pullData(true).then(() => setSyncProgress(prev => ({ ...prev, logs: true }))),
@@ -817,7 +829,7 @@ export const useSync = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, [userId, pullData, pullMemories, pullProfile, toast, t]);
+  }, [userId, pullData, pullMemories, pullProfile, toast, t, waitForHealthLogsInit, waitForMemoriesInit]);
 
   // 在用户登录后，自动执行一次完整同步（带节流）
   useEffect(() => {

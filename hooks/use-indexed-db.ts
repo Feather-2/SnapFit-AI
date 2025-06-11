@@ -13,7 +13,11 @@ interface IndexedDBHook {
   error: Error | null
   getAllData: () => Promise<any[]>
   batchSave: (items: any[]) => Promise<void>
+  waitForInitialization: () => Promise<void>
 }
+
+// 创建一个全局变量来跟踪数据库初始化状态
+const dbInitializationPromises: Record<string, Promise<IDBDatabase>> = {};
 
 export function useIndexedDB(storeName: string): IndexedDBHook {
   const [isLoading, setIsLoading] = useState(false)
@@ -23,95 +27,121 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
 
   // 初始化数据库
   useEffect(() => {
-    const initDB = async () => {
-      try {
-        if (!window.indexedDB) {
-          console.warn("IndexedDB not supported")
-          return
-        }
-
-        const request = window.indexedDB.open(DB_NAME, DB_VERSION)
-
-        request.onupgradeneeded = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result
-
-          // 确保所有必需的对象存储都被创建
-          const storeNames = ["healthLogs", "aiMemories"];
-
-          storeNames.forEach(name => {
-            if (!db.objectStoreNames.contains(name)) {
-              console.log(`Creating object store: ${name}`);
-              db.createObjectStore(name);
-            }
-          });
-        }
-
-        request.onsuccess = (event) => {
-          const database = (event.target as IDBOpenDBRequest).result;
-
-          // 验证所需的存储对象是否存在
-          if (!database.objectStoreNames.contains(storeName)) {
-            console.error(`Required object store '${storeName}' not found in database`);
-
-            // 关闭当前数据库连接
-            database.close();
-
-            // 尝试删除并重新创建数据库
-            console.log("Attempting to delete and recreate database...");
-            const deleteRequest = window.indexedDB.deleteDatabase("healthApp");
-
-            deleteRequest.onsuccess = () => {
-              console.log("Database deleted successfully, reopening...");
-              // 重新打开数据库，这将触发 onupgradeneeded
-              const reopenRequest = window.indexedDB.open(DB_NAME, DB_VERSION);
-
-              reopenRequest.onupgradeneeded = (event) => {
-                const newDb = (event.target as IDBOpenDBRequest).result;
-                // 创建所有必需的对象存储
-                ["healthLogs", "aiMemories"].forEach(name => {
-                  if (!newDb.objectStoreNames.contains(name)) {
-                    newDb.createObjectStore(name);
-                  }
-                });
-              };
-
-              reopenRequest.onsuccess = (event) => {
-                setDb((event.target as IDBOpenDBRequest).result);
-                setIsInitializing(false);
-                console.log("Database successfully recreated with all required stores");
-              };
-
-              reopenRequest.onerror = (event) => {
-                setError(new Error("无法重新创建数据库"));
-                setIsInitializing(false);
-                console.error("IndexedDB reopen error:", (event.target as IDBOpenDBRequest).error);
-              };
-            };
-
-            deleteRequest.onerror = (event) => {
-              setError(new Error("无法删除损坏的数据库"));
-              setIsInitializing(false);
-              console.error("IndexedDB delete error:", (event.target as IDBOpenDBRequest).error);
-            };
-          } else {
-            // 正常情况，存储对象存在
-            setDb(database);
-            setIsInitializing(false);
+    // 如果该存储的初始化Promise已经存在，则复用它
+    if (!dbInitializationPromises[storeName]) {
+      dbInitializationPromises[storeName] = new Promise((resolve, reject) => {
+        try {
+          if (!window.indexedDB) {
+            console.warn("IndexedDB not supported")
+            reject(new Error("IndexedDB not supported"));
+            return;
           }
-        }
 
-        request.onerror = (event) => {
-          setError(new Error("无法打开数据库"));
+          console.log(`Opening IndexedDB ${DB_NAME} version ${DB_VERSION} for store ${storeName}...`);
+          const request = window.indexedDB.open(DB_NAME, DB_VERSION)
+
+          request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result
+
+            // 确保所有必需的对象存储都被创建
+            const storeNames = ["healthLogs", "aiMemories"];
+
+            storeNames.forEach(name => {
+              if (!db.objectStoreNames.contains(name)) {
+                console.log(`Creating object store: ${name}`);
+                db.createObjectStore(name);
+              }
+            });
+          }
+
+          request.onsuccess = (event) => {
+            const database = (event.target as IDBOpenDBRequest).result;
+
+            // 验证所需的存储对象是否存在
+            if (!database.objectStoreNames.contains(storeName)) {
+              console.error(`Required object store '${storeName}' not found in database`);
+
+              // 关闭当前数据库连接
+              database.close();
+
+              // 尝试删除并重新创建数据库
+              console.log("Attempting to delete and recreate database...");
+              const deleteRequest = window.indexedDB.deleteDatabase(DB_NAME);
+
+              deleteRequest.onsuccess = () => {
+                console.log("Database deleted successfully, reopening...");
+                // 重新打开数据库，这将触发 onupgradeneeded
+                const reopenRequest = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+                reopenRequest.onupgradeneeded = (event) => {
+                  const newDb = (event.target as IDBOpenDBRequest).result;
+                  // 创建所有必需的对象存储
+                  ["healthLogs", "aiMemories"].forEach(name => {
+                    if (!newDb.objectStoreNames.contains(name)) {
+                      newDb.createObjectStore(name);
+                    }
+                  });
+                };
+
+                reopenRequest.onsuccess = (event) => {
+                  const newDatabase = (event.target as IDBOpenDBRequest).result;
+                  setDb(newDatabase);
+                  setIsInitializing(false);
+                  console.log("Database successfully recreated with all required stores");
+                  resolve(newDatabase);
+                };
+
+                reopenRequest.onerror = (event) => {
+                  const errorMsg = "无法重新创建数据库";
+                  setError(new Error(errorMsg));
+                  setIsInitializing(false);
+                  console.error("IndexedDB reopen error:", (event.target as IDBOpenDBRequest).error);
+                  reject(new Error(errorMsg));
+                };
+              };
+
+              deleteRequest.onerror = (event) => {
+                const errorMsg = "无法删除损坏的数据库";
+                setError(new Error(errorMsg));
+                setIsInitializing(false);
+                console.error("IndexedDB delete error:", (event.target as IDBOpenDBRequest).error);
+                reject(new Error(errorMsg));
+              };
+            } else {
+              // 正常情况，存储对象存在
+              setDb(database);
+              setIsInitializing(false);
+              console.log(`Database opened successfully for store: ${storeName}`);
+              resolve(database);
+            }
+          }
+
+          request.onerror = (event) => {
+            const errorMsg = "无法打开数据库";
+            setError(new Error(errorMsg));
+            setIsInitializing(false);
+            console.error("IndexedDB error:", (event.target as IDBOpenDBRequest).error);
+            reject(new Error(errorMsg));
+          }
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err : new Error("初始化数据库时发生未知错误");
+          setError(errorMsg);
           setIsInitializing(false);
-          console.error("IndexedDB error:", (event.target as IDBOpenDBRequest).error);
+          reject(errorMsg);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error("初始化数据库时发生未知错误"));
-        setIsInitializing(false);
-      }
+      });
     }
 
-    initDB()
+    // 使用已存在的Promise
+    dbInitializationPromises[storeName]
+      .then((database) => {
+        setDb(database);
+        setIsInitializing(false);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err : new Error(String(err)));
+        setIsInitializing(false);
+      });
 
     return () => {
       if (db) {
@@ -120,163 +150,182 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
     }
   }, [storeName])
 
+  // 等待初始化完成的函数
+  const waitForInitialization = useCallback(async (): Promise<void> => {
+    if (!isInitializing && db) return Promise.resolve();
+
+    try {
+      await dbInitializationPromises[storeName];
+      return Promise.resolve();
+    } catch (err) {
+      return Promise.reject(err);
+    }
+  }, [isInitializing, db, storeName]);
+
   // 获取数据
   const getData = useCallback(
     async (key: string): Promise<any> => {
-      if (!db) return null
+      await waitForInitialization();
+      if (!db) return null;
 
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
 
       try {
         return new Promise((resolve, reject) => {
-          const transaction = db.transaction([storeName], "readonly")
-          const store = transaction.objectStore(storeName)
-          const request = store.get(key)
+          const transaction = db.transaction([storeName], "readonly");
+          const store = transaction.objectStore(storeName);
+          const request = store.get(key);
 
           request.onsuccess = () => {
-            setIsLoading(false)
-            resolve(request.result)
-          }
+            setIsLoading(false);
+            resolve(request.result);
+          };
 
           request.onerror = () => {
-            setIsLoading(false)
-            setError(new Error("获取数据失败"))
-            reject(new Error("获取数据失败"))
-          }
-        })
+            setIsLoading(false);
+            setError(new Error("获取数据失败"));
+            reject(new Error("获取数据失败"));
+          };
+        });
       } catch (err) {
-        setIsLoading(false)
-        setError(err instanceof Error ? err : new Error("获取数据时发生未知错误"))
-        throw err
+        setIsLoading(false);
+        setError(err instanceof Error ? err : new Error("获取数据时发生未知错误"));
+        throw err;
       }
     },
-    [db, storeName],
-  )
+    [db, storeName, waitForInitialization]
+  );
 
   // 保存数据
   const saveData = useCallback(
     async (key: string, data: any): Promise<void> => {
-      if (!db) {
-        console.warn(`[IndexedDB] Database not ready for store: ${storeName}, skipping save for key: ${key}`);
-        return;
-      }
-
-      setIsLoading(true)
-      setError(null)
-
       try {
+        await waitForInitialization();
+        if (!db) {
+          console.warn(`[IndexedDB] Database not ready for store: ${storeName}, skipping save for key: ${key}`);
+          return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+
         return new Promise((resolve, reject) => {
-          const transaction = db.transaction([storeName], "readwrite")
-          const store = transaction.objectStore(storeName)
-          const request = store.put(data, key)
+          const transaction = db.transaction([storeName], "readwrite");
+          const store = transaction.objectStore(storeName);
+          const request = store.put(data, key);
 
           request.onsuccess = () => {
-            setIsLoading(false)
-            resolve()
-          }
+            setIsLoading(false);
+            resolve();
+          };
 
           request.onerror = () => {
-            setIsLoading(false)
-            setError(new Error("保存数据失败"))
-            reject(new Error("保存数据失败"))
-          }
-        })
+            setIsLoading(false);
+            setError(new Error("保存数据失败"));
+            reject(new Error("保存数据失败"));
+          };
+        });
       } catch (err) {
-        setIsLoading(false)
-        setError(err instanceof Error ? err : new Error("保存数据时发生未知错误"))
-        throw err
+        setIsLoading(false);
+        setError(err instanceof Error ? err : new Error("保存数据时发生未知错误"));
+        throw err;
       }
     },
-    [db, storeName],
-  )
+    [db, storeName, waitForInitialization]
+  );
 
   // 删除数据
   const deleteData = useCallback(
     async (key: string): Promise<void> => {
-      if (!db) return
+      await waitForInitialization();
+      if (!db) return;
 
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
 
       try {
         return new Promise((resolve, reject) => {
-          const transaction = db.transaction([storeName], "readwrite")
-          const store = transaction.objectStore(storeName)
-          const request = store.delete(key)
+          const transaction = db.transaction([storeName], "readwrite");
+          const store = transaction.objectStore(storeName);
+          const request = store.delete(key);
 
           request.onsuccess = () => {
-            setIsLoading(false)
-            resolve()
-          }
+            setIsLoading(false);
+            resolve();
+          };
 
           request.onerror = () => {
-            setIsLoading(false)
-            setError(new Error("删除数据失败"))
-            reject(new Error("删除数据失败"))
-          }
-        })
+            setIsLoading(false);
+            setError(new Error("删除数据失败"));
+            reject(new Error("删除数据失败"));
+          };
+        });
       } catch (err) {
-        setIsLoading(false)
-        setError(err instanceof Error ? err : new Error("删除数据时发生未知错误"))
-        throw err
+        setIsLoading(false);
+        setError(err instanceof Error ? err : new Error("删除数据时发生未知错误"));
+        throw err;
       }
     },
-    [db, storeName],
-  )
+    [db, storeName, waitForInitialization]
+  );
 
   // 清空所有数据
   const clearAllData = useCallback(async (): Promise<void> => {
-    if (!db) return
+    await waitForInitialization();
+    if (!db) return;
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
       return new Promise((resolve, reject) => {
-        const transaction = db.transaction([storeName], "readwrite")
-        const store = transaction.objectStore(storeName)
-        const request = store.clear()
+        const transaction = db.transaction([storeName], "readwrite");
+        const store = transaction.objectStore(storeName);
+        const request = store.clear();
 
         request.onsuccess = () => {
-          setIsLoading(false)
-          resolve()
-        }
+          setIsLoading(false);
+          resolve();
+        };
 
         request.onerror = () => {
-          setIsLoading(false)
-          setError(new Error("清空数据失败"))
-          reject(new Error("清空数据失败"))
-        }
-      })
+          setIsLoading(false);
+          setError(new Error("清空数据失败"));
+          reject(new Error("清空数据失败"));
+        };
+      });
     } catch (err) {
-      setIsLoading(false)
-      setError(err instanceof Error ? err : new Error("清空数据时发生未知错误"))
-      throw err
+      setIsLoading(false);
+      setError(err instanceof Error ? err : new Error("清空数据时发生未知错误"));
+      throw err;
     }
-  }, [db, storeName])
+  }, [db, storeName, waitForInitialization]);
 
   const getAllData = useCallback(async (): Promise<any[]> => {
-    if (!db) return []
+    await waitForInitialization();
+    if (!db) return [];
+
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([storeName], "readonly")
-      const store = transaction.objectStore(storeName)
-      const request = store.getAll()
+      const transaction = db.transaction([storeName], "readonly");
+      const store = transaction.objectStore(storeName);
+      const request = store.getAll();
 
       request.onsuccess = () => {
-        setIsLoading(false)
-        resolve(request.result)
-      }
+        setIsLoading(false);
+        resolve(request.result);
+      };
 
       request.onerror = () => {
-        setIsLoading(false)
-        setError(new Error("获取所有数据失败"))
-        reject(new Error("获取所有数据失败"))
-      }
-    })
-  }, [db, storeName])
+        setIsLoading(false);
+        setError(new Error("获取所有数据失败"));
+        reject(new Error("获取所有数据失败"));
+      };
+    });
+  }, [db, storeName, waitForInitialization]);
 
   const batchSave = useCallback(async (items: any[]): Promise<void> => {
+    await waitForInitialization();
     if (!db) return;
     if (items.length === 0) return Promise.resolve();
 
@@ -290,13 +339,13 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
       items.forEach(item => {
         // 确保使用 date 作为 key
         if (!item.date) {
-            console.error("Batch save error: item is missing 'date' property.", item);
-            // 跳过这个没有date的坏数据
-            completed++;
-            if (completed === total) {
-                transaction.commit ? transaction.commit() : resolve();
-            }
-            return;
+          console.error("Batch save error: item is missing 'date' property.", item);
+          // 跳过这个没有date的坏数据
+          completed++;
+          if (completed === total) {
+            transaction.commit ? transaction.commit() : resolve();
+          }
+          return;
         }
         const request = store.put(item, item.date);
         request.onsuccess = () => {
@@ -306,9 +355,9 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
           }
         };
         request.onerror = (event) => {
-            // 一个请求失败并不需要让整个事务失败
-            console.error("Batch save error on item:", item, (event.target as IDBRequest).error);
-        }
+          // 一个请求失败并不需要让整个事务失败
+          console.error("Batch save error on item:", item, (event.target as IDBRequest).error);
+        };
       });
 
       transaction.oncomplete = () => {
@@ -320,7 +369,18 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
         reject(new Error(`批量保存事务失败: ${(event.target as IDBTransaction).error}`));
       };
     });
-  }, [db, storeName]);
+  }, [db, storeName, waitForInitialization]);
 
-  return { getData, saveData, deleteData, clearAllData, isLoading, isInitializing, error, getAllData, batchSave }
+  return {
+    getData,
+    saveData,
+    deleteData,
+    clearAllData,
+    isLoading,
+    isInitializing,
+    error,
+    getAllData,
+    batchSave,
+    waitForInitialization
+  };
 }

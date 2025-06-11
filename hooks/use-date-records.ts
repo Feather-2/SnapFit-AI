@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { format } from "date-fns"
 import { DB_NAME, DB_VERSION } from '@/lib/db-config'
+import { useIndexedDB } from './use-indexed-db'
 
 interface DateRecordsHook {
   hasRecord: (date: Date) => boolean
@@ -13,6 +14,7 @@ interface DateRecordsHook {
 export function useDateRecords(): DateRecordsHook {
   const [recordedDates, setRecordedDates] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
+  const { waitForInitialization } = useIndexedDB('healthLogs')
 
   // 检查某个日期是否有记录
   const hasRecord = useCallback((date: Date): boolean => {
@@ -24,22 +26,10 @@ export function useDateRecords(): DateRecordsHook {
   const loadRecordedDates = useCallback(async () => {
     setIsLoading(true)
     try {
-      const request = indexedDB.open(DB_NAME, DB_VERSION) // 更新版本号以匹配use-indexed-db.ts
+      // 等待IndexedDB初始化完成
+      await waitForInitialization()
 
-      // 添加升级处理逻辑
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result
-
-        // 确保所有必需的对象存储都被创建
-        const storeNames = ["healthLogs", "aiMemories"];
-
-        storeNames.forEach(name => {
-          if (!db.objectStoreNames.contains(name)) {
-            console.log(`Creating object store: ${name}`);
-            db.createObjectStore(name);
-          }
-        });
-      }
+      const request = indexedDB.open(DB_NAME, DB_VERSION)
 
       request.onsuccess = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
@@ -105,7 +95,7 @@ export function useDateRecords(): DateRecordsHook {
       setRecordedDates(new Set())
       setIsLoading(false)
     }
-  }, [])
+  }, [waitForInitialization])
 
   // 刷新记录状态
   const refreshRecords = useCallback(async () => {
