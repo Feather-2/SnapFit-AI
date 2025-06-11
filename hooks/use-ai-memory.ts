@@ -5,6 +5,7 @@ import { useIndexedDB } from "./use-indexed-db"
 import { useAIMemorySync } from "./use-ai-memory-sync"
 import type { AIMemory, AIMemoryUpdateRequest } from "@/lib/types"
 import { useToast } from "./use-toast"
+import { DB_NAME, DB_VERSION } from '@/lib/db-config'
 
 interface AIMemoryHook {
   memories: Record<string, AIMemory>
@@ -16,7 +17,7 @@ interface AIMemoryHook {
   error: Error | null
 }
 
-const DB_VERSION = 3
+const STORE_NAME = 'aiMemory'
 
 export function useAIMemory(): AIMemoryHook {
   const [memories, setMemories] = useState<Record<string, AIMemory>>({})
@@ -25,7 +26,7 @@ export function useAIMemory(): AIMemoryHook {
   const { toast } = useToast()
   const { syncSingleMemory } = useAIMemorySync()
 
-  const { getData, saveData, deleteData, clearAllData } = useIndexedDB("aiMemories")
+  const { getData, saveData, deleteData, clearAllData } = useIndexedDB(STORE_NAME)
 
   useEffect(() => {
     let isMounted = true;
@@ -33,12 +34,12 @@ export function useAIMemory(): AIMemoryHook {
     const initDB = async () => {
       try {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
-          const request = window.indexedDB.open("healthApp", DB_VERSION);
+          const request = window.indexedDB.open(DB_NAME, DB_VERSION);
 
           request.onupgradeneeded = (event) => {
             const dbInstance = (event.target as IDBOpenDBRequest).result;
-            if (!dbInstance.objectStoreNames.contains("aiMemories")) {
-              dbInstance.createObjectStore("aiMemories");
+            if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
+              dbInstance.createObjectStore(STORE_NAME);
             }
           };
 
@@ -46,7 +47,7 @@ export function useAIMemory(): AIMemoryHook {
           request.onerror = () => reject(request.error);
         });
 
-        if (!db.objectStoreNames.contains("aiMemories")) {
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.close();
           if (isMounted) {
             setIsLoading(false)
@@ -54,8 +55,8 @@ export function useAIMemory(): AIMemoryHook {
           return;
         }
 
-        const transaction = db.transaction(["aiMemories"], "readonly");
-        const objectStore = transaction.objectStore("aiMemories");
+        const transaction = db.transaction([STORE_NAME], "readonly");
+        const objectStore = transaction.objectStore(STORE_NAME);
         const allMemoriesRequest = objectStore.getAll();
 
         allMemoriesRequest.onsuccess = () => {

@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { NetworkDiagnostic } from "@/components/network-diagnostic"
 import { useWelcomeGuide } from "@/components/onboarding/welcome-guide"
+import { DB_NAME, DB_VERSION } from "@/lib/db-config"
 
 // 定义共享Key的类型
 interface PublicSharedKey {
@@ -52,8 +53,6 @@ interface PublicSharedKey {
     avatarUrl: string | null;
   };
 }
-
-const DB_VERSION = 3;
 
 const defaultUserProfile = {
   weight: 70,
@@ -704,7 +703,7 @@ function SettingsContent() {
   // 导出所有数据
   const handleExportData = useCallback(async () => {
     try {
-      const dbRequest = window.indexedDB.open("healthApp", DB_VERSION);
+      const dbRequest = window.indexedDB.open(DB_NAME, DB_VERSION);
 
       const dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
         dbRequest.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
@@ -801,7 +800,7 @@ function SettingsContent() {
             setAIConfig(importedData.aiConfig);
           }
 
-          const dbOpenRequest = window.indexedDB.open("healthApp", DB_VERSION);
+          const dbOpenRequest = window.indexedDB.open(DB_NAME, DB_VERSION);
 
           dbOpenRequest.onupgradeneeded = (event) => {
             const db = (event.target as IDBOpenDBRequest).result;

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { DB_NAME, DB_VERSION } from '@/lib/db-config'
 
 interface ExportReminderState {
   shouldRemind: boolean
@@ -76,7 +77,7 @@ export function useExportReminder(): ExportReminderState {
     // 检查IndexedDB中数据的时间跨度
     const checkDataSpan = async (): Promise<{ hasData: boolean; spanDays: number }> => {
       return new Promise((resolve) => {
-        const request = indexedDB.open('healthApp', 1)
+        const request = indexedDB.open(DB_NAME, DB_VERSION)
 
         request.onerror = () => {
           resolve({ hasData: false, spanDays: 0 })

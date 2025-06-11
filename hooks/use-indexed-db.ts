@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { DB_NAME, DB_VERSION } from '@/lib/db-config';
 
 interface IndexedDBHook {
   getData: (key: string) => Promise<any>
@@ -24,7 +25,12 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
   useEffect(() => {
     const initDB = async () => {
       try {
-        const request = window.indexedDB.open("healthApp", 3)
+        if (!window.indexedDB) {
+          console.warn("IndexedDB not supported")
+          return
+        }
+
+        const request = window.indexedDB.open(DB_NAME, DB_VERSION)
 
         request.onupgradeneeded = (event) => {
           const db = (event.target as IDBOpenDBRequest).result
@@ -57,7 +63,7 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
             deleteRequest.onsuccess = () => {
               console.log("Database deleted successfully, reopening...");
               // 重新打开数据库，这将触发 onupgradeneeded
-              const reopenRequest = window.indexedDB.open("healthApp", 3);
+              const reopenRequest = window.indexedDB.open(DB_NAME, DB_VERSION);
 
               reopenRequest.onupgradeneeded = (event) => {
                 const newDb = (event.target as IDBOpenDBRequest).result;

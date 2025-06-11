@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { format } from "date-fns"
+import { DB_NAME, DB_VERSION } from '@/lib/db-config'
 
 interface DateRecordsHook {
   hasRecord: (date: Date) => boolean
@@ -23,7 +24,7 @@ export function useDateRecords(): DateRecordsHook {
   const loadRecordedDates = useCallback(async () => {
     setIsLoading(true)
     try {
-      const request = indexedDB.open('healthApp', 3) // 更新版本号以匹配use-indexed-db.ts
+      const request = indexedDB.open(DB_NAME, DB_VERSION) // 更新版本号以匹配use-indexed-db.ts
 
       // 添加升级处理逻辑
       request.onupgradeneeded = (event) => {
