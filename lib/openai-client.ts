@@ -1,11 +1,15 @@
-// 超时配置常量
+// 检测是否在 Vercel 环境中运行
+const isVercelEnvironment = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined
+
+// 超时配置常量 - 基于 Vercel 官方限制优化
 const TIMEOUT_CONFIG = {
-  CONNECTION_TEST: 15000,    // 连接测试：15秒
-  SIMPLE_CHAT: 60000,        // 简单对话：60秒
-  COMPLEX_ANALYSIS: 90000,   // 复杂分析：90秒
-  STREAM_RESPONSE: 120000,   // 流式响应：120秒
-  IMAGE_PROCESSING: 75000,   // 图像处理：75秒
-  DEFAULT: 60000             // 默认：60秒
+  CONNECTION_TEST: isVercelEnvironment ? 10000 : 15000,    // Vercel: 10秒, 其他: 15秒
+  SIMPLE_CHAT: isVercelEnvironment ? 45000 : 55000,        // Vercel: 45秒, 其他: 55秒
+  COMPLEX_ANALYSIS: isVercelEnvironment ? 50000 : 90000,   // Vercel: 50秒, 其他: 90秒
+  STREAM_RESPONSE: isVercelEnvironment ? 55000 : 120000,   // Vercel: 55秒, 其他: 120秒
+  IMAGE_PROCESSING: isVercelEnvironment ? 40000 : 75000,   // Vercel: 40秒, 其他: 75秒
+  DEFAULT: isVercelEnvironment ? 45000 : 55000,            // Vercel: 45秒, 其他: 55秒
+  SMART_SUGGESTIONS: isVercelEnvironment ? 50000 : 55000   // Vercel: 50秒, 其他: 55秒
 } as const
 
 // 通用的 OpenAI 兼容客户端
@@ -52,32 +56,32 @@ export class OpenAICompatibleClient {
       ...(params.max_tokens && { max_tokens: params.max_tokens }),
     }
 
-    // 🐛 调试日志 - 避免打印完整的 base64 图片数据
-    const debugRequestBody = {
-      ...requestBody,
-      messages: requestBody.messages.map((msg: any) => {
-        if (msg.content && Array.isArray(msg.content)) {
-          return {
-            ...msg,
-            content: msg.content.map((item: any) => {
-              if (item.type === 'image_url' && item.image_url?.url) {
-                const url = item.image_url.url
-                const preview = url.length > 100 ? `${url.substring(0, 50)}...[${url.length} chars total]` : url
-                return {
-                  ...item,
-                  image_url: {
-                    ...item.image_url,
-                    url: preview
-                  }
-                }
-              }
-              return item
-            })
-          }
-        }
-        return msg
-      })
-    }
+    // 🐛 调试日志 - 避免打印完整的 base64 图片数据（生产环境已禁用）
+    // const debugRequestBody = {
+    //   ...requestBody,
+    //   messages: requestBody.messages.map((msg: any) => {
+    //     if (msg.content && Array.isArray(msg.content)) {
+    //       return {
+    //         ...msg,
+    //         content: msg.content.map((item: any) => {
+    //           if (item.type === 'image_url' && item.image_url?.url) {
+    //             const url = item.image_url.url
+    //             const preview = url.length > 100 ? `${url.substring(0, 50)}...[${url.length} chars total]` : url
+    //             return {
+    //               ...item,
+    //               image_url: {
+    //                 ...item.image_url,
+    //                 url: preview
+    //               }
+    //             }
+    //           }
+    //           return item
+    //         })
+    //       }
+    //     }
+    //     return msg
+    //   })
+    // }
     //console.log("Request body (base64 truncated):", JSON.stringify(debugRequestBody, null, 2))
 
     try {
@@ -92,6 +96,9 @@ export class OpenAICompatibleClient {
         Array.isArray(msg.content) && msg.content.some((item: any) => item.type === 'image_url')
       )) {
         timeout = TIMEOUT_CONFIG.IMAGE_PROCESSING
+      } else if (params.response_format?.type === 'json_object') {
+        // JSON 格式响应通常用于智能建议等复杂分析
+        timeout = TIMEOUT_CONFIG.SMART_SUGGESTIONS
       }
 
       const timeoutId = setTimeout(() => controller.abort(), timeout)

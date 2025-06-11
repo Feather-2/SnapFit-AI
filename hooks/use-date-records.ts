@@ -23,50 +23,85 @@ export function useDateRecords(): DateRecordsHook {
   const loadRecordedDates = useCallback(async () => {
     setIsLoading(true)
     try {
-      const request = indexedDB.open('healthApp', 2)
-      
+      const request = indexedDB.open('healthApp', 3) // 更新版本号以匹配use-indexed-db.ts
+
+      // 添加升级处理逻辑
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+
+        // 确保所有必需的对象存储都被创建
+        const storeNames = ["healthLogs", "aiMemories"];
+
+        storeNames.forEach(name => {
+          if (!db.objectStoreNames.contains(name)) {
+            console.log(`Creating object store: ${name}`);
+            db.createObjectStore(name);
+          }
+        });
+      }
+
       request.onsuccess = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
-        const transaction = db.transaction(['healthLogs'], 'readonly')
-        const objectStore = transaction.objectStore('healthLogs')
-        const getAllRequest = objectStore.getAll()
 
-        getAllRequest.onsuccess = () => {
-          const allLogs = getAllRequest.result
-          const dates = new Set<string>()
-
-          if (allLogs && allLogs.length > 0) {
-            allLogs.forEach(log => {
-              if (log && (
-                (log.foodEntries && log.foodEntries.length > 0) ||
-                (log.exerciseEntries && log.exerciseEntries.length > 0) ||
-                log.weight !== undefined ||
-                log.dailyStatus ||
-                log.calculatedBMR ||
-                log.calculatedTDEE ||
-                log.tefAnalysis
-              )) {
-                dates.add(log.date)
-              }
-            })
-          }
-
-          setRecordedDates(dates)
-          setIsLoading(false)
+        // 验证healthLogs存储是否存在
+        if (!db.objectStoreNames.contains('healthLogs')) {
+          console.error("'healthLogs' object store not found in database");
+          setRecordedDates(new Set());
+          setIsLoading(false);
+          return;
         }
 
-        getAllRequest.onerror = () => {
-          console.error('Failed to load recorded dates')
+        try {
+          const transaction = db.transaction(['healthLogs'], 'readonly')
+          const objectStore = transaction.objectStore('healthLogs')
+          const getAllRequest = objectStore.getAll()
+
+          getAllRequest.onsuccess = () => {
+            const allLogs = getAllRequest.result
+            const dates = new Set<string>()
+
+            if (allLogs && allLogs.length > 0) {
+              allLogs.forEach(log => {
+                if (log && (
+                  (log.foodEntries && log.foodEntries.length > 0) ||
+                  (log.exerciseEntries && log.exerciseEntries.length > 0) ||
+                  log.weight !== undefined ||
+                  log.dailyStatus ||
+                  log.calculatedBMR ||
+                  log.calculatedTDEE ||
+                  log.tefAnalysis
+                )) {
+                  dates.add(log.date)
+                }
+              })
+            }
+
+            setRecordedDates(dates)
+            setIsLoading(false)
+          }
+
+          getAllRequest.onerror = (event) => {
+            console.error('Failed to load recorded dates', event)
+            setIsLoading(false)
+          }
+        } catch (transactionError) {
+          console.error('Transaction error:', transactionError)
+          setRecordedDates(new Set())
           setIsLoading(false)
+        } finally {
+          // 确保数据库关闭
+          db.close()
         }
       }
 
-      request.onerror = () => {
-        console.error('Failed to open IndexedDB')
+      request.onerror = (event) => {
+        console.error('Failed to open IndexedDB', event)
+        setRecordedDates(new Set())
         setIsLoading(false)
       }
     } catch (error) {
       console.error('Error loading recorded dates:', error)
+      setRecordedDates(new Set())
       setIsLoading(false)
     }
   }, [])

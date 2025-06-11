@@ -22,6 +22,7 @@ import type { Message } from "ai"
 import { useTranslation } from "@/hooks/use-i18n"
 import styles from "./chat.module.css"
 import { compressImage } from "@/lib/image-utils"
+import { WelcomeGuide, useWelcomeGuide } from "@/components/onboarding/welcome-guide"
 
 // 图片预览接口
 interface ImagePreview {
@@ -328,6 +329,9 @@ export default function ChatPage() {
   const t = useTranslation('chat')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isLoadingMessagesRef = useRef(false) // 用于防止循环更新
+
+  // 引导功能
+  const { showGuide, closeGuide } = useWelcomeGuide()
   const [includeHealthData, setIncludeHealthData] = useState(true)
   const [selectedExpert, setSelectedExpert] = useState<string>("general")
   const [isClient, setIsClient] = useState(false)
@@ -2253,6 +2257,9 @@ export default function ChatPage() {
         </CardContent>
       </Card>
       </div>
+
+      {/* 欢迎引导 */}
+      <WelcomeGuide isOpen={showGuide} onClose={closeGuide} />
     </div>
   )
 }

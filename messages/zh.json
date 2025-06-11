@@ -358,7 +358,15 @@
       "noSuggestions": "暂无建议",
       "addMoreData": "记录更多数据以获得建议。",
       "generatePrompt": "记录更多数据以获得个性化建议。",
-      "generatedTime": "生成时间"
+      "generatedTime": "生成时间",
+      "partialResults": "部分结果可用",
+      "generatingProgress": "正在生成智能建议...",
+      "status": {
+        "pending": "等待中",
+        "generating": "生成中",
+        "success": "已完成",
+        "error": "生成失败"
+      }
     },
     "foodCard": {
       "foodName": "食物名称",

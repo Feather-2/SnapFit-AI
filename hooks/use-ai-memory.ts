@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useIndexedDB } from "./use-indexed-db"
 import { useAIMemorySync } from "./use-ai-memory-sync"
 import type { AIMemory, AIMemoryUpdateRequest } from "@/lib/types"
+import { useToast } from "./use-toast"
 
 interface AIMemoryHook {
   memories: Record<string, AIMemory>
@@ -15,87 +16,95 @@ interface AIMemoryHook {
   error: Error | null
 }
 
+const DB_VERSION = 3
+
 export function useAIMemory(): AIMemoryHook {
   const [memories, setMemories] = useState<Record<string, AIMemory>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
-
-  const { getData, saveData, deleteData, clearAllData } = useIndexedDB("aiMemories")
+  const { toast } = useToast()
   const { syncSingleMemory } = useAIMemorySync()
 
-  // 加载所有记忆
-  const loadMemories = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
+  const { getData, saveData, deleteData, clearAllData } = useIndexedDB("aiMemories")
 
-      // 动态获取所有存在的记忆，而不是只加载预定义的专家ID
-      const memoriesData: Record<string, AIMemory> = {}
+  useEffect(() => {
+    let isMounted = true;
 
-      // 尝试打开IndexedDB并获取所有记忆
+    const initDB = async () => {
       try {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
-          const request = window.indexedDB.open("healthApp", 2)
-          request.onsuccess = () => resolve(request.result)
-          request.onerror = () => reject(request.error)
-        })
+          const request = window.indexedDB.open("healthApp", DB_VERSION);
 
-        if (db.objectStoreNames.contains("aiMemories")) {
-          const transaction = db.transaction(["aiMemories"], "readonly")
-          const objectStore = transaction.objectStore("aiMemories")
-
-          const allMemories = await new Promise<Record<string, AIMemory>>((resolve, reject) => {
-            const memories: Record<string, AIMemory> = {}
-            const request = objectStore.openCursor()
-
-            request.onsuccess = (event) => {
-              const cursor = (event.target as IDBRequest).result
-              if (cursor) {
-                memories[cursor.key as string] = cursor.value
-                cursor.continue()
-              } else {
-                resolve(memories)
-              }
+          request.onupgradeneeded = (event) => {
+            const dbInstance = (event.target as IDBOpenDBRequest).result;
+            if (!dbInstance.objectStoreNames.contains("aiMemories")) {
+              dbInstance.createObjectStore("aiMemories");
             }
+          };
 
-            request.onerror = () => reject(request.error)
-          })
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
 
-          Object.assign(memoriesData, allMemories)
+        if (!db.objectStoreNames.contains("aiMemories")) {
+          db.close();
+          if (isMounted) {
+            setIsLoading(false)
+          }
+          return;
         }
 
-        db.close()
-      } catch (dbError) {
-        console.warn("Failed to load memories from IndexedDB directly, falling back to individual queries:", dbError)
+        const transaction = db.transaction(["aiMemories"], "readonly");
+        const objectStore = transaction.objectStore("aiMemories");
+        const allMemoriesRequest = objectStore.getAll();
 
-        // 如果直接访问IndexedDB失败，回退到预定义的专家ID列表
-        const expertIds = ["general", "nutrition", "fitness", "psychology", "medical", "sleep", "exercise", "metabolism", "behavior", "timing"]
+        allMemoriesRequest.onsuccess = () => {
+          if (isMounted) {
+            const allItems = allMemoriesRequest.result;
+            const allKeysRequest = objectStore.getAllKeys();
 
-        for (const expertId of expertIds) {
-          try {
-            const memory = await getData(expertId)
-            if (memory) {
-              memoriesData[expertId] = memory
+            allKeysRequest.onsuccess = () => {
+              const keys = allKeysRequest.result;
+              const memoriesData: Record<string, AIMemory> = {};
+              allItems.forEach((item, index) => {
+                memoriesData[keys[index] as string] = item;
+              });
+              setMemories(memoriesData);
+              setIsLoading(false);
             }
-          } catch (err) {
-            // 单个记忆加载失败不影响其他记忆
-            console.warn(`Failed to load memory for expert ${expertId}:`, err)
+            allKeysRequest.onerror = () => {
+               setError(new Error("Failed to retrieve memory keys."));
+               setIsLoading(false);
+            }
           }
+        };
+
+        allMemoriesRequest.onerror = () => {
+          if (isMounted) {
+            setError(new Error("Failed to retrieve memories."));
+            setIsLoading(false);
+          }
+        };
+
+        transaction.oncomplete = () => {
+          db.close();
+        };
+
+      } catch (dbError) {
+        if (isMounted) {
+          console.error("Failed to initialize DB for memories:", dbError);
+          setError(dbError instanceof Error ? dbError : new Error("Unknown DB error"));
+          setIsLoading(false);
         }
       }
+    };
 
-      setMemories(memoriesData)
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error("加载AI记忆失败"))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [getData])
+    initDB();
 
-  // 初始化时加载记忆
-  useEffect(() => {
-    loadMemories()
-  }, [loadMemories])
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // 获取特定专家的记忆
   const getMemory = useCallback((expertId: string): AIMemory | null => {

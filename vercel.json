@@ -5,7 +5,16 @@
   "framework": "nextjs",
   "functions": {
     "app/api/**/*.ts": {
-      "maxDuration": 30
+      "maxDuration": 60
+    },
+    "app/api/openai/smart-suggestions-shared/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/openai/parse-shared/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/openai/chat-shared/route.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [

@@ -40,6 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTranslation } from "@/hooks/use-i18n"
 import { useSync } from '@/hooks/use-sync';
 import { v4 as uuidv4 } from 'uuid';
+import { WelcomeGuide, useWelcomeGuide } from "@/components/onboarding/welcome-guide"
 
 // 图片预览类型
 interface ImagePreview {
@@ -55,6 +56,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   // 解包params Promise
   const resolvedParams = use(params)
 
+  // 引导功能
+  const { showGuide, closeGuide } = useWelcomeGuide()
+
   // 获取当前语言环境
   const currentLocale = resolvedParams.locale === 'en' ? enUS : zhCN
   const [inputText, setInputText] = useState("")
@@ -68,6 +72,19 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   const [chartRefreshTrigger, setChartRefreshTrigger] = useState<number>(0)
   const [tefAnalysisCountdown, setTEFAnalysisCountdown] = useState(0)
   const [smartSuggestionsLoading, setSmartSuggestionsLoading] = useState(false)
+
+  // 智能建议进度状态
+  const [suggestionProgress, setSuggestionProgress] = useState<{
+    status: 'idle' | 'loading' | 'partial' | 'success' | 'error';
+    message?: string;
+    categories: Record<string, {
+      status: 'pending' | 'generating' | 'success' | 'error';
+      message?: string;
+    }>;
+  }>({
+    status: 'idle',
+    categories: {}
+  })
 
   // 图片上传状态
   const [uploadedImages, setUploadedImages] = useState<ImagePreview[]>([])
@@ -83,6 +100,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     goal: "maintain",
     bmrFormula: "mifflin-st-jeor" as "mifflin-st-jeor",
   })
+
+  // 智能建议专家选择
+  const [selectedExperts, setSelectedExperts] = useLocalStorage<string[]>('selectedSuggestionExperts', ['nutrition', 'exercise']);
 
   // 获取AI配置
   const [aiConfig] = useLocalStorage<AIConfig>("aiConfig", {
@@ -289,6 +309,44 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   // 智能建议localStorage存储
   const [smartSuggestions, setSmartSuggestions] = useLocalStorage<Record<string, SmartSuggestionsResponse>>('smartSuggestions', {});
 
+  // 带重试机制的 fetch 函数
+  const fetchWithRetry = async (url: string, options: RequestInit, maxRetries: number = 2): Promise<Response> => {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // 创建超时控制器
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90000); // 90秒超时
+
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        // 如果是网络错误或服务器错误，且还有重试次数，则重试
+        if (!response.ok && response.status >= 500 && attempt < maxRetries) {
+          console.warn(`[Smart Suggestions] Attempt ${attempt + 1} failed with status ${response.status}, retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // 递增延迟
+          continue;
+        }
+
+        return response;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(`[Smart Suggestions] Attempt ${attempt + 1} failed:`, lastError.message);
+
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // 递增延迟
+        }
+      }
+    }
+
+    throw lastError || new Error('All retry attempts failed');
+  };
+
   // 智能建议功能
   const generateSmartSuggestions = async (targetDate?: string) => {
     const analysisDate = targetDate || dailyLog.date;
@@ -296,16 +354,30 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
     if (!targetLog || (targetLog.foodEntries?.length === 0 && targetLog.exerciseEntries?.length === 0)) {
       console.warn("No data available for smart suggestions on", analysisDate);
-      // 可选：在这里给用户一个提示
       toast({
         title: t('smartSuggestions.noData.title'),
         description: t('smartSuggestions.noData.description', { date: analysisDate }),
         variant: "default",
-      })
+      });
       return;
     }
 
     setSmartSuggestionsLoading(true);
+    // 初始化进度状态
+    const initialCategories = selectedExperts.reduce((acc, expertKey) => {
+      acc[expertKey] = { status: 'pending' };
+      return acc;
+    }, {} as Record<string, { status: 'pending' | 'generating' | 'success' | 'error'; message?: string; }>);
+
+    setSuggestionProgress({
+      status: 'loading',
+      message: '正在准备数据...',
+      categories: initialCategories
+    });
+
+    // 声明流式响应相关变量
+    let streamTimeout: NodeJS.Timeout | null = null;
+
     try {
       // 获取目标日期前7天的数据
       const recentLogs = [];
@@ -320,28 +392,40 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         }
       }
 
-      const response = await fetch("/api/openai/smart-suggestions-shared", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          dailyLog: targetLog,
-          userProfile,
-          recentLogs,
-          aiConfig, // 添加AI配置
-        }),
-      });
+      // 准备请求数据
+      const requestBody = {
+        dailyLog: targetLog,
+        userProfile,
+        recentLogs,
+        aiConfig, // 添加AI配置
+        selectedExperts, // 添加用户选择的专家
+      };
 
+      // 发送 POST 请求 - 使用流式响应和重试机制
+      const response = await fetchWithRetry('/api/openai/smart-suggestions-shared', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      }, 2); // 最多重试2次
+
+      // 检查响应状态
       if (!response.ok) {
+        // 如果服务器返回错误状态码，解析错误信息
         const errorData = await response.json().catch(() => ({}));
 
-        if (response.status === 429 && errorData.code === 'LIMIT_EXCEEDED') {
-          // 🚫 限额超过
+        if (response.status === 408 && errorData.code === 'REQUEST_TIMEOUT') {
+          toast({
+            title: "智能建议生成超时",
+            description: "AI服务响应时间过长，请稍后重试。您也可以尝试使用私有API配置以获得更稳定的服务。",
+            variant: "destructive",
+          });
+        } else if (response.status === 429 && errorData.code === 'LIMIT_EXCEEDED') {
           const details = errorData.details || {};
           toast({
             title: "智能建议生成失败",
-            description: `今日AI使用次数已达上限 (${details.currentUsage}/${details.dailyLimit})，请明天再试或提升信任等级`,
+            description: `今日AI使用次数已达上限 (${details.currentUsage || '未知'}/${details.dailyLimit || '未知'})，请明天再试或提升信任等级`,
             variant: "destructive",
           });
         } else if (response.status === 401 && errorData.code === 'UNAUTHORIZED') {
@@ -350,43 +434,332 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
             description: "请先登录后再使用AI功能",
             variant: "destructive",
           });
+        } else if (response.status === 503 && errorData.code === 'SHARED_KEYS_EXHAUSTED') {
+          toast({
+            title: "共享AI服务不可用",
+            description: errorData.error || "所有共享密钥已达到每日使用限制，请稍后重试或使用私有API配置。",
+            variant: "destructive",
+          });
         } else {
-          console.warn("Smart suggestions failed:", response.statusText, errorData);
           toast({
             title: t('smartSuggestions.error.title'),
             description: errorData.error || t('smartSuggestions.error.description'),
             variant: "destructive",
           });
         }
+
+        setSmartSuggestionsLoading(false);
         return;
       }
 
-      const suggestions = await response.json();
+      // 解析流式响应 - 增强错误处理和恢复机制
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('无法读取响应流');
+      }
 
-      // 保存到localStorage
-      const newSuggestions = { ...smartSuggestions };
-      newSuggestions[analysisDate] = suggestions as SmartSuggestionsResponse;
-      setSmartSuggestions(newSuggestions);
+      // 存储部分结果和状态
+      const partialResults: Record<string, any> = {}; // 修改为对象，以便按类别存储部分结果
+      const textDecoder = new TextDecoder();
+      let buffer = '';
+      let hasReceivedData = false;
+      const processingStartTime = Date.now(); // 记录处理开始时间
 
-      // 🔄 智能建议生成成功后刷新使用量信息，确保所有组件同步
-      console.log('[Smart Suggestions] Refreshing usage info after successful generation')
-      refreshUsageInfo()
+      // 设置流式响应超时监控
+      const resetStreamTimeout = () => {
+        if (streamTimeout) clearTimeout(streamTimeout);
+        streamTimeout = setTimeout(() => {
+          console.warn('[Smart Suggestions] Stream timeout - no data received for 30 seconds');
+          reader.cancel();
+        }, 30000); // 30秒无数据则超时
+      };
 
-      toast({
-        title: t('smartSuggestions.success.title'),
-        description: t('smartSuggestions.success.description', { date: analysisDate }),
-        variant: "default",
-      })
+      resetStreamTimeout();
+
+      try {
+        // 读取流
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          hasReceivedData = true;
+          resetStreamTimeout(); // 重置超时计时器
+
+          // 解码并添加到缓冲区
+          buffer += textDecoder.decode(value, { stream: true });
+
+          // 处理缓冲区中的所有完整事件
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || ''; // 保留最后一个可能不完整的事件
+
+          for (const event of events) {
+            if (!event.trim() || !event.startsWith('data: ')) continue;
+
+            try {
+              const jsonStr = event.replace(/^data: /, '').trim();
+              const data = JSON.parse(jsonStr);
+              console.log('[Smart Suggestions] Received event:', data.type);
+
+              switch (data.type) {
+                case 'heartbeat':
+                  // 心跳包，重置超时计时器
+                  resetStreamTimeout();
+                  break;
+
+                case 'init':
+                  setSuggestionProgress(prev => ({
+                    ...prev,
+                    status: 'loading',
+                    message: data.message || '正在生成智能建议...'
+                  }));
+                  break;
+
+                case 'progress':
+                  setSuggestionProgress(prev => ({
+                    ...prev,
+                    categories: {
+                      ...prev.categories,
+                      [data.category]: {
+                        status: 'generating',
+                        message: data.message
+                      }
+                    }
+                  }));
+                  break;
+
+                case 'partial':
+                  // 添加到部分结果，按类别存储
+                  if (data.data && data.category) {
+                    // 检查是否是单条建议的更新
+                    if (data.isSingleSuggestion && data.data.suggestion) {
+                      // 获取当前类别的已有建议
+                      const existingCategory = partialResults[data.category] || {
+                        key: data.category,
+                        category: data.category,
+                        priority: data.data.priority || 'medium',
+                        suggestions: [],
+                        summary: data.data.summary || '正在生成建议...'
+                      };
+
+                      // 添加新的单条建议
+                      existingCategory.suggestions = [
+                        ...existingCategory.suggestions,
+                        data.data.suggestion
+                      ];
+
+                      // 更新部分结果
+                      partialResults[data.category] = existingCategory;
+                    } else {
+                      // 处理完整类别更新
+                      partialResults[data.category] = data.data;
+                    }
+
+                    // 立即将部分结果应用到当前显示，无条件更新UI
+                    const partialSuggestions = Object.values(partialResults);
+
+                    // 创建一个临时的建议对象用于显示
+                    const tempSuggestions = { ...smartSuggestions };
+
+                    // 确保每个部分结果都有正确的结构
+                    const formattedSuggestions = partialSuggestions.map(suggestion => {
+                      // 确保每个建议都有必要的字段
+                      return {
+                        ...suggestion,
+                        key: suggestion.key || suggestion.category || data.category,
+                        category: suggestion.category || data.category,
+                        priority: suggestion.priority || 'medium',
+                        suggestions: Array.isArray(suggestion.suggestions) ? suggestion.suggestions : [],
+                        summary: suggestion.summary || '正在生成建议...'
+                      };
+                    });
+
+                    tempSuggestions[analysisDate] = {
+                      suggestions: formattedSuggestions,
+                      generatedAt: new Date().toISOString(),
+                      dataDate: analysisDate,
+                      processingTime: Date.now() - processingStartTime,
+                      isPartial: true, // 标记为部分结果，用于显示动画效果
+                      lastUpdated: Date.now(), // 添加最后更新时间，用于触发动画
+                      currentCategory: data.category, // 添加当前正在处理的类别
+                      recentSuggestion: data.isSingleSuggestion ? data.data.suggestion : null // 添加最新的单条建议
+                    };
+
+                    // 无条件更新UI，确保每次收到新建议都立即显示
+                    setSmartSuggestions(tempSuggestions);
+                    console.log('[Smart Suggestions] Updated with partial results:',
+                      data.isSingleSuggestion ? 'Single suggestion added' : 'Category updated');
+                  }
+
+                  // 获取类别的中文名称
+                  const categoryDisplayName = data.category === 'nutrition' ? '营养' :
+                                             data.category === 'exercise' ? '运动' :
+                                             data.category === 'metabolism' ? '代谢' :
+                                             data.category === 'behavior' ? '行为' :
+                                             data.category === 'timing' ? '时机' :
+                                             data.category === 'wellness' ? '整体健康' :
+                                             data.category;
+
+                  // 如果是单条建议更新，不改变类别状态
+                  if (!data.isSingleSuggestion) {
+                    setSuggestionProgress(prev => ({
+                      ...prev,
+                      status: 'partial',
+                      message: `正在生成${categoryDisplayName}建议...`,
+                      categories: {
+                        ...prev.categories,
+                        [data.category]: {
+                          status: 'success',
+                          message: '分析完成'
+                        }
+                      }
+                    }));
+                  } else {
+                    // 单条建议更新时，更新消息和进度
+                    setSuggestionProgress(prev => ({
+                      ...prev,
+                      status: 'partial',
+                      message: `正在生成${categoryDisplayName}建议...（已生成 ${
+                        partialResults[data.category]?.suggestions?.length || 0
+                      } 条）`,
+                      categories: {
+                        ...prev.categories,
+                        [data.category]: {
+                          status: 'generating',
+                          message: `正在生成第 ${
+                            partialResults[data.category]?.suggestions?.length || 0
+                          } 条建议`
+                        }
+                      }
+                    }));
+                  }
+                  break;
+
+                case 'error':
+                  setSuggestionProgress(prev => ({
+                    ...prev,
+                    categories: {
+                      ...prev.categories,
+                      [data.category]: {
+                        status: 'error',
+                        message: data.message || '分析失败'
+                      }
+                    }
+                  }));
+                  break;
+
+                case 'fatal':
+                  setSuggestionProgress(prev => ({
+                    ...prev,
+                    status: 'error',
+                    message: data.message || '生成失败，请稍后重试'
+                  }));
+                  setSmartSuggestionsLoading(false);
+                  toast({
+                    title: t('smartSuggestions.error.title'),
+                    description: data.message || t('smartSuggestions.error.description'),
+                    variant: "destructive",
+                  });
+                  return;
+
+                case 'complete':
+                  // 处理完整结果
+
+                  // 如果服务器返回了完整结果，则使用它；否则使用收集的部分结果
+                  let finalSuggestions;
+                  if (data.suggestions && data.suggestions.length > 0) {
+                    finalSuggestions = data.suggestions;
+                  } else {
+                    // 将部分结果转换为数组
+                    finalSuggestions = Object.values(partialResults);
+                  }
+
+                  // 确保结果符合预期的格式
+                  if (finalSuggestions.length > 0) {
+                    // 确保每个建议都有正确的结构
+                    const formattedSuggestions = finalSuggestions.map((suggestion: any) => {
+                      // 确保每个建议都有必要的字段
+                      return {
+                        ...suggestion,
+                        key: suggestion.key || suggestion.category || 'unknown',
+                        category: suggestion.category || 'unknown',
+                        priority: suggestion.priority || 'medium',
+                        suggestions: Array.isArray(suggestion.suggestions) ? suggestion.suggestions : [],
+                        summary: suggestion.summary || '暂无摘要'
+                      };
+                    });
+
+                    // 保存到localStorage
+                    const newSuggestions = { ...smartSuggestions };
+                    newSuggestions[analysisDate] = {
+                      suggestions: formattedSuggestions,
+                      generatedAt: data.generatedAt || new Date().toISOString(),
+                      dataDate: analysisDate,
+                      keyInfo: data.keyInfo,
+                      processingTime: data.processingTime || (Date.now() - processingStartTime),
+                      lastUpdated: Date.now() // 添加最后更新时间，用于触发动画
+                    };
+                    setSmartSuggestions(newSuggestions);
+                    console.log('[Smart Suggestions] Complete results saved:', formattedSuggestions);
+                  }
+
+                  // 更新状态
+                  setSuggestionProgress({
+                    status: 'success',
+                    message: '智能建议生成完成',
+                    categories: {
+                      nutrition: { status: 'success' },
+                      exercise: { status: 'success' }
+                    }
+                  });
+
+                  // 刷新使用量信息
+                  console.log('[Smart Suggestions] Refreshing usage info after successful generation');
+                  refreshUsageInfo();
+
+                  toast({
+                    title: t('smartSuggestions.success.title'),
+                    description: t('smartSuggestions.success.description', { date: analysisDate }),
+                    variant: "default",
+                  });
+                  break;
+              }
+            } catch (error) {
+              console.error('[Smart Suggestions] Error parsing event data:', error);
+            }
+          }
+        }
+      } catch (streamError) {
+        console.error('[Smart Suggestions] Stream reading error:', streamError);
+        throw streamError;
+      } finally {
+        // 清理超时计时器
+        if (streamTimeout) clearTimeout(streamTimeout);
+      }
+
+      // 如果没有收到任何数据，可能是连接问题
+      if (!hasReceivedData) {
+        throw new Error('未收到任何数据，可能是网络连接问题');
+      }
+
+      setSmartSuggestionsLoading(false);
 
     } catch (error) {
       console.warn("Smart suggestions error:", error);
-       toast({
-        title: t('smartSuggestions.unknownError.title'),
-        description: t('smartSuggestions.unknownError.description'),
-        variant: "destructive",
-      })
-    } finally {
       setSmartSuggestionsLoading(false);
+
+      // 清理超时计时器
+      if (streamTimeout) clearTimeout(streamTimeout);
+
+      setSuggestionProgress({
+        status: 'error',
+        message: error instanceof Error ? error.message : '未知错误',
+        categories: {}
+      });
+      toast({
+        title: t('smartSuggestions.error.title') || '错误',
+        description: error instanceof Error ? error.message : t('smartSuggestions.error.description') || '生成智能建议时发生错误',
+        variant: "destructive",
+      });
     }
   };
 
@@ -1605,6 +1978,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
               isLoading={smartSuggestionsLoading}
               onRefresh={() => generateSmartSuggestions(dailyLog.date)}
               currentDate={dailyLog.date}
+              progress={suggestionProgress}
+              selectedExperts={selectedExperts}
+              onSelectedExpertsChange={setSelectedExperts}
             />
           </div>
         </div>
@@ -1618,6 +1994,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
           </div>
         </div>
       </div>
+
+      {/* 欢迎引导 */}
+      <WelcomeGuide isOpen={showGuide} onClose={closeGuide} />
     </div>
   )
 }

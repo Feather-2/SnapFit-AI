@@ -144,8 +144,12 @@ export async function POST(req: Request) {
       response_format: { type: "json_object" },
     })
 
+    // 从Markdown代码块中提取JSON
+    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
+    const jsonString = jsonMatch ? jsonMatch[1] : text.trim();
+
     // 解析AI分析结果
-    const analysisResult = JSON.parse(text)
+    const analysisResult = JSON.parse(jsonString)
 
     // 验证和规范化结果
     const enhancementMultiplier = Math.max(1.0, Math.min(1.3, analysisResult.enhancementMultiplier || 1.0))

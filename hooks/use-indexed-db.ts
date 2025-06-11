@@ -24,32 +24,84 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
   useEffect(() => {
     const initDB = async () => {
       try {
-        const request = window.indexedDB.open("healthApp", 2)
+        const request = window.indexedDB.open("healthApp", 3)
 
         request.onupgradeneeded = (event) => {
           const db = (event.target as IDBOpenDBRequest).result
-          if (!db.objectStoreNames.contains(storeName)) {
-            db.createObjectStore(storeName)
-          }
-          // 确保aiMemories存储也被创建
-          if (!db.objectStoreNames.contains("aiMemories")) {
-            db.createObjectStore("aiMemories")
-          }
+
+          // 确保所有必需的对象存储都被创建
+          const storeNames = ["healthLogs", "aiMemories"];
+
+          storeNames.forEach(name => {
+            if (!db.objectStoreNames.contains(name)) {
+              console.log(`Creating object store: ${name}`);
+              db.createObjectStore(name);
+            }
+          });
         }
 
         request.onsuccess = (event) => {
-          setDb((event.target as IDBOpenDBRequest).result)
-          setIsInitializing(false)
+          const database = (event.target as IDBOpenDBRequest).result;
+
+          // 验证所需的存储对象是否存在
+          if (!database.objectStoreNames.contains(storeName)) {
+            console.error(`Required object store '${storeName}' not found in database`);
+
+            // 关闭当前数据库连接
+            database.close();
+
+            // 尝试删除并重新创建数据库
+            console.log("Attempting to delete and recreate database...");
+            const deleteRequest = window.indexedDB.deleteDatabase("healthApp");
+
+            deleteRequest.onsuccess = () => {
+              console.log("Database deleted successfully, reopening...");
+              // 重新打开数据库，这将触发 onupgradeneeded
+              const reopenRequest = window.indexedDB.open("healthApp", 3);
+
+              reopenRequest.onupgradeneeded = (event) => {
+                const newDb = (event.target as IDBOpenDBRequest).result;
+                // 创建所有必需的对象存储
+                ["healthLogs", "aiMemories"].forEach(name => {
+                  if (!newDb.objectStoreNames.contains(name)) {
+                    newDb.createObjectStore(name);
+                  }
+                });
+              };
+
+              reopenRequest.onsuccess = (event) => {
+                setDb((event.target as IDBOpenDBRequest).result);
+                setIsInitializing(false);
+                console.log("Database successfully recreated with all required stores");
+              };
+
+              reopenRequest.onerror = (event) => {
+                setError(new Error("无法重新创建数据库"));
+                setIsInitializing(false);
+                console.error("IndexedDB reopen error:", (event.target as IDBOpenDBRequest).error);
+              };
+            };
+
+            deleteRequest.onerror = (event) => {
+              setError(new Error("无法删除损坏的数据库"));
+              setIsInitializing(false);
+              console.error("IndexedDB delete error:", (event.target as IDBOpenDBRequest).error);
+            };
+          } else {
+            // 正常情况，存储对象存在
+            setDb(database);
+            setIsInitializing(false);
+          }
         }
 
         request.onerror = (event) => {
-          setError(new Error("无法打开数据库"))
-          setIsInitializing(false)
-          console.error("IndexedDB error:", (event.target as IDBOpenDBRequest).error)
+          setError(new Error("无法打开数据库"));
+          setIsInitializing(false);
+          console.error("IndexedDB error:", (event.target as IDBOpenDBRequest).error);
         }
       } catch (err) {
-        setError(err instanceof Error ? err : new Error("初始化数据库时发生未知错误"))
-        setIsInitializing(false)
+        setError(err instanceof Error ? err : new Error("初始化数据库时发生未知错误"));
+        setIsInitializing(false);
       }
     }
 

@@ -90,6 +90,12 @@ export interface SmartSuggestionsResponse {
   suggestions: SmartSuggestionCategory[]
   generatedAt: string
   dataDate: string
+  keyInfo?: any // 使用的密钥信息
+  processingTime?: number // 处理时间（毫秒）
+  isPartial?: boolean // 是否为部分结果
+  lastUpdated?: number // 最后更新时间戳
+  currentCategory?: string // 当前正在处理的类别
+  recentSuggestion?: SmartSuggestion // 最近添加的单条建议
 }
 
 // 每日状态记录类型

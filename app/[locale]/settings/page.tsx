@@ -40,6 +40,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { NetworkDiagnostic } from "@/components/network-diagnostic"
+import { useWelcomeGuide } from "@/components/onboarding/welcome-guide"
 
 // 定义共享Key的类型
 interface PublicSharedKey {
@@ -51,6 +52,8 @@ interface PublicSharedKey {
     avatarUrl: string | null;
   };
 }
+
+const DB_VERSION = 3;
 
 const defaultUserProfile = {
   weight: 70,
@@ -236,6 +239,7 @@ function SettingsContent() {
   const t = useTranslation('settings')
   const searchParams = useSearchParams()
   const { data: session } = useSession()
+
   const [userProfile, setUserProfile] = useLocalStorage("userProfile", defaultUserProfile)
   const [aiConfig, setAIConfig] = useLocalStorage<AIConfig>("aiConfig", defaultAIConfig)
 
@@ -261,6 +265,9 @@ function SettingsContent() {
 
   // 网络诊断状态
   const [showDiagnostic, setShowDiagnostic] = useState(false)
+
+  // 引导功能
+  const { resetGuide } = useWelcomeGuide()
 
   // 初始化编辑状态
   useEffect(() => {
@@ -596,31 +603,52 @@ function SettingsContent() {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/shared-keys/test", {
+      console.log("🔧 Fetching models for", modelType, "from", modelConfig.baseUrl);
+
+      const response = await fetch("/api/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           baseUrl: modelConfig.baseUrl,
           apiKey: modelConfig.apiKey,
-          modelName: modelConfig.name, // Use current name for the test
         })
       });
 
-      const result = await response.json();
+      // 检查响应是否为JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("❌ Non-JSON response:", text.substring(0, 200));
+        throw new Error("服务器返回了非JSON响应，可能是API地址错误或服务器故障");
+      }
 
-      if (result.success && result.availableModels) {
+      const result = await response.json();
+      console.log("📋 Models API response:", result);
+
+      if (result.success && result.models) {
         toast({
           title: t('ai.fetchModelsSuccess'),
-          description: t('ai.foundModels', { count: result.availableModels.length })
+          description: t('ai.foundModels', { count: result.models.length })
         });
-        setModels(result.availableModels.map((id: string) => ({ id })));
+        setModels(result.models.map((model: any) => ({ id: model.id })));
       } else {
         throw new Error(result.error || t('ai.getModelsError'));
       }
     } catch (error: any) {
+      console.error("❌ Fetch models error:", error);
+
+      let errorMessage = error.message || t('ai.networkErrorOrApiUnavailable');
+
+      // 特殊处理常见错误
+      if (error.message?.includes("Unexpected token '<'")) {
+        errorMessage = "API地址可能不正确：服务器返回了网页而不是API响应";
+      } else if (error.message?.includes("Failed to fetch")) {
+        errorMessage = "网络连接失败：请检查API地址和网络连接";
+      }
+
       toast({
         title: t('ai.fetchModelsFailed'),
-        description: error.message || t('ai.networkErrorOrApiUnavailable'),
+        description: errorMessage,
         variant: "destructive"
       });
       setModels([]);
@@ -676,236 +704,169 @@ function SettingsContent() {
   // 导出所有数据
   const handleExportData = useCallback(async () => {
     try {
-      // 获取所有健康日志
-      const db = await window.indexedDB.open("healthApp", 2)
-      const request = new Promise((resolve, reject) => {
-        db.onsuccess = (event) => {
-          const database = (event.target as IDBOpenDBRequest).result
-          const transaction = database.transaction(["healthLogs"], "readonly")
-          const objectStore = transaction.objectStore("healthLogs")
-          const allData: Record<string, any> = {}
+      const dbRequest = window.indexedDB.open("healthApp", DB_VERSION);
 
-          objectStore.openCursor().onsuccess = (cursorEvent) => {
-            const cursor = (cursorEvent.target as IDBRequest).result
-            if (cursor) {
-              allData[cursor.key as string] = cursor.value
-              cursor.continue()
-            } else {
-              resolve(allData)
-            }
+      const dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+        dbRequest.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
+        dbRequest.onerror = (event) => reject((event.target as IDBOpenDBRequest).error);
+      });
+
+      const db = await dbPromise;
+      const transaction = db.transaction(["healthLogs", "aiMemories"], "readonly");
+      const healthLogsStore = transaction.objectStore("healthLogs");
+      const aiMemoriesStore = transaction.objectStore("aiMemories");
+
+      const healthLogsPromise = new Promise<Record<string, any>>((resolve, reject) => {
+        const allData: Record<string, any> = {};
+        const request = healthLogsStore.openCursor();
+        request.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest).result;
+          if (cursor) {
+            allData[cursor.key as string] = cursor.value;
+            cursor.continue();
+          } else {
+            resolve(allData);
           }
+        };
+        request.onerror = (event) => reject((event.target as IDBRequest).error);
+      });
 
-          transaction.onerror = () => reject(new Error(t('data.importErrorDescription')))
-        }
-        db.onerror = () => reject(new Error(t('data.importErrorDescription')))
-      })
-
-      const healthLogs = await request
-
-      // 获取AI记忆数据
-      const aiMemoriesRequest = new Promise((resolve, reject) => {
-        const db2 = window.indexedDB.open("healthApp", 2)
-        db2.onsuccess = (event) => {
-          const database = (event.target as IDBOpenDBRequest).result
-          if (!database.objectStoreNames.contains("aiMemories")) {
-            resolve({})
-            return
+      const aiMemoriesPromise = new Promise<Record<string, any>>((resolve, reject) => {
+        const allMemories: Record<string, any> = {};
+        const request = aiMemoriesStore.openCursor();
+        request.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest).result;
+          if (cursor) {
+            allMemories[cursor.key as string] = cursor.value;
+            cursor.continue();
+          } else {
+            resolve(allMemories);
           }
+        };
+        request.onerror = (event) => reject((event.target as IDBRequest).error);
+      });
 
-          const transaction = database.transaction(["aiMemories"], "readonly")
-          const objectStore = transaction.objectStore("aiMemories")
-          const allMemories: Record<string, any> = {}
+      const [healthLogs, aiMemories] = await Promise.all([healthLogsPromise, aiMemoriesPromise]);
 
-          objectStore.openCursor().onsuccess = (cursorEvent) => {
-            const cursor = (cursorEvent.target as IDBRequest).result
-            if (cursor) {
-              allMemories[cursor.key as string] = cursor.value
-              cursor.continue()
-            } else {
-              resolve(allMemories)
-            }
-          }
-
-          transaction.onerror = () => resolve({}) // 如果出错，返回空对象
-        }
-        db2.onerror = () => resolve({}) // 如果出错，返回空对象
-      })
-
-      const aiMemories = await aiMemoriesRequest
-
-      // 创建导出对象
       const exportData = {
         userProfile,
         aiConfig,
         healthLogs,
         aiMemories,
-      }
+      };
 
-      // 创建并下载 JSON 文件
-      const dataStr = JSON.stringify(exportData, null, 2)
-      const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr)
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+      const exportFileDefaultName = `health-data-${new Date().toISOString().slice(0, 10)}.json`;
 
-      const exportFileDefaultName = `health-data-${new Date().toISOString().slice(0, 10)}.json`
+      const linkElement = document.createElement("a");
+      linkElement.setAttribute("href", dataUri);
+      linkElement.setAttribute("download", exportFileDefaultName);
+      linkElement.click();
 
-      const linkElement = document.createElement("a")
-      linkElement.setAttribute("href", dataUri)
-      linkElement.setAttribute("download", exportFileDefaultName)
-      linkElement.click()
-
-      // 记录导出时间
-      localStorage.setItem('lastExportTime', new Date().toISOString())
+      localStorage.setItem('lastExportTime', new Date().toISOString());
 
       toast({
         title: t('data.exportSuccessTitle'),
         description: t('data.exportSuccessDescription'),
-      })
+      });
     } catch (error) {
-      console.error("Export data failed:", error)
+      console.error("Export data failed:", error);
       toast({
         title: t('data.exportErrorTitle'),
-        description: t('data.exportErrorDescription'),
+        description: error instanceof Error ? error.message : t('data.exportErrorDescription'),
         variant: "destructive",
-      })
+      });
     }
-  }, [userProfile, aiConfig, toast])
+  }, [userProfile, aiConfig, toast, t]);
 
   // 导入数据
   const handleImportData = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0]
-      if (!file) return
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const content = e.target?.result as string
-          const importedData = JSON.parse(content)
+          const content = e.target?.result as string;
+          const importedData = JSON.parse(content);
 
-          // 验证导入的数据格式
           if (!importedData.userProfile || !importedData.healthLogs) {
-            throw new Error(t('data.importErrorDescription'))
+            throw new Error(t('data.importErrorDescription'));
           }
 
-          // 更新用户配置
-          setUserProfile(importedData.userProfile)
-
-          // 更新AI配置（如果存在）
+          setUserProfile(importedData.userProfile);
           if (importedData.aiConfig) {
-            setAIConfig(importedData.aiConfig)
+            setAIConfig(importedData.aiConfig);
           }
 
-          // 更新健康日志
-          const db = await window.indexedDB.open("healthApp", 2)
-          db.onsuccess = (event) => {
-            const database = (event.target as IDBOpenDBRequest).result
-            const transaction = database.transaction(["healthLogs"], "readwrite")
-            const objectStore = transaction.objectStore("healthLogs")
+          const dbOpenRequest = window.indexedDB.open("healthApp", DB_VERSION);
 
-            // 清除现有数据
-            objectStore.clear()
+          dbOpenRequest.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains("healthLogs")) {
+              db.createObjectStore("healthLogs");
+            }
+            if (!db.objectStoreNames.contains("aiMemories")) {
+              db.createObjectStore("aiMemories");
+            }
+          };
 
-            // 添加导入的数据
-            Object.entries(importedData.healthLogs).forEach(([key, value]) => {
-              objectStore.add(value, key)
-            })
+          dbOpenRequest.onsuccess = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result;
+            const transaction = db.transaction(["healthLogs", "aiMemories"], "readwrite");
+            const healthLogsStore = transaction.objectStore("healthLogs");
+            const aiMemoriesStore = transaction.objectStore("aiMemories");
 
-            transaction.oncomplete = async () => {
-              // 导入AI记忆数据（如果存在）
-              if (importedData.aiMemories && Object.keys(importedData.aiMemories).length > 0) {
-                try {
-                  const db2 = await window.indexedDB.open("healthApp", 2)
-                  db2.onsuccess = (event2) => {
-                    const database2 = (event2.target as IDBOpenDBRequest).result
+            healthLogsStore.clear().onsuccess = () => {
+              Object.entries(importedData.healthLogs).forEach(([key, value]) => {
+                healthLogsStore.add(value, key);
+              });
+            };
 
-                    // 确保aiMemories对象存储存在
-                    if (!database2.objectStoreNames.contains("aiMemories")) {
-                      // 如果不存在，需要升级数据库版本
-                      database2.close()
-                      const upgradeRequest = window.indexedDB.open("healthApp", 2)
-                      upgradeRequest.onupgradeneeded = (upgradeEvent) => {
-                        const upgradeDb = (upgradeEvent.target as IDBOpenDBRequest).result
-                        if (!upgradeDb.objectStoreNames.contains("aiMemories")) {
-                          upgradeDb.createObjectStore("aiMemories")
-                        }
-                      }
-                      upgradeRequest.onsuccess = (upgradeEvent) => {
-                        const upgradeDb = (upgradeEvent.target as IDBOpenDBRequest).result
-                        const memoryTransaction = upgradeDb.transaction(["aiMemories"], "readwrite")
-                        const memoryStore = memoryTransaction.objectStore("aiMemories")
-
-                        // 清除现有AI记忆
-                        memoryStore.clear()
-
-                        // 添加导入的AI记忆
-                        Object.entries(importedData.aiMemories).forEach(([key, value]) => {
-                          memoryStore.add(value, key)
-                        })
-
-                        memoryTransaction.oncomplete = () => {
-                          toast({
-                            title: t('data.importSuccessWithMemoryTitle'),
-                            description: t('data.importSuccessWithMemoryDescription'),
-                          })
-                        }
-                      }
-                    } else {
-                      const memoryTransaction = database2.transaction(["aiMemories"], "readwrite")
-                      const memoryStore = memoryTransaction.objectStore("aiMemories")
-
-                      // 清除现有AI记忆
-                      memoryStore.clear()
-
-                      // 添加导入的AI记忆
-                      Object.entries(importedData.aiMemories).forEach(([key, value]) => {
-                        memoryStore.add(value, key)
-                      })
-
-                      memoryTransaction.oncomplete = () => {
-                        toast({
-                          title: t('data.importSuccessWithMemoryTitle'),
-                          description: t('data.importSuccessWithMemoryDescription'),
-                        })
-                      }
-                    }
-                  }
-                } catch (memoryError) {
-                  console.warn("Import AI memory failed:", memoryError)
-                  toast({
-                    title: t('data.partialImportSuccessTitle'),
-                    description: t('data.partialImportSuccessDescription'),
-                  })
-                }
-              } else {
-                toast({
-                  title: t('data.importSuccessTitle'),
-                  description: t('data.importSuccessDescription'),
-                })
-              }
-
-              // 重置文件输入
-              if (event.target) {
-                (event.target as HTMLInputElement).value = ""
-              }
+            if (importedData.aiMemories) {
+              aiMemoriesStore.clear().onsuccess = () => {
+                Object.entries(importedData.aiMemories).forEach(([key, value]) => {
+                  aiMemoriesStore.add(value, key);
+                });
+              };
             }
 
-            transaction.onerror = () => {
-              throw new Error(t('data.importErrorDescription'))
-            }
-          }
+            transaction.oncomplete = () => {
+              toast({
+                title: t('data.importSuccessTitle'),
+                description: t('data.importSuccessDescription'),
+              });
+              // 重新加载页面以确保状态同步
+              window.location.reload();
+            };
+
+            transaction.onerror = (event) => {
+              console.error("Import transaction error:", (event.target as IDBTransaction).error);
+              throw new Error(t('data.importErrorDescription'));
+            };
+          };
+
+          dbOpenRequest.onerror = (event) => {
+            console.error("DB open error on import:", (event.target as IDBOpenDBRequest).error);
+            throw new Error(t('data.importErrorDescription'));
+          };
+
         } catch (error) {
-          console.error("Import data failed:", error)
+          console.error("Import data failed:", error);
           toast({
             title: t('data.importErrorTitle'),
-            description: t('data.importErrorDescription'),
+            description: error instanceof Error ? error.message : t('data.importErrorDescription'),
             variant: "destructive",
-          })
+          });
         }
-      }
+      };
 
-      reader.readAsText(file)
+      reader.readAsText(file);
     },
-    [setUserProfile, setAIConfig, toast],
-  )
+    [setUserProfile, setAIConfig, toast, t]
+  );
 
   // 清空所有数据
   const handleClearAllData = useCallback(async () => {
@@ -1813,7 +1774,7 @@ function SettingsContent() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={pullMemories}
+                          onClick={() => pullMemories()}
                           disabled={isSyncing}
                           className="text-xs h-9"
                         >
@@ -1823,7 +1784,7 @@ function SettingsContent() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={pushMemories}
+                          onClick={() => pushMemories()}
                           disabled={isSyncing}
                           className="text-xs h-9"
                         >
@@ -1833,7 +1794,7 @@ function SettingsContent() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={pullProfile}
+                          onClick={() => pullProfile()}
                           disabled={isSyncing}
                           className="text-xs h-9"
                         >
@@ -1843,7 +1804,7 @@ function SettingsContent() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={pushProfile}
+                          onClick={() => pushProfile()}
                           disabled={isSyncing}
                           className="text-xs h-9"
                         >
@@ -1992,6 +1953,29 @@ function SettingsContent() {
           <div>
             <h3 className="text-lg font-medium">{t('about.versionTitle')}</h3>
             <p className="text-sm text-muted-foreground">{t('about.versionInfo')}</p>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-medium">使用引导</h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              重新查看初次使用时的引导说明，了解SnapFit AI社区版的特色功能。
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetGuide();
+                toast({
+                  title: "引导已重置",
+                  description: "欢迎引导将在页面刷新后显示",
+                });
+              }}
+              className="flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              重新显示使用引导
+            </Button>
           </div>
         </CardContent>
       </Card>

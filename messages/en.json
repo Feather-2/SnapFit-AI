@@ -194,6 +194,14 @@
       "success": {
         "title": "Suggestions Updated",
         "description": "New smart suggestions have been generated for {date}."
+      },
+      "partialResults": "Partial results available",
+      "generatingProgress": "Generating smart suggestions...",
+      "status": {
+        "pending": "Pending",
+        "generating": "Generating",
+        "success": "Completed",
+        "error": "Generation failed"
       }
     },
     "ui": {
@@ -361,7 +369,15 @@
       "noSuggestions": "No suggestions available",
       "generatePrompt": "Record more data to get personalized suggestions.",
       "addMoreData": "Add more data to get personalized advice",
-      "generatedTime": "Generated Time"
+      "generatedTime": "Generated Time",
+      "partialResults": "Partial results available",
+      "generatingProgress": "Generating smart suggestions...",
+      "status": {
+        "pending": "Pending",
+        "generating": "Generating",
+        "success": "Completed",
+        "error": "Generation failed"
+      }
     },
     "foodCard": {
       "foodName": "Food Name",
@@ -1002,24 +1018,6 @@
     "pushStarted": "Pushing local changes to the cloud...",
     "pushFinished": "Successfully pushed changes to the cloud.",
     "pushFailed": "Failed to push data to the cloud: {error}"
-  },
-  "smartSuggestions": {
-    "noData": {
-      "title": "Insufficient Data",
-      "description": "Not enough data for {date} to generate suggestions."
-    },
-    "error": {
-      "title": "Suggestion Generation Failed",
-      "description": "Unable to generate smart suggestions, please try again later."
-    },
-    "unknownError": {
-      "title": "Unknown Error",
-      "description": "An unknown error occurred while generating suggestions."
-    },
-    "success": {
-      "title": "Suggestions Updated",
-      "description": "New smart suggestions have been generated for {date}."
-    }
   },
   "sharedKeys": {
     "title": "Shared Key Pool",
