@@ -53,6 +53,12 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   const t = useTranslation('dashboard')
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
 
+  // 解决 React 418 Hydration 错误：仅在挂载完成后再渲染实际内容
+  const [hasMounted, setHasMounted] = useState(false)
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
   // 解包params Promise
   const resolvedParams = use(params)
 
@@ -1312,6 +1318,11 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   const handleSaveDailyStatus = (status: DailyStatus) => {
     const patch = { dailyStatus: status };
     updateLogAndPush(patch);
+  }
+
+  // 如果组件尚未挂载，渲染占位，避免 SSR/CSR 不一致导致水合错误
+  if (!hasMounted) {
+    return <div className="min-h-screen bg-white dark:bg-slate-900" />
   }
 
   return (
