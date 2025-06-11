@@ -4,6 +4,9 @@ import { checkApiAuth, rollbackUsageIfNeeded } from '@/lib/api-auth-helper'
 import type { DailyLog, UserProfile, AIConfig } from "@/lib/types"
 
 export async function POST(req: Request) {
+  // 提前声明，便于在 catch 中访问并回滚
+  let session: any = null
+  let usageManager: any = null
   try {
     // 获取AI配置和专家角色
     const aiConfigStr = req.headers.get("x-ai-config")
@@ -30,7 +33,7 @@ export async function POST(req: Request) {
       }, { status: authResult.error!.status })
     }
 
-    const { session, usageManager } = authResult
+    ;({ session, usageManager } = authResult)
 
     const body = await req.json()
     //console.log("=== API接收到的完整请求体 ===")
@@ -238,24 +241,24 @@ export async function POST(req: Request) {
           userProfile.gender === "male" ? "男" : userProfile.gender === "female" ? "女" : userProfile.gender || "未知"
         }
         - 活动水平: ${
-          {
+          ({
             sedentary: "久坐不动",
             light: "轻度活跃",
             moderate: "中度活跃",
             active: "高度活跃",
             very_active: "非常活跃",
-          }[userProfile.activityLevel] ||
+          } as Record<string, string>)[userProfile.activityLevel as string] ||
           userProfile.activityLevel ||
           "未知"
         }
         - 健康目标: ${
-          {
+          ({
             lose_weight: "减重",
             maintain: "保持体重",
             gain_weight: "增重",
             build_muscle: "增肌",
             improve_health: "改善健康",
-          }[userProfile.goal] ||
+          } as Record<string, string>)[userProfile.goal as string] ||
           userProfile.goal ||
           "未知"
         }
@@ -314,7 +317,7 @@ export async function POST(req: Request) {
       if (healthData?.foodEntries?.length > 0) {
         systemPrompt += `
         今日食物记录:
-        ${healthData.foodEntries.map(entry => {
+        ${healthData.foodEntries.map((entry: any) => {
           const nutrition = entry.total_nutritional_info_consumed;
           return `- ${entry.food_name} (${entry.consumed_grams}g): ${nutrition?.calories?.toFixed(0) || 0} kcal
           蛋白质: ${nutrition?.protein?.toFixed(1) || 0}g, 碳水: ${nutrition?.carbohydrates?.toFixed(1) || 0}g, 脂肪: ${nutrition?.fat?.toFixed(1) || 0}g
@@ -326,7 +329,7 @@ export async function POST(req: Request) {
       if (healthData?.exerciseEntries?.length > 0) {
         systemPrompt += `
         今日运动记录:
-        ${healthData.exerciseEntries.map(entry =>
+        ${healthData.exerciseEntries.map((entry: any) =>
           `- ${entry.exercise_name} (${entry.duration_minutes}分钟): ${entry.calories_burned_estimated?.toFixed(0) || entry.calories_burned || 0} kcal
           ${entry.notes ? `备注: ${entry.notes}` : ""}`
         ).join('\n')}
@@ -336,13 +339,13 @@ export async function POST(req: Request) {
       // 添加历史数据趋势（排除今天）
       if (recentHealthData && recentHealthData.length > 0) {
         // 过滤掉今天的数据，只显示历史数据
-        const historicalData = recentHealthData.filter((dayLog, index) => index > 0)
+        const historicalData = recentHealthData.filter((dayLog: any, index: number) => index > 0)
 
         if (historicalData.length > 0) {
           systemPrompt += `
 
         历史健康数据趋势 (最近${historicalData.length}天):
-        ${historicalData.map((dayLog, index) => {
+        ${historicalData.map((dayLog: any, index: number) => {
           const dayLabel = index === 0 ? "昨天" : `${index + 1}天前`
           return `
         ${dayLabel} (${dayLog.date}):
@@ -358,9 +361,9 @@ export async function POST(req: Request) {
         ${dayLog.dailyStatus ? `- 状态: ${formatDailyStatusForAI(dayLog.dailyStatus)}` : ""}
         ${dayLog.tefAnalysis ? `- TEF增强: ×${dayLog.tefAnalysis.enhancementMultiplier.toFixed(2)} (${dayLog.tefAnalysis.enhancementFactors.join(", ") || "无"})` : ""}
         ${dayLog.foodEntries?.length > 0 ? `
-        主要食物: ${dayLog.foodEntries.slice(0, 3).map(entry => `${entry.food_name}(${entry.consumed_grams}g)`).join(", ")}${dayLog.foodEntries.length > 3 ? "..." : ""}` : ""}
+        主要食物: ${dayLog.foodEntries.slice(0, 3).map((entry: any) => `${entry.food_name}(${entry.consumed_grams}g)`).join(", ")}${dayLog.foodEntries.length > 3 ? "..." : ""}` : ""}
         ${dayLog.exerciseEntries?.length > 0 ? `
-        主要运动: ${dayLog.exerciseEntries.slice(0, 2).map(entry => `${entry.exercise_name}(${entry.duration_minutes}分钟${entry.time_period ? `, ${entry.time_period}` : ""})`).join(", ")}${dayLog.exerciseEntries.length > 2 ? "..." : ""}` : ""}
+        主要运动: ${dayLog.exerciseEntries.slice(0, 2).map((entry: any) => `${entry.exercise_name}(${entry.duration_minutes}分钟${entry.time_period ? ", " + entry.time_period : ""})`).join(", ")}${dayLog.exerciseEntries.length > 2 ? "..." : ""}` : ""}
           `
         }).join('\n')}
         `
@@ -592,6 +595,12 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error('Chat API error:', error)
+
+    // 发生异常，回滚使用计数
+    if (session?.user?.id) {
+      await rollbackUsageIfNeeded(usageManager || null, session.user.id, 'conversation_count')
+    }
+
     return Response.json(
       {
         error: "Failed to process chat request",

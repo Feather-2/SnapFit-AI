@@ -14,7 +14,7 @@ interface DateRecordsHook {
 export function useDateRecords(): DateRecordsHook {
   const [recordedDates, setRecordedDates] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
-  const { waitForInitialization } = useIndexedDB('healthLogs')
+  const { waitForInitialization, getAllData } = useIndexedDB('healthLogs')
 
   // 检查某个日期是否有记录
   const hasRecord = useCallback((date: Date): boolean => {
@@ -29,73 +29,35 @@ export function useDateRecords(): DateRecordsHook {
       // 等待IndexedDB初始化完成
       await waitForInitialization()
 
-      const request = indexedDB.open(DB_NAME, DB_VERSION)
+      // 直接使用共享的 IndexedDB API
+      const allLogs = await getAllData();
 
-      request.onsuccess = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result
+      const dates = new Set<string>();
 
-        // 验证healthLogs存储是否存在
-        if (!db.objectStoreNames.contains('healthLogs')) {
-          console.error("'healthLogs' object store not found in database");
-          setRecordedDates(new Set());
-          setIsLoading(false);
-          return;
-        }
-
-        try {
-          const transaction = db.transaction(['healthLogs'], 'readonly')
-          const objectStore = transaction.objectStore('healthLogs')
-          const getAllRequest = objectStore.getAll()
-
-          getAllRequest.onsuccess = () => {
-            const allLogs = getAllRequest.result
-            const dates = new Set<string>()
-
-            if (allLogs && allLogs.length > 0) {
-              allLogs.forEach(log => {
-                if (log && (
-                  (log.foodEntries && log.foodEntries.length > 0) ||
-                  (log.exerciseEntries && log.exerciseEntries.length > 0) ||
-                  log.weight !== undefined ||
-                  log.dailyStatus ||
-                  log.calculatedBMR ||
-                  log.calculatedTDEE ||
-                  log.tefAnalysis
-                )) {
-                  dates.add(log.date)
-                }
-              })
-            }
-
-            setRecordedDates(dates)
-            setIsLoading(false)
+      if (allLogs && allLogs.length > 0) {
+        allLogs.forEach((log: any) => {
+          if (log && (
+            (log.foodEntries && log.foodEntries.length > 0) ||
+            (log.exerciseEntries && log.exerciseEntries.length > 0) ||
+            log.weight !== undefined ||
+            log.dailyStatus ||
+            log.calculatedBMR ||
+            log.calculatedTDEE ||
+            log.tefAnalysis
+          )) {
+            dates.add(log.date);
           }
-
-          getAllRequest.onerror = (event) => {
-            console.error('Failed to load recorded dates', event)
-            setIsLoading(false)
-          }
-        } catch (transactionError) {
-          console.error('Transaction error:', transactionError)
-          setRecordedDates(new Set())
-          setIsLoading(false)
-        } finally {
-          // 确保数据库关闭
-          db.close()
-        }
+        });
       }
 
-      request.onerror = (event) => {
-        console.error('Failed to open IndexedDB', event)
-        setRecordedDates(new Set())
-        setIsLoading(false)
-      }
+      setRecordedDates(dates);
+      setIsLoading(false);
     } catch (error) {
       console.error('Error loading recorded dates:', error)
       setRecordedDates(new Set())
       setIsLoading(false)
     }
-  }, [waitForInitialization])
+  }, [waitForInitialization, getAllData])
 
   // 刷新记录状态
   const refreshRecords = useCallback(async () => {

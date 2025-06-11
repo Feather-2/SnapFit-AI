@@ -1,8 +1,11 @@
 import { SharedOpenAIClient } from "@/lib/shared-openai-client"
 import { v4 as uuidv4 } from "uuid"
-import { checkApiAuth } from '@/lib/api-auth-helper'
+import { checkApiAuth, rollbackUsageIfNeeded } from '@/lib/api-auth-helper'
+import { safeJSONParse } from '@/lib/safe-json'
 
 export async function POST(req: Request) {
+  let session: any = null
+  let usageManager: any = null
   try {
     const formData = await req.formData()
     const text = (formData.get("text") as string) || ""
@@ -38,13 +41,13 @@ export async function POST(req: Request) {
       return Response.json({
         error: authResult.error!.message,
         code: authResult.error!.code,
-        ...(authResult.error!.details && { details: authResult.error!.details })
+        ...((authResult.error as any)?.details && { details: (authResult.error as any).details })
       }, { status: authResult.error!.status })
     }
 
     console.log('✅ Auth check passed, proceeding with AI request')
 
-    const { session } = authResult
+    ;({ session, usageManager } = authResult)
 
     // 获取用户选择的视觉模型并检查模式
     let selectedModel = "gpt-4o" // 默认视觉模型
@@ -67,6 +70,8 @@ export async function POST(req: Request) {
           apiKey: aiConfig.visionModel.apiKey
         }
       } else {
+        // 私有配置不完整，回滚已计数的使用量
+        await rollbackUsageIfNeeded(usageManager || null, session.user.id, 'conversation_count')
         return Response.json({
           error: "私有模式需要完整的AI配置（模型名称、API地址、API密钥）",
           code: "INCOMPLETE_AI_CONFIG"
@@ -157,7 +162,7 @@ export async function POST(req: Request) {
       })
 
       // 解析结果
-      const result = JSON.parse(resultText)
+      const result = safeJSONParse(resultText)
 
       // 为每个食物项添加唯一 ID
       if (result.food && Array.isArray(result.food)) {
@@ -223,7 +228,7 @@ export async function POST(req: Request) {
       })
 
       // 解析结果
-      const result = JSON.parse(resultText)
+      const result = safeJSONParse(resultText)
 
       // 为每个运动项添加唯一 ID
       if (result.exercise && Array.isArray(result.exercise)) {
@@ -241,6 +246,10 @@ export async function POST(req: Request) {
     }
   } catch (error) {
     console.error('Parse with images API error:', error)
+
+    if (session?.user?.id) {
+      await rollbackUsageIfNeeded(usageManager || null, session.user.id, 'conversation_count')
+    }
 
     // 检查是否是共享密钥限额问题
     const errorMessage = error instanceof Error ? error.message : String(error)

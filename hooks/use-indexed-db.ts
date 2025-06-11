@@ -19,6 +19,23 @@ interface IndexedDBHook {
 // 创建一个全局变量来跟踪数据库初始化状态
 const dbInitializationPromises: Record<string, Promise<IDBDatabase>> = {};
 
+// 跟踪已经打开的数据库实例，用于页面关闭时统一释放
+const openDatabases: Set<IDBDatabase> = new Set();
+
+// 仅注册一次 beforeunload 事件
+if (typeof window !== 'undefined' && !(window as any).__indexedDBCleanupRegistered) {
+  window.addEventListener('beforeunload', () => {
+    openDatabases.forEach(db => {
+      try {
+        db.close();
+      } catch (e) {
+        // 忽略关闭错误
+      }
+    });
+  });
+  (window as any).__indexedDBCleanupRegistered = true;
+}
+
 export function useIndexedDB(storeName: string): IndexedDBHook {
   const [isLoading, setIsLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
@@ -86,6 +103,7 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
                 reopenRequest.onsuccess = (event) => {
                   const newDatabase = (event.target as IDBOpenDBRequest).result;
                   setDb(newDatabase);
+                  openDatabases.add(newDatabase);
                   setIsInitializing(false);
                   console.log("Database successfully recreated with all required stores");
                   resolve(newDatabase);
@@ -110,6 +128,7 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
             } else {
               // 正常情况，存储对象存在
               setDb(database);
+              openDatabases.add(database);
               setIsInitializing(false);
               console.log(`Database opened successfully for store: ${storeName}`);
               resolve(database);
@@ -136,6 +155,7 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
     dbInitializationPromises[storeName]
       .then((database) => {
         setDb(database);
+        openDatabases.add(database);
         setIsInitializing(false);
       })
       .catch((err) => {
@@ -143,11 +163,7 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
         setIsInitializing(false);
       });
 
-    return () => {
-      if (db) {
-        db.close()
-      }
-    }
+    return () => { /* keep db open */ }
   }, [storeName])
 
   // 等待初始化完成的函数

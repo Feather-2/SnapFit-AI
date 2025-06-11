@@ -1,8 +1,12 @@
 import { SharedOpenAIClient } from "@/lib/shared-openai-client"
 import type { FoodEntry } from "@/lib/types"
-import { checkApiAuth } from '@/lib/api-auth-helper'
+import { checkApiAuth, rollbackUsageIfNeeded } from '@/lib/api-auth-helper'
+import { safeJSONParse } from '@/lib/safe-json'
 
 export async function POST(req: Request) {
+  let session: any = null;
+  let usageManager: any = null;
+
   try {
     const { foodEntries, aiConfig } = await req.json()
 
@@ -20,7 +24,7 @@ export async function POST(req: Request) {
       }, { status: authResult.error!.status })
     }
 
-    const { session } = authResult
+    ;({ session, usageManager } = authResult)
 
     // 获取用户选择的工作模型并检查模式
     let selectedModel = "gemini-2.5-flash-preview-05-20" // 默认模型
@@ -144,12 +148,8 @@ export async function POST(req: Request) {
       response_format: { type: "json_object" },
     })
 
-    // 从Markdown代码块中提取JSON
-    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
-    const jsonString = jsonMatch ? jsonMatch[1] : text.trim();
-
-    // 解析AI分析结果
-    const analysisResult = JSON.parse(jsonString)
+    // 解析AI分析结果（使用安全解析）
+    const analysisResult = safeJSONParse(text)
 
     // 验证和规范化结果
     const enhancementMultiplier = Math.max(1.0, Math.min(1.3, analysisResult.enhancementMultiplier || 1.0))
@@ -169,6 +169,11 @@ export async function POST(req: Request) {
 
   } catch (error) {
     console.error('TEF analysis API error:', error)
+
+    if (session?.user?.id) {
+      await rollbackUsageIfNeeded(usageManager || null, session.user.id, 'conversation_count')
+    }
+
     return Response.json({
       error: "Failed to analyze TEF factors",
       code: "AI_SERVICE_ERROR",

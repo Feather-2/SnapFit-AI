@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import type { SmartSuggestionsResponse, SmartSuggestion, SmartSuggestionCategory } from "@/lib/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +29,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useToast } from "@/hooks/use-toast"
+// @ts-ignore -- 第三方库缺少类型声明
+import autoAnimate from "@formkit/auto-animate"
 
 interface SmartSuggestionsProps {
   suggestions?: SmartSuggestionsResponse
@@ -72,6 +74,16 @@ export function SmartSuggestions({
   const [lastUpdated, setLastUpdated] = useState<number>(0)
   const [animateSuggestion, setAnimateSuggestion] = useState<string | null>(null)
   const { toast } = useToast()
+
+  // 容器引用，用于自动动画
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // 初始化 auto-animate
+  useEffect(() => {
+    if (containerRef.current) {
+      autoAnimate(containerRef.current, { duration: 300, easing: "ease-in-out" })
+    }
+  }, [])
 
   const handleExpertSelection = (expertId: string) => {
     const newSelection = selectedExperts.includes(expertId)
@@ -278,6 +290,11 @@ export function SmartSuggestions({
     return 0; // idle
   };
 
+  // 计算当前正在生成的类别（并发时可能有多个）
+  const generatingCategoryNames = Object.entries(progress.categories)
+    .filter(([, value]) => value.status === 'generating')
+    .map(([key]) => getCategoryDisplayName(key));
+
   // 渲染单个建议项
   const renderSuggestionItem = (suggestion: SmartSuggestion, index: number, category: SmartSuggestionCategory) => {
     const isRecentSuggestion = suggestions?.recentSuggestion &&
@@ -340,7 +357,7 @@ export function SmartSuggestions({
     }
 
     return (
-      <div className="space-y-1 flex-1 overflow-y-auto">
+      <div ref={containerRef} className="space-y-1 flex-1 overflow-y-auto">
         {suggestions.suggestions.map((category) => (
           <Collapsible
             key={category.key}
@@ -353,7 +370,7 @@ export function SmartSuggestions({
                 variant="ghost"
                 className={`w-full justify-between py-1.5 px-2 h-auto text-left transition-all ${
                   suggestions?.currentCategory === category.category ? 'text-primary' : ''
-                }`}
+                } ${animateSuggestion === category.key ? 'animate-slideIn border border-primary/50 animate-pulse-border rounded-md' : ''}`}
               >
                 <div className="flex items-center space-x-2 min-w-0 flex-1">
                   <span className="text-base flex-shrink-0">
@@ -497,9 +514,9 @@ export function SmartSuggestions({
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground text-center">
               {progress.message || t('generatingProgress')}
-              {progress.status === 'partial' && suggestions?.currentCategory && (
+              {progress.status === 'partial' && generatingCategoryNames.length > 0 && (
                 <span className="ml-1 text-primary">
-                  {getCategoryDisplayName(suggestions.currentCategory)}
+                  {generatingCategoryNames.join('、')}
                 </span>
               )}
             </p>
@@ -702,11 +719,11 @@ export function SmartSuggestions({
         )}
 
         {/* 极简进度显示 */}
-        {suggestions?.isPartial && progress.status !== 'idle' && suggestions?.currentCategory && (
+        {suggestions?.isPartial && progress.status !== 'idle' && generatingCategoryNames.length > 0 && (
           <div className="mt-1 flex items-center text-xs">
             <span className="text-primary mr-1">•</span>
             <span className="text-muted-foreground">
-              正在生成: {getCategoryDisplayName(suggestions.currentCategory)}
+              正在生成: {generatingCategoryNames.join('、')}
             </span>
           </div>
         )}

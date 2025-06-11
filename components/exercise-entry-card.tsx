@@ -72,6 +72,18 @@ export function ExerciseEntryCard({ entry, onDelete, onUpdate }: ExerciseEntryCa
     return t(`timePeriods.${period}`) || period
   }
 
+  // 🔄 占位条目骨架
+  if (entry.is_pending) {
+    return (
+      <Card className="rounded-xl border p-4 md:p-6 animate-pulse bg-card/50">
+        <CardContent className="p-0 space-y-2">
+          <div className="h-4 w-2/3 bg-muted/40 rounded" />
+          <div className="h-3 w-1/2 bg-muted/20 rounded" />
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className={cn(
       "bg-card rounded-xl border transition-all duration-300 shadow-md hover:shadow-xl hover:shadow-blue-100/50 dark:hover:shadow-blue-900/30",

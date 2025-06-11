@@ -67,9 +67,13 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
   // 获取当前语言环境
   const currentLocale = resolvedParams.locale === 'en' ? enUS : zhCN
-  const [inputText, setInputText] = useState("")
-  const [isProcessing, setIsProcessing] = useState(false)
   const [activeTab, setActiveTab] = useState("food")
+  // 各 Tab 独立的输入内容，避免互相覆盖
+  const [tabInputs, setTabInputs] = useState<{ food: string; exercise: string }>({ food: "", exercise: "" })
+  const inputText = tabInputs[activeTab as 'food' | 'exercise']
+  // 提交处理中状态：按 Tab 维度拆分，互不阻塞
+  const [processing, setProcessing] = useState<{ food: boolean; exercise: boolean }>({ food: false, exercise: false })
+  const tabProcessing = processing[activeTab as 'food' | 'exercise']
   const { toast } = useToast()
   const { refreshUsageInfo } = useUsageLimit()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -195,7 +199,14 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       console.log("从IndexedDB为日期加载数据:", dateKey, data);
       const defaultActivity = userProfile.activityLevel || "moderate";
       if (data) {
-        setDailyLog(data);
+        // 移除可能遗留的占位条目（is_pending）
+        const cleanedData = {
+          ...data,
+          foodEntries: (data.foodEntries || []).filter((e: any) => !e.is_pending),
+          exerciseEntries: (data.exerciseEntries || []).filter((e: any) => !e.is_pending)
+        };
+
+        setDailyLog(cleanedData);
         setCurrentDayWeight(data.weight ? data.weight.toString() : "");
         setCurrentDayActivityLevelForSelect(data.activityLevel || defaultActivity);
       } else {
@@ -233,8 +244,11 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       const currentDate = format(selectedDate, "yyyy-MM-dd");
 
       if (eventDate === currentDate) {
-        console.log(`[Page] Force refreshing data for ${currentDate} (source: ${source || 'unknown'})`);
-        loadDailyLog(selectedDate);
+        console.log(`[Page] Queuing refresh for ${currentDate} (source: ${source || 'unknown'})`);
+        // 给 IndexedDB 写入留出时间，避免读到旧快照
+        setTimeout(() => {
+          loadDailyLog(selectedDate);
+        }, 300);
       }
     };
 
@@ -390,7 +404,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       const targetDateObj = new Date(analysisDate);
       for (let i = 1; i <= 7; i++) { // 从前一天开始
         const date = new Date(targetDateObj);
-        date.setDate(date.getDate() - i);
+        date.getDate() - i;
         const dateKey = date.toISOString().split('T')[0];
         const log = await getDailyLog(dateKey);
         if (log && (log.foodEntries?.length > 0 || log.exerciseEntries?.length > 0)) {
@@ -1065,10 +1079,46 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
   // 处理提交（文本+可能的图片）
   const handleSubmit = async () => {
-    if (isProcessing) return
-    setIsProcessing(true)
+    if (tabProcessing) return;
+    setProcessing(prev => ({ ...prev, [activeTab]: true }));
+
+    // ⚡ 记录当前激活的标签，避免请求返回前被用户切换
+    const currentTab = activeTab;
+
+    // ===== 1️⃣ 乐观插入占位条目 =====
+    const tempId = `pending-${uuidv4()}`;
+    setDailyLog(prev => {
+      const listKey = currentTab === 'food' ? 'foodEntries' : 'exerciseEntries';
+
+      const placeholder: any = currentTab === 'food'
+        ? {
+            log_id: tempId,
+            food_name: inputText || '解析中…',
+            consumed_grams: 0,
+            meal_type: null,
+            nutritional_info_per_100g: { calories: 0, carbohydrates: 0, protein: 0, fat: 0 },
+            total_nutritional_info_consumed: { calories: 0, carbohydrates: 0, protein: 0, fat: 0 },
+            is_estimated: true,
+            is_pending: true,
+          }
+        : {
+            log_id: tempId,
+            exercise_name: inputText || '解析中…',
+            exercise_type: 'other',
+            duration_minutes: 0,
+            estimated_mets: 1,
+            user_weight: userProfile.weight,
+            calories_burned_estimated: 0,
+            is_estimated: true,
+            is_pending: true,
+          };
+
+      return { ...prev, [listKey]: [...prev[listKey], placeholder] } as any;
+    });
+
+    // ===== 校验AI配置 =====
     if (!checkAIConfig()) {
-      setIsProcessing(false);
+      setProcessing(prev => ({ ...prev, [currentTab]: false }));
       return;
     }
 
@@ -1127,7 +1177,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         }
       }
 
-      const result = await response.json()
+      const result = await response.json();
       if (result.error) {
         throw new Error(result.error)
       }
@@ -1141,13 +1191,20 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         log_id: uuidv4(), // 强制生成一个新的唯一ID
       }));
 
-      // 使用函数式更新来确保我们基于最新的状态进行修改
+      // ===== 2️⃣ 用真实结果替换占位 =====
       setDailyLog(prevLog => {
-        const updatedLog = {
-          ...prevLog,
-          foodEntries: [...prevLog.foodEntries, ...newFoodEntries],
-          exerciseEntries: [...prevLog.exerciseEntries, ...newExerciseEntries],
-        };
+        const listKey = currentTab === 'food' ? 'foodEntries' : 'exerciseEntries';
+
+        // 先移除占位
+        const filtered = (prevLog as any)[listKey].filter((e: any) => e.log_id !== tempId);
+
+        let updatedLog: any = { ...prevLog };
+        if (currentTab === 'food') {
+          updatedLog.foodEntries = [...filtered, ...newFoodEntries];
+        } else {
+          updatedLog.exerciseEntries = [...filtered, ...newExerciseEntries];
+        }
+
         const finalLog = recalculateSummary(updatedLog);
 
         // 增量更新: 将所有相关的更改合并到一个补丁中
@@ -1157,14 +1214,14 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
           summary: finalLog.summary,
         };
 
-        // 直接保存和推送，避免嵌套的setDailyLog调用
+        // 真实数据完成后再保存并同步云端
         saveDailyLog(finalLog.date, finalLog);
         pushData(finalLog.date, patch);
 
         return finalLog;
       });
 
-      setInputText("")
+      setTabInputs(prev => ({ ...prev, [currentTab]: "" }))
       setUploadedImages([]) // 清空上传的图片
       toast({
         title: t('handleSubmit.success.title'),
@@ -1172,13 +1229,22 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         variant: "default",
       })
     } catch (error: any) {
+      // 移除占位条目，保持列表一致
+      setDailyLog(prev => {
+        const listKey = currentTab === 'food' ? 'foodEntries' : 'exerciseEntries';
+        return {
+          ...prev,
+          [listKey]: (prev as any)[listKey].filter((e: any) => e.log_id !== tempId),
+        } as any;
+      });
+
       toast({
         title: t('handleSubmit.error.title'),
         description: error.message,
         variant: "destructive",
       })
     } finally {
-      setIsProcessing(false)
+      setProcessing(prev => ({ ...prev, [currentTab]: false }));
     }
   }
 
@@ -1552,7 +1618,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                   />
                   <Button
                     onClick={handleSaveDailyWeight}
-                    disabled={isProcessing}
+                    disabled={processing.food || processing.exercise}
                     className="btn-gradient-primary w-full h-12"
                   >
                     <Save className="mr-2 h-4 w-4" />
@@ -1647,7 +1713,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                       />
                       <Button
                         onClick={handleSaveDailyWeight}
-                        disabled={isProcessing}
+                        disabled={processing.food || processing.exercise}
                         className="btn-gradient-primary w-full h-11"
                       >
                         <Save className="mr-2 h-4 w-4" />
@@ -1791,7 +1857,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                       : t('placeholders.exerciseExample')
                   }
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={(e) => setTabInputs({ ...tabInputs, [activeTab]: e.target.value })}
                   className={`min-h-[120px] md:min-h-[140px] p-4 md:p-6 rounded-xl ${isMobile ? 'text-sm' : 'text-base'}`}
                 />
               )}
@@ -1832,20 +1898,20 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                     multiple
                     className="hidden"
                     onChange={handleImageUpload}
-                    disabled={isProcessing || isCompressing || uploadedImages.length >= 5}
+                    disabled={tabProcessing || uploadedImages.length >= 5}
                     ref={fileInputRef}
                   />
                   <Button
                     variant="outline"
                     type="button"
                     size={isMobile ? "default" : "lg"}
-                    disabled={isProcessing || isCompressing || uploadedImages.length >= 5}
+                    disabled={tabProcessing || uploadedImages.length >= 5}
                     onClick={() => fileInputRef.current?.click()}
                     className="w-full sm:w-auto h-11 md:h-12 px-4 md:px-6"
                   >
                     <UploadCloud className="mr-2 h-4 w-4 md:h-5 md:w-5" />
                     <span className="text-sm md:text-base">
-                      {isCompressing ? t('buttons.imageProcessing') : `${t('buttons.uploadImages')} (${uploadedImages.length}/5)`}
+                      {tabProcessing ? t('buttons.imageProcessing') : `${t('buttons.uploadImages')} (${uploadedImages.length}/5)`}
                     </span>
                   </Button>
                   {uploadedImages.length > 0 && (
@@ -1865,9 +1931,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                   onClick={handleSubmit}
                   size={isMobile ? "default" : "lg"}
                   className="btn-gradient-primary w-full sm:w-auto px-8 md:px-12 h-11 md:h-12 text-sm md:text-base"
-                  disabled={isProcessing || isCompressing || (!inputText.trim() && uploadedImages.length === 0)}
+                  disabled={tabProcessing || (!inputText.trim() && uploadedImages.length === 0)}
                 >
-                  {isProcessing ? (
+                  {tabProcessing ? (
                     <>
                       <svg className="animate-spin -ml-1 mr-3 h-4 w-4 md:h-5 md:w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

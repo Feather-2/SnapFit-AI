@@ -26,6 +26,7 @@ export interface FoodEntry {
     [key: string]: number | undefined
   }
   is_estimated: boolean
+  is_pending?: boolean // 新增：前端乐观插入时的临时占位标记
   timestamp?: string
 }
 
@@ -45,6 +46,7 @@ export interface ExerciseEntry {
   calories_burned_estimated: number
   muscle_groups?: string[] // 锻炼的肌肉群
   is_estimated: boolean
+  is_pending?: boolean // 新增：前端乐观插入时的临时占位标记
   timestamp?: string
 }
 

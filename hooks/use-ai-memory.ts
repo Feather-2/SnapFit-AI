@@ -17,7 +17,7 @@ interface AIMemoryHook {
   error: Error | null
 }
 
-const STORE_NAME = 'aiMemory'
+const STORE_NAME = 'aiMemories'
 
 export function useAIMemory(): AIMemoryHook {
   const [memories, setMemories] = useState<Record<string, AIMemory>>({})
@@ -26,86 +26,45 @@ export function useAIMemory(): AIMemoryHook {
   const { toast } = useToast()
   const { syncSingleMemory } = useAIMemorySync()
 
-  const { getData, saveData, deleteData, clearAllData } = useIndexedDB(STORE_NAME)
+  const { getData, saveData, deleteData, clearAllData, getAllData, waitForInitialization } = useIndexedDB(STORE_NAME)
 
+  // 初始化加载所有本地 AI 记忆
   useEffect(() => {
-    let isMounted = true;
+    let cancelled = false;
 
-    const initDB = async () => {
+    const loadMemories = async () => {
       try {
-        const db = await new Promise<IDBDatabase>((resolve, reject) => {
-          const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+        setIsLoading(true);
+        await waitForInitialization();
+        const allItems: AIMemory[] = await getAllData();
 
-          request.onupgradeneeded = (event) => {
-            const dbInstance = (event.target as IDBOpenDBRequest).result;
-            if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
-              dbInstance.createObjectStore(STORE_NAME);
-            }
-          };
+        if (cancelled) return;
 
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
+        // 转换为以 expertId 为 key 的对象
+        const memoriesData: Record<string, AIMemory> = {};
+        allItems.forEach(item => {
+          if (item && item.expertId) {
+            memoriesData[item.expertId] = item;
+          }
         });
 
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.close();
-          if (isMounted) {
-            setIsLoading(false)
-          }
-          return;
+        setMemories(memoriesData);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load AI memories:", err);
+          setError(err instanceof Error ? err : new Error("Unable to load memories"));
         }
-
-        const transaction = db.transaction([STORE_NAME], "readonly");
-        const objectStore = transaction.objectStore(STORE_NAME);
-        const allMemoriesRequest = objectStore.getAll();
-
-        allMemoriesRequest.onsuccess = () => {
-          if (isMounted) {
-            const allItems = allMemoriesRequest.result;
-            const allKeysRequest = objectStore.getAllKeys();
-
-            allKeysRequest.onsuccess = () => {
-              const keys = allKeysRequest.result;
-              const memoriesData: Record<string, AIMemory> = {};
-              allItems.forEach((item, index) => {
-                memoriesData[keys[index] as string] = item;
-              });
-              setMemories(memoriesData);
-              setIsLoading(false);
-            }
-            allKeysRequest.onerror = () => {
-               setError(new Error("Failed to retrieve memory keys."));
-               setIsLoading(false);
-            }
-          }
-        };
-
-        allMemoriesRequest.onerror = () => {
-          if (isMounted) {
-            setError(new Error("Failed to retrieve memories."));
-            setIsLoading(false);
-          }
-        };
-
-        transaction.oncomplete = () => {
-          db.close();
-        };
-
-      } catch (dbError) {
-        if (isMounted) {
-          console.error("Failed to initialize DB for memories:", dbError);
-          setError(dbError instanceof Error ? dbError : new Error("Unknown DB error"));
-          setIsLoading(false);
-        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     };
 
-    initDB();
+    loadMemories();
 
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
-  }, []);
+  }, [getAllData, waitForInitialization]);
 
   // 获取特定专家的记忆
   const getMemory = useCallback((expertId: string): AIMemory | null => {

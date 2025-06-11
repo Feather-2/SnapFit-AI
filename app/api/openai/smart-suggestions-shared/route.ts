@@ -1,8 +1,10 @@
 import { SharedOpenAIClient } from "@/lib/shared-openai-client"
 import type { DailyLog, UserProfile } from "@/lib/types"
 import { formatDailyStatusForAI } from "@/lib/utils"
-import { checkApiAuth } from '@/lib/api-auth-helper'
+import { checkApiAuth, rollbackUsageIfNeeded } from '@/lib/api-auth-helper'
 import { VERCEL_CONFIG } from '@/lib/vercel-config'
+// @ts-ignore -- 第三方库缺少类型声明，但运行时可用
+import { jsonrepair } from 'jsonrepair'
 
 // 流式响应编码器 - 增强版本
 function encodeChunk(data: any) {
@@ -234,6 +236,9 @@ ${JSON.stringify(dataSummary, null, 2)}
 };
 
 export async function POST(req: Request) {
+  // 供整个函数使用，便于在catch回滚额度
+  let session: any = null;
+  let usageManager: any = null;
   const startTime = Date.now();
   console.log(`[Smart Suggestions] Starting request at ${new Date().toISOString()}`);
   console.log(`[Smart Suggestions] Vercel environment: ${VERCEL_CONFIG.isVercel}`);
@@ -256,7 +261,7 @@ export async function POST(req: Request) {
       }, { status: authResult.error!.status })
     }
 
-    const { session } = authResult
+    ;({ session, usageManager } = authResult)
 
     // 获取用户选择的工作模型并检查模式
     let selectedModel = "gemini-2.5-flash-preview-05-20" // 默认模型
@@ -401,10 +406,11 @@ export async function POST(req: Request) {
           const currentKeyInfo = sharedClient.getCurrentKeyInfo();
 
           try {
-            // 依次处理每个建议类型
-            for (const [key, prompt] of Object.entries(suggestionPrompts)) {
+            // ------------ 改为并发执行 ------------
+            // 把单个专家的生成逻辑封装成函数，便于并发调用
+            const processExpert = async (key: string, prompt: string) => {
               try {
-                // 发送处理状态更新
+                // 推送进度状态
                 controller.enqueue(encodeChunk({
                   type: "progress",
                   status: "generating",
@@ -413,7 +419,6 @@ export async function POST(req: Request) {
                   timestamp: Date.now()
                 }));
 
-                // 使用 Vercel 优化的超时配置
                 const singleTimeout = VERCEL_CONFIG.smartSuggestions.getSingleRequestTimeout();
                 const timeoutPromise = new Promise((_, reject) => {
                   setTimeout(() => reject(new Error('Request timeout')), singleTimeout);
@@ -421,76 +426,72 @@ export async function POST(req: Request) {
 
                 const requestPromise = sharedClient.generateText({
                   model: selectedModel,
-                  prompt: prompt as string,
+                  prompt,
                   response_format: { type: "json_object" },
-                  max_tokens: VERCEL_CONFIG.optimizations.limitOutputTokens ? 800 : undefined, // 限制输出长度
+                  max_tokens: VERCEL_CONFIG.optimizations.limitOutputTokens ? 800 : undefined,
                 });
 
                 const { text, keyInfo } = await Promise.race([requestPromise, timeoutPromise]) as any;
 
+                // 统一的 JSON 提取函数，支持 ```json、```、或无 code fence
+                const extractJSON = (raw: string) => {
+                  const fenceRegex = /```(?:json)?\s*([\s\S]*?)```/i;
+                  const match = raw.match(fenceRegex);
+                  return (match ? match[1] : raw).trim();
+                };
+
+                let jsonString = extractJSON(text);
+
+                let result: any;
                 try {
-                  // 从Markdown代码块中提取JSON
-                  const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
-                  const jsonString = jsonMatch ? jsonMatch[1] : text.trim();
-
-                  const result = JSON.parse(jsonString);
-                  const suggestion = {
-                    key,
-                    ...result,
-                    keyInfo // 包含使用的Key信息
-                  };
-
-                  // 验证和清理结果
-                  if (!suggestion.summary || suggestion.summary.trim() === "") {
-                    if (suggestion.suggestions && suggestion.suggestions.length > 0) {
-                      suggestion.summary = "要点: " + suggestion.suggestions.slice(0, 2).map((s: any) => s.title).join('; ');
-                    } else {
-                      suggestion.summary = "暂无具体建议";
+                  result = JSON.parse(jsonString);
+                } catch (e) {
+                  // 尝试修复并重新解析可能的不完整/无效 JSON
+                  try {
+                    const repaired = jsonrepair(jsonString);
+                    result = JSON.parse(repaired);
+                  } catch (e2) {
+                    // 最后再尝试使用完整文本修复一次
+                    try {
+                      const repairedFull = jsonrepair(text);
+                      result = JSON.parse(repairedFull);
+                    } catch (e3) {
+                      throw e; // 继续由外层捕获处理
                     }
                   }
-
-                  // 逐条发送建议，实现真正的流式效果
-                  if (suggestion.suggestions && suggestion.suggestions.length > 0) {
-                    for (const singleSuggestion of suggestion.suggestions) {
-                      // 使用 sendPartialSuggestion 函数发送单条建议
-                      sendPartialSuggestion(
-                        controller,
-                        key,
-                        singleSuggestion,
-                        suggestion.priority || 'medium',
-                        suggestion.summary
-                      );
-
-                      // 添加小延迟，使流式效果更明显，但不要太长
-                      await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-                  }
-
-                  // 添加到已完成列表
-                  completedSuggestions.push(suggestion);
-
-                  // 发送完整类别更新
-                  controller.enqueue(encodeChunk({
-                    type: "partial",
-                    status: "success",
-                    category: key,
-                    data: suggestion,
-                    timestamp: Date.now()
-                  }));
-                } catch (parseError) {
-                  console.warn(`Failed to parse ${key} suggestion:`, parseError);
-                  controller.enqueue(encodeChunk({
-                    type: "error",
-                    status: "error",
-                    category: key,
-                    message: `${key}建议解析失败`,
-                    timestamp: Date.now()
-                  }));
                 }
+
+                const suggestion = {
+                  key,
+                  ...result,
+                  keyInfo
+                };
+
+                if (!suggestion.summary || suggestion.summary.trim() === "") {
+                  suggestion.summary = (suggestion.suggestions && suggestion.suggestions.length > 0)
+                    ? "要点: " + suggestion.suggestions.slice(0, 2).map((s: any) => s.title).join('; ')
+                    : "暂无具体建议";
+                }
+
+                // 流式发送单条建议
+                if (suggestion.suggestions && suggestion.suggestions.length > 0) {
+                  for (const singleSuggestion of suggestion.suggestions) {
+                    sendPartialSuggestion(controller, key, singleSuggestion, suggestion.priority || 'medium', suggestion.summary);
+                    await new Promise(res => setTimeout(res, 100));
+                  }
+                }
+
+                completedSuggestions.push(suggestion);
+
+                controller.enqueue(encodeChunk({
+                  type: "partial",
+                  status: "success",
+                  category: key,
+                  data: suggestion,
+                  timestamp: Date.now()
+                }));
               } catch (error) {
                 console.warn(`Smart suggestion failed for ${key}:`, error);
-
-                // 发送错误状态
                 controller.enqueue(encodeChunk({
                   type: "error",
                   status: "error",
@@ -499,17 +500,25 @@ export async function POST(req: Request) {
                   timestamp: Date.now()
                 }));
 
-                // 添加一个空的建议，以保持结构完整
                 completedSuggestions.push({
                   key,
-                  category: expertPrompts[key as keyof typeof expertPrompts]?.(dataSummary)?.category || (key === 'nutrition' ? '营养配比优化' : '运动处方优化'),
+                  category: expertPrompts[key as keyof typeof expertPrompts]?.(dataSummary)?.category || key,
                   priority: "low",
                   suggestions: [],
                   summary: "分析暂时不可用，请稍后重试",
                   keyInfo: null
                 });
               }
-            }
+            };
+
+            // 并发启动所有专家任务（最多 3 个）
+            const taskPromises = Object.entries(suggestionPrompts).map(([key, prompt]) =>
+              processExpert(key, prompt as string)
+            );
+
+            // 等待全部任务完成（无论成败），再统一发送 complete 事件
+            await Promise.allSettled(taskPromises);
+            // ------------ 并发逻辑结束 ------------
 
             // 按优先级排序
             const priorityOrder: { [key: string]: number } = { high: 0, medium: 1, low: 2 };
@@ -567,6 +576,10 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Smart suggestions API error:', error);
+
+    if (session?.user?.id) {
+      await rollbackUsageIfNeeded(usageManager || null, session.user.id, 'conversation_count');
+    }
 
     // 检查是否是超时错误
     const errorMessage = error instanceof Error ? error.message : String(error);

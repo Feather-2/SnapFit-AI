@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { DB_NAME, DB_VERSION } from '@/lib/db-config'
+import { useState, useEffect, useCallback } from 'react'
+import { useIndexedDB } from './use-indexed-db'
 
 interface ExportReminderState {
   shouldRemind: boolean
@@ -18,10 +18,45 @@ export function useExportReminder(): ExportReminderState {
     dataSpanDays: 0
   })
 
+  const { getAllData, waitForInitialization } = useIndexedDB('healthLogs')
+
+  const checkDataSpan = useCallback(async (): Promise<{ hasData: boolean; spanDays: number }> => {
+    try {
+      await waitForInitialization()
+      const allLogs: any[] = await getAllData()
+
+      if (!allLogs || allLogs.length === 0) {
+        return { hasData: false, spanDays: 0 }
+      }
+
+      const dates = allLogs
+        .filter(log => log && (
+          (log.foodEntries && log.foodEntries.length > 0) ||
+          (log.exerciseEntries && log.exerciseEntries.length > 0) ||
+          log.weight !== undefined
+        ))
+        .map(log => new Date(log.date))
+        .sort((a: Date, b: Date) => a.getTime() - b.getTime())
+
+      if (dates.length === 0) {
+        return { hasData: false, spanDays: 0 }
+      }
+
+      const earliestDate = dates[0]
+      const latestDate = dates[dates.length - 1]
+      const timeDiff = latestDate.getTime() - earliestDate.getTime()
+      const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24))
+
+      return { hasData: daysDiff >= 1, spanDays: daysDiff + 1 }
+    } catch (error) {
+      console.error('checkDataSpan error:', error)
+      return { hasData: false, spanDays: 0 }
+    }
+  }, [getAllData, waitForInitialization])
+
   useEffect(() => {
     const checkExportReminder = async () => {
       try {
-        // 首先检查IndexedDB中的数据
         const hasEnoughData = await checkDataSpan()
 
         if (!hasEnoughData.hasData) {
@@ -74,71 +109,13 @@ export function useExportReminder(): ExportReminderState {
       }
     }
 
-    // 检查IndexedDB中数据的时间跨度
-    const checkDataSpan = async (): Promise<{ hasData: boolean; spanDays: number }> => {
-      return new Promise((resolve) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION)
-
-        request.onerror = () => {
-          resolve({ hasData: false, spanDays: 0 })
-        }
-
-        request.onsuccess = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result
-          const transaction = db.transaction(['healthLogs'], 'readonly')
-          const objectStore = transaction.objectStore('healthLogs')
-          const getAllRequest = objectStore.getAll()
-
-          getAllRequest.onsuccess = () => {
-            const allLogs = getAllRequest.result
-
-            if (!allLogs || allLogs.length === 0) {
-              resolve({ hasData: false, spanDays: 0 })
-              return
-            }
-
-            // 获取所有有数据的日期
-            const dates = allLogs
-              .filter(log => log && (
-                (log.foodEntries && log.foodEntries.length > 0) ||
-                (log.exerciseEntries && log.exerciseEntries.length > 0) ||
-                log.weight !== undefined
-              ))
-              .map(log => new Date(log.date))
-              .sort((a, b) => a.getTime() - b.getTime())
-
-            if (dates.length === 0) {
-              resolve({ hasData: false, spanDays: 0 })
-              return
-            }
-
-            // 计算最早和最晚日期的差值
-            const earliestDate = dates[0]
-            const latestDate = dates[dates.length - 1]
-            const timeDiff = latestDate.getTime() - earliestDate.getTime()
-            const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24))
-
-            // 需要至少2天的数据跨度
-            resolve({
-              hasData: daysDiff >= 1, // 至少跨越2天（差值>=1）
-              spanDays: daysDiff + 1 // 实际天数
-            })
-          }
-
-          getAllRequest.onerror = () => {
-            resolve({ hasData: false, spanDays: 0 })
-          }
-        }
-      })
-    }
-
     checkExportReminder()
 
     // 每小时检查一次
     const interval = setInterval(checkExportReminder, 60 * 60 * 1000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [checkDataSpan])
 
   return reminderState
 }

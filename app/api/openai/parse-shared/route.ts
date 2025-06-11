@@ -1,8 +1,11 @@
 import { SharedOpenAIClient } from "@/lib/shared-openai-client"
 import { v4 as uuidv4 } from "uuid"
-import { checkApiAuth } from '@/lib/api-auth-helper'
+import { checkApiAuth, rollbackUsageIfNeeded } from '@/lib/api-auth-helper'
+import { safeJSONParse } from '@/lib/safe-json'
 
 export async function POST(req: Request) {
+  let session: any = null
+  let usageManager: any = null
   try {
     const { text, type, userWeight, aiConfig } = await req.json()
 
@@ -20,7 +23,7 @@ export async function POST(req: Request) {
       }, { status: authResult.error!.status })
     }
 
-    const { session } = authResult
+    ;({ session, usageManager } = authResult)
 
     // 获取用户选择的工作模型并检查模式
     let selectedModel = "gemini-2.5-flash-preview-05-20" // 默认模型
@@ -122,7 +125,7 @@ export async function POST(req: Request) {
       // 解析结果
       console.log('🔍 AI返回的原始文本(食物):', resultText.substring(0, 200) + '...')
       console.log('🔍 清理后的文本(食物):', cleanedResultText.substring(0, 200) + '...')
-      const result = JSON.parse(cleanedResultText)
+      const result = safeJSONParse(cleanedResultText)
       console.log('🔍 解析后的结果(食物):', JSON.stringify(result, null, 2).substring(0, 300) + '...')
 
       // 为每个食物项添加唯一 ID
@@ -197,7 +200,7 @@ export async function POST(req: Request) {
       // 解析结果
       console.log('🔍 AI返回的原始文本(运动):', resultText.substring(0, 200) + '...')
       console.log('🔍 清理后的文本(运动):', cleanedResultText.substring(0, 200) + '...')
-      const result = JSON.parse(cleanedResultText)
+      const result = safeJSONParse(cleanedResultText)
       console.log('🔍 解析后的结果(运动):', JSON.stringify(result, null, 2).substring(0, 300) + '...')
 
       // 为每个运动项添加唯一 ID
@@ -220,6 +223,11 @@ export async function POST(req: Request) {
     }
   } catch (error) {
     console.error('Parse shared API error:', error)
+
+    // 回滚使用计数，防止白扣额度
+    if (session?.user?.id) {
+      await rollbackUsageIfNeeded(usageManager || null, session.user.id, 'conversation_count')
+    }
 
     // 检查是否是共享密钥限额问题
     const errorMessage = error instanceof Error ? error.message : String(error)

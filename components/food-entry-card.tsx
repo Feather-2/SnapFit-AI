@@ -44,7 +44,7 @@ export function FoodEntryCard({ entry, onDelete, onUpdate }: FoodEntryCardProps)
             }
             return acc
           },
-          {} as Record<string, number>,
+          {} as any,
         )
       }
 
@@ -78,6 +78,18 @@ export function FoodEntryCard({ entry, onDelete, onUpdate }: FoodEntryCardProps)
   const getMealTypeLabel = (type: string | null | undefined) => {
     if (!type) return t('unknown') || '未知'
     return t(`mealTypes.${type}`) || type
+  }
+
+  // 🔄 如果是占位条目，渲染骨架屏
+  if (entry.is_pending) {
+    return (
+      <Card className="rounded-xl border p-4 md:p-6 animate-pulse bg-card/50">
+        <CardContent className="p-0 space-y-2">
+          <div className="h-4 w-2/3 bg-muted/40 rounded" />
+          <div className="h-3 w-1/2 bg-muted/20 rounded" />
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
