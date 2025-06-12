@@ -1,6 +1,6 @@
-# SnapFit AI Docker 部署指南
+# Snapifit AI Docker 部署指南
 
-本文档介绍如何使用 Docker 部署 SnapFit AI 健康管理应用。
+本文档介绍如何使用 Docker 部署 Snapifit AI 健康管理应用。
 
 ## 📋 前置要求
 
@@ -171,7 +171,7 @@ docker system prune -a
    ```bash
    # 检查端口占用
    netstat -tulpn | grep :3000
-   
+
    # 修改 docker-compose.yml 中的端口映射
    ports:
      - "3001:3000"  # 改为其他端口
@@ -191,7 +191,7 @@ docker system prune -a
    ```bash
    # 清理构建缓存
    docker builder prune -a
-   
+
    # 重新构建
    docker-compose build --no-cache
    ```

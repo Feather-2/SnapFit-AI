@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SnapFit AI Database Quick Deployment Script
+# Snapifit AI Database Quick Deployment Script
 # Version: 2.0.0
 # Date: 2025-06-10
 
@@ -38,7 +38,7 @@ print_error() {
 
 # Function to show usage
 show_usage() {
-    echo "SnapFit AI Database Quick Deployment"
+    echo "Snapifit AI Database Quick Deployment"
     echo ""
     echo "Usage: $0 [OPTIONS]"
     echo ""
@@ -95,7 +95,7 @@ fi
 
 # Main deployment function
 deploy_database() {
-    print_status "Starting SnapFit AI Database Deployment"
+    print_status "Starting Snapifit AI Database Deployment"
     print_status "Database: $DB_NAME"
     print_status "User: $DB_USER"
     print_status "Type: $DEPLOY_TYPE"
@@ -195,7 +195,7 @@ deploy_database() {
     fi
 
     echo ""
-    print_success "🎉 SnapFit AI Database deployment completed!"
+    print_success "🎉 Snapifit AI Database deployment completed!"
     echo ""
     print_status "Connection details:"
     print_status "  Database: $DB_NAME"

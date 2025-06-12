@@ -1,9 +1,9 @@
--- SnapFit AI Database Deployment Script
+-- Snapifit AI Database Deployment Script
 -- Version: 2.0.0 (Production Schema)
 -- Date: 2025-06-10
 -- Source: Supabase production environment
 --
--- This script deploys the SnapFit AI database structure including:
+-- This script deploys the Snapifit AI database structure including:
 -- - 6 tables (users, user_profiles, shared_keys, daily_logs, ai_memories, security_events)
 -- - 18 functions (complete business logic)
 -- - 4 triggers (automatic timestamp updates)
@@ -15,7 +15,7 @@
 --   psql -d snapfit_ai -f deployment/database/deploy.sql
 
 \echo '========================================='
-\echo 'SnapFit AI Database Deployment'
+\echo 'Snapifit AI Database Deployment'
 \echo 'Version: 2.0.0 (Production Schema)'
 \echo 'Date: 2025-06-10'
 \echo '========================================='
@@ -158,7 +158,7 @@ BEGIN
 END $$;
 
 \echo ''
-\echo '🎉 SnapFit AI Database deployment completed successfully!'
+\echo '🎉 Snapifit AI Database deployment completed successfully!'
 \echo ''
 \echo '📋 Deployment summary:'
 \echo '  ✅ Database structure deployed'
@@ -166,4 +166,4 @@ END $$;
 \echo '  ✅ Production data imported'
 \echo '  ✅ All constraints and indexes created'
 \echo ''
-\echo '🚀 Your SnapFit AI database is ready for use!'
+\echo '🚀 Your Snapifit AI database is ready for use!'

@@ -99,53 +99,62 @@
 }
 
 @layer components {
-  /* 健康主题卡片样式 - 更轻盈的设计 */
+  /* 健康主题卡片样式 - 统一轻盈设计 */
   .health-card {
-    @apply bg-white/90 dark:bg-slate-800/60 border border-slate-200/40 dark:border-slate-700/40 rounded-2xl transition-all duration-300;
+    @apply bg-white/95 dark:bg-slate-800/70 border border-slate-200/50 dark:border-slate-700/50 rounded-xl transition-all duration-200 ease-out;
     box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
       0 2px 4px -1px rgba(0, 0, 0, 0.06),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
+      0 1px 2px -1px rgba(0, 0, 0, 0.04),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 
   .health-card:hover {
+    @apply transform translate-y-[-1px];
     box-shadow:
-      0 10px 15px -3px rgba(0, 0, 0, 0.1),
-      0 4px 6px -2px rgba(0, 0, 0, 0.05),
-      0 0 0 1px rgba(255, 255, 255, 0.1),
-      0 0 20px rgba(16, 185, 129, 0.15);
+      0 4px 8px -2px rgba(0, 0, 0, 0.08),
+      0 2px 4px -1px rgba(0, 0, 0, 0.06),
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      0 0 12px rgba(16, 185, 129, 0.08);
   }
 
   .dark .health-card {
     box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.3),
       0 2px 4px -1px rgba(0, 0, 0, 0.2),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
-  }
-
-  /* 移动端优化 */
-  @media (max-width: 768px) {
-    .health-card {
-      @apply rounded-xl;
-      box-shadow:
-        0 2px 4px -1px rgba(0, 0, 0, 0.1),
-        0 1px 2px -1px rgba(0, 0, 0, 0.06);
-    }
-
-    .health-card:hover {
-      box-shadow:
-        0 4px 6px -1px rgba(0, 0, 0, 0.1),
-        0 2px 4px -1px rgba(0, 0, 0, 0.06),
-        0 0 10px rgba(16, 185, 129, 0.1);
-    }
+      0 1px 2px -1px rgba(0, 0, 0, 0.15),
+      0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 
   .dark .health-card:hover {
     box-shadow:
-      0 10px 15px -3px rgba(0, 0, 0, 0.4),
-      0 4px 6px -2px rgba(0, 0, 0, 0.25),
-      0 0 0 1px rgba(255, 255, 255, 0.1),
-      0 0 25px rgba(16, 185, 129, 0.2);
+      0 4px 8px -2px rgba(0, 0, 0, 0.3),
+      0 2px 4px -1px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      0 0 15px rgba(16, 185, 129, 0.12);
+  }
+
+  /* 移动端优化 - 更小的圆角和阴影 */
+  @media (max-width: 768px) {
+    .health-card {
+      @apply rounded-lg;
+      box-shadow:
+        0 1px 3px -1px rgba(0, 0, 0, 0.06),
+        0 1px 2px -1px rgba(0, 0, 0, 0.04);
+    }
+
+    .health-card:hover {
+      @apply transform translate-y-0;
+      box-shadow:
+        0 2px 4px -1px rgba(0, 0, 0, 0.08),
+        0 1px 2px -1px rgba(0, 0, 0, 0.06),
+        0 0 8px rgba(16, 185, 129, 0.06);
+    }
+
+    .dark .health-card:hover {
+      box-shadow:
+        0 2px 4px -1px rgba(0, 0, 0, 0.25),
+        0 1px 2px -1px rgba(0, 0, 0, 0.18),
+        0 0 10px rgba(16, 185, 129, 0.08);
+    }
   }
 
   .health-card-primary {
@@ -229,6 +238,18 @@
   }
 }
 
+/* 呼吸感动画 - 更轻微的效果 */
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.01);
+    opacity: 0.95;
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -241,7 +262,7 @@
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(15px);
   }
   to {
     opacity: 1;
@@ -252,7 +273,7 @@
 @keyframes scaleIn {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
@@ -351,4 +372,19 @@
   border-radius: 50%;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   pointer-events: none;
+}
+
+/* =============================
+   Snapifit Logo 默认尺寸放大
+   ============================= */
+img[src="/snapifit-pure.svg"] {
+  width: 40px;  /* 相当于 Tailwind 的 w-10 */
+  height: 40px; /* h-10 */
+}
+
+@media (min-width: 768px) {
+  img[src="/snapifit-pure.svg"] {
+    width: 48px; /* md:w-12 */
+    height: 48px;
+  }
 }

@@ -1,8 +1,8 @@
-# SnapFit AI Database
+# Snapifit AI Database
 
 ## 🎯 概述
 
-SnapFit AI 数据库基于 2025-06-10 从 Supabase 生产环境导出的完整结构，包含所有业务逻辑函数、触发器和生产数据。
+Snapifit AI 数据库基于 2025-06-10 从 Supabase 生产环境导出的完整结构，包含所有业务逻辑函数、触发器和生产数据。
 
 ## 📊 数据库统计
 
@@ -353,10 +353,10 @@ psql -d snapfit_ai -c "\d+ users"
 
 部署成功后，您将拥有：
 
-- ✅ 完整的 SnapFit AI 数据库
+- ✅ 完整的 Snapifit AI 数据库
 - ✅ 所有业务逻辑函数
 - ✅ 自动化触发器
 - ✅ 生产级性能优化
 - ✅ 完整的数据完整性保护
 
-数据库现在可以支持 SnapFit AI 应用的所有功能！
+数据库现在可以支持 Snapifit AI 应用的所有功能！

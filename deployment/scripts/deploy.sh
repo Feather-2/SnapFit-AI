@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SnapFit AI 部署脚本
+# Snapifit AI 部署脚本
 set -e
 
 # 颜色定义
@@ -15,7 +15,7 @@ ENVIRONMENT=${1:-development}
 IMAGE_NAME="snapfit-ai"
 TAG=${2:-latest}
 
-echo -e "${GREEN}🚀 开始部署 SnapFit AI...${NC}"
+echo -e "${GREEN}🚀 开始部署 Snapifit AI...${NC}"
 echo -e "${BLUE}环境: ${ENVIRONMENT}${NC}"
 echo -e "${BLUE}镜像: ${IMAGE_NAME}:${TAG}${NC}"
 

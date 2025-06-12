@@ -1,4 +1,4 @@
--- SnapFit AI 数据库功能测试脚本
+-- Snapifit AI 数据库功能测试脚本
 -- 验证所有复杂功能是否正常工作
 
 -- ========================================
@@ -66,13 +66,13 @@ SELECT upsert_log_patch(
 );
 
 -- 验证结果
-SELECT 
+SELECT
   date,
   log_data->'foodEntries' as food_entries,
   log_data->'exerciseEntries' as exercise_entries,
   log_data->'deletedFoodIds' as deleted_food_ids,
   last_modified
-FROM daily_logs 
+FROM daily_logs
 WHERE user_id = '11111111-1111-1111-1111-111111111111'
 AND date = CURRENT_DATE;
 
@@ -154,13 +154,13 @@ SELECT atomic_usage_check_and_increment(
 ) FROM generate_series(1, 5);  -- 应该有几次失败
 
 -- 查看共享密钥状态
-SELECT 
+SELECT
   name,
   usage_count_today,
   daily_limit,
   total_usage_count,
   is_active
-FROM shared_keys 
+FROM shared_keys
 WHERE id = '33333333-3333-3333-3333-333333333333';
 
 -- ========================================
@@ -217,7 +217,7 @@ BEGIN
       '22222222-2222-2222-2222-222222222222'::uuid,
       CURRENT_DATE,
       jsonb_build_object(
-        'foodEntries', 
+        'foodEntries',
         jsonb_build_array(
           jsonb_build_object(
             'log_id', 'concurrent_food_' || i,
@@ -233,10 +233,10 @@ BEGIN
 END $$;
 
 -- 查看并发测试结果
-SELECT 
+SELECT
   jsonb_array_length(log_data->'foodEntries') as food_count,
   log_data->'foodEntries'
-FROM daily_logs 
+FROM daily_logs
 WHERE user_id = '22222222-2222-2222-2222-222222222222'
 AND date = CURRENT_DATE;
 
@@ -249,8 +249,8 @@ AND date = CURRENT_DATE;
 -- 测试使用量验证触发器
 BEGIN;
   -- 这应该失败（超过限制）
-  UPDATE shared_keys 
-  SET usage_count_today = 1000 
+  UPDATE shared_keys
+  SET usage_count_today = 1000
   WHERE id = '33333333-3333-3333-3333-333333333333';
 EXCEPTION
   WHEN OTHERS THEN
@@ -258,12 +258,12 @@ EXCEPTION
 ROLLBACK;
 
 -- 测试负数使用量自动修正
-UPDATE shared_keys 
-SET usage_count_today = -5 
+UPDATE shared_keys
+SET usage_count_today = -5
 WHERE id = '33333333-3333-3333-3333-333333333333';
 
-SELECT usage_count_today 
-FROM shared_keys 
+SELECT usage_count_today
+FROM shared_keys
 WHERE id = '33333333-3333-3333-3333-333333333333';
 
 -- ========================================

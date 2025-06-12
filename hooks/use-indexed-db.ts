@@ -182,14 +182,24 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
   const getData = useCallback(
     async (key: string): Promise<any> => {
       await waitForInitialization();
-      if (!db) return null;
+      let database = db;
+      if (!database) {
+        // 如果状态更新尚未生效，直接从初始化结果中获取
+        try {
+          database = await dbInitializationPromises[storeName];
+          setDb(database);
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!database) return null;
 
       setIsLoading(true);
       setError(null);
 
       try {
         return new Promise((resolve, reject) => {
-          const transaction = db.transaction([storeName], "readonly");
+          const transaction = database!.transaction([storeName], "readonly");
           const store = transaction.objectStore(storeName);
           const request = store.get(key);
 
@@ -216,18 +226,27 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
   // 保存数据
   const saveData = useCallback(
     async (key: string, data: any): Promise<void> => {
-      try {
-        await waitForInitialization();
-        if (!db) {
-          console.warn(`[IndexedDB] Database not ready for store: ${storeName}, skipping save for key: ${key}`);
-          return;
+      await waitForInitialization();
+      let database = db;
+      if (!database) {
+        try {
+          database = await dbInitializationPromises[storeName];
+          setDb(database);
+        } catch {
+          // 无法获取数据库实例
         }
+      }
+      if (!database) {
+        console.warn(`[IndexedDB] Database not ready for store: ${storeName}, skipping save for key: ${key}`);
+        return;
+      }
 
-        setIsLoading(true);
-        setError(null);
+      setIsLoading(true);
+      setError(null);
 
+      try {
         return new Promise((resolve, reject) => {
-          const transaction = db.transaction([storeName], "readwrite");
+          const transaction = database!.transaction([storeName], "readwrite");
           const store = transaction.objectStore(storeName);
           const request = store.put(data, key);
 
@@ -342,11 +361,30 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
 
   const batchSave = useCallback(async (items: any[]): Promise<void> => {
     await waitForInitialization();
-    if (!db) return;
-    if (items.length === 0) return Promise.resolve();
+    let database = db;
+    if (!database) {
+      // 与 getData/saveData 保持一致的兜底获取方式，防止 state 未及时更新导致 database 为空
+      try {
+        database = await dbInitializationPromises[storeName];
+        setDb(database);
+      } catch {
+        /* 无法获取数据库实例 */
+      }
+    }
+    if (!database) {
+      console.error("[BatchSave] Database not initialized");
+      return;
+    }
+    if (items.length === 0) {
+      console.log("[BatchSave] No items to save");
+      return Promise.resolve();
+    }
+
+    console.log(`[BatchSave] Starting batch save of ${items.length} items to store: ${storeName}`);
+    console.log(`[BatchSave] Items to save:`, items.map(item => ({ date: item.date, foodCount: item.foodEntries?.length || 0, exerciseCount: item.exerciseEntries?.length || 0 }))); // 保持现有日志
 
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([storeName], "readwrite");
+      const transaction = database!.transaction([storeName], "readwrite");
       const store = transaction.objectStore(storeName);
 
       let completed = 0;
@@ -366,13 +404,19 @@ export function useIndexedDB(storeName: string): IndexedDBHook {
         const request = store.put(item, item.date);
         request.onsuccess = () => {
           completed++;
+          console.log(`[BatchSave] Successfully saved item ${completed}/${total} for date: ${item.date}`);
           if (completed === total) {
-            // 所有操作都成功，可以解析Promise
+            console.log(`[BatchSave] All ${total} items saved successfully`);
+            // 所有操作都成功，但不在这里resolve，让transaction.oncomplete处理
           }
         };
         request.onerror = (event) => {
           // 一个请求失败并不需要让整个事务失败
           console.error("Batch save error on item:", item, (event.target as IDBRequest).error);
+          completed++; // 🔧 修复：即使失败也要增加计数，避免死锁
+          if (completed === total) {
+            console.log(`[BatchSave] All ${total} items processed (some may have failed)`);
+          }
         };
       });
 

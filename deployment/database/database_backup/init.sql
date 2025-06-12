@@ -1,4 +1,4 @@
--- SnapFit AI 数据库初始化脚本
+-- Snapifit AI 数据库初始化脚本
 -- 基于当前生产环境的完整数据库结构
 
 -- ========================================
@@ -251,7 +251,7 @@ GRANT SELECT ON public.ip_bans TO authenticated;
 -- 8. 添加表注释
 -- ========================================
 COMMENT ON SCHEMA public IS
-'SnapFit AI database schema - RLS disabled, using application-level access control';
+'Snapifit AI database schema - RLS disabled, using application-level access control';
 
 COMMENT ON TABLE public.users IS 'User accounts from Linux.do OAuth';
 COMMENT ON TABLE public.user_profiles IS 'User health profiles and preferences';
@@ -271,6 +271,6 @@ VALUES (
   jsonb_build_object(
     'timestamp', NOW(),
     'version', '1.0.0',
-    'description', 'SnapFit AI database initialized successfully'
+    'description', 'Snapifit AI database initialized successfully'
   )
 ) ON CONFLICT DO NOTHING;

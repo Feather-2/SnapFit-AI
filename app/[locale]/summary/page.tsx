@@ -26,15 +26,19 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-
   Brain,
   Camera,
-  Download
+  Download,
+  PieChart,
+  Zap,
+  Sparkles
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { FoodEntryCard } from "@/components/food-entry-card"
 import { ExerciseEntryCard } from "@/components/exercise-entry-card"
+import { BMIIndicator } from "@/components/bmi-indicator"
+import { WeightChangePredictor } from "@/components/weight-change-predictor"
 
 const defaultUserProfile: UserProfile = {
   weight: 70,
@@ -586,21 +590,6 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   if (!dailyLog) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -640,6 +629,29 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
       calorieStatusColor = "text-blue-500 dark:text-blue-400"
     }
   }
+
+  // ▶️ 额外计算：宏量营养素、TEF、BMI 等
+  const macros = summary.macros || { carbs: 0, protein: 0, fat: 0 }
+  const totalMacros = macros.carbs + macros.protein + macros.fat
+  const carbsPercent = totalMacros > 0 ? (macros.carbs / totalMacros) * 100 : 0
+  const proteinPercent = totalMacros > 0 ? (macros.protein / totalMacros) * 100 : 0
+  const fatPercent = totalMacros > 0 ? (macros.fat / totalMacros) * 100 : 0
+
+  const MACRO_RANGES = {
+    carbs: { min: 45, max: 65 },
+    protein: { min: 10, max: 35 },
+    fat: { min: 20, max: 35 },
+  }
+
+  const carbsStatus = carbsPercent < MACRO_RANGES.carbs.min ? 'low' : carbsPercent > MACRO_RANGES.carbs.max ? 'high' : 'ok'
+  const proteinStatus = proteinPercent < MACRO_RANGES.protein.min ? 'low' : proteinPercent > MACRO_RANGES.protein.max ? 'high' : 'ok'
+  const fatStatus = fatPercent < MACRO_RANGES.fat.min ? 'low' : fatPercent > MACRO_RANGES.fat.max ? 'high' : 'ok'
+
+  const tefAnalysis = dailyLog.tefAnalysis
+
+  // 体重变化预测使用的差值方向需与组件保持一致（正=盈余，负=缺口）
+  const calorieDifferenceForWeight = calculatedTDEE ? netCalories - calculatedTDEE : 0
+  const currentWeight = dailyLog.weight ?? userProfile.weight
 
   return (
     <div ref={summaryContentRef} className="container mx-auto px-4 py-8 max-w-4xl" data-screenshot="true">
@@ -855,6 +867,144 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
           </CardContent>
         </Card>
 
+        {/* TEF、宏量营养素、BMI、体重变化预测 */}
+        <Card>
+          <CardContent className="space-y-8 pt-6">
+            {/* TEF 分析 */}
+            <div className="space-y-3">
+              <h4 className="text-lg font-medium flex items-center">
+                <Zap className="mr-2 h-5 w-5 text-primary" />
+                {tDashboard('summary.tef.title')}
+              </h4>
+
+              {tefAnalysis ? (
+                <>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
+                      <div className="flex items-center justify-center mb-1">
+                        <Flame className="h-4 w-4 text-orange-500" />
+                      </div>
+                      <div className="text-xs text-muted-foreground mb-1">{tDashboard('summary.tef.baseTEF')}</div>
+                      <div className="text-sm font-medium">
+                        {tefAnalysis.baseTEF.toFixed(1)} kcal
+                      </div>
+                      <div className="text-xs text-muted-foreground">({tefAnalysis.baseTEFPercentage.toFixed(1)}%)</div>
+                    </div>
+
+                    {tefAnalysis.enhancementMultiplier > 1 ? (
+                      <>
+                        <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2">
+                          <div className="flex items-center justify-center mb-1">
+                            <Brain className="h-4 w-4 text-purple-500" />
+                          </div>
+                          <div className="text-xs text-muted-foreground mb-1">增强乘数</div>
+                          <div className="text-sm font-medium text-purple-600">×{tefAnalysis.enhancementMultiplier.toFixed(2)}</div>
+                        </div>
+                        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-2">
+                          <div className="flex items-center justify-center mb-1">
+                            <Sparkles className="h-4 w-4 text-emerald-500" />
+                          </div>
+                          <div className="text-xs text-muted-foreground mb-1">{tDashboard('summary.tef.enhancedTEF')}</div>
+                          <div className="text-sm font-bold text-emerald-600">{tefAnalysis.enhancedTEF.toFixed(1)} kcal</div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="col-span-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 flex items-center justify-center">
+                        <span className="text-xs text-muted-foreground">{tDashboard('summary.tef.noEnhancement')}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {tefAnalysis.enhancementFactors.length > 0 && (
+                    <div className="pt-1">
+                      <p className="text-xs text-muted-foreground mb-1">{tDashboard('summary.tef.enhancementFactorsLabel')}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {tefAnalysis.enhancementFactors.map((factor, idx) => (
+                          <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">{factor}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">{tDashboard('summary.tef.noAnalysis')}</p>
+              )}
+            </div>
+
+            {/* 宏量营养素分布 */}
+            {totalMacros > 0 && (
+              <div className="space-y-4 border-t pt-6">
+                <h4 className="text-lg font-medium flex items-center">
+                  <PieChart className="mr-2 h-5 w-5 text-primary" />
+                  {tDashboard('summary.macronutrients')}
+                </h4>
+
+                {/* 碳水化合物 */}
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-xs">{tDashboard('summary.carbohydrates')}</span>
+                    <span className="text-xs">
+                      {macros.carbs.toFixed(1)}g ({carbsPercent.toFixed(0)}%)
+                      {carbsStatus === 'low' && <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.carbs.min}%</span>}
+                      {carbsStatus === 'high' && <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.carbs.max}%</span>}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden relative">
+                    <div className="absolute top-0 h-full bg-sky-500/20 dark:bg-sky-600/20" style={{ left: `${MACRO_RANGES.carbs.min}%`, width: `${MACRO_RANGES.carbs.max - MACRO_RANGES.carbs.min}%` }} />
+                    <div className="h-full bg-sky-500 rounded-full relative" style={{ width: `${carbsPercent}%` }} />
+                  </div>
+                </div>
+
+                {/* 蛋白质 */}
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-xs">{tDashboard('summary.protein')}</span>
+                    <span className="text-xs">
+                      {macros.protein.toFixed(1)}g ({proteinPercent.toFixed(0)}%)
+                      {proteinStatus === 'low' && <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.protein.min}%</span>}
+                      {proteinStatus === 'high' && <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.protein.max}%</span>}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden relative">
+                    <div className="absolute top-0 h-full bg-emerald-500/20 dark:bg-emerald-600/20" style={{ left: `${MACRO_RANGES.protein.min}%`, width: `${MACRO_RANGES.protein.max - MACRO_RANGES.protein.min}%` }} />
+                    <div className="h-full bg-emerald-500 rounded-full relative" style={{ width: `${proteinPercent}%` }} />
+                  </div>
+                </div>
+
+                {/* 脂肪 */}
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-xs">{tDashboard('summary.fat')}</span>
+                    <span className="text-xs">
+                      {macros.fat.toFixed(1)}g ({fatPercent.toFixed(0)}%)
+                      {fatStatus === 'low' && <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.fat.min}%</span>}
+                      {fatStatus === 'high' && <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.fat.max}%</span>}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden relative">
+                    <div className="absolute top-0 h-full bg-amber-500/20 dark:bg-amber-600/20" style={{ left: `${MACRO_RANGES.fat.min}%`, width: `${MACRO_RANGES.fat.max - MACRO_RANGES.fat.min}%` }} />
+                    <div className="h-full bg-amber-500 rounded-full relative" style={{ width: `${fatPercent}%` }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* BMI 指数 */}
+            {currentWeight && userProfile.height && (
+              <div className="border-t pt-6">
+                <BMIIndicator weight={currentWeight} height={userProfile.height} />
+              </div>
+            )}
+
+            {/* 体重变化预测 */}
+            {currentWeight && calculatedTDEE && Math.abs(calorieDifferenceForWeight) > 0 && (
+              <div className="border-t pt-6">
+                <WeightChangePredictor calorieDifference={calorieDifferenceForWeight} currentWeight={currentWeight} targetWeight={userProfile?.targetWeight} />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* 智能建议 */}
         {smartSuggestions && smartSuggestions.suggestions && smartSuggestions.suggestions.length > 0 && (
           <Card className="smart-suggestions-card">
@@ -934,33 +1084,13 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
         )}
 
         {/* 截图专用Logo区域 - 使用与导航栏一致的绿色主题 */}
-        <div className="screenshot-logo-area mt-8 pt-6 border-t border-slate-200/50 dark:border-slate-600/30 text-center">
-          <div className="flex items-center justify-center space-x-4">
-            <div className="flex items-center space-x-3">
-              {/* Logo图标 - 与导航栏一致的绿色渐变背景 */}
-              <div className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 dark:from-green-400 dark:to-green-500 shadow-lg">
-                <Image
-                  src="/placeholder.svg"
-                  alt="SnapFit AI Logo"
-                  width={28}
-                  height={28}
-                  className="brightness-0 invert"
-                />
-              </div>
-              {/* 品牌名称 - 与导航栏一致的绿色渐变文字 */}
-              <div className="text-left">
-                <div className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-700 dark:from-green-300 dark:to-green-400 bg-clip-text text-transparent">
-                  SnapFit AI
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {t('branding.tagline')}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 text-xs text-muted-foreground">
-            {t('branding.slogan')}
-          </div>
+        <div className="screenshot-logo-area mt-10 pt-8 border-t border-slate-200/50 dark:border-slate-600/30 text-center">
+          <img
+            src="/snapifit_summary.svg"
+            alt="Snapifit AI Logo"
+            className="mx-auto h-16 md:h-24 w-auto select-none opacity-90 hover:opacity-100 transition-opacity duration-300"
+            style={{ filter: 'invert(34%) sepia(61%) saturate(504%) hue-rotate(90deg) brightness(95%) contrast(92%)' }}
+          />
         </div>
       </div>
     </div>

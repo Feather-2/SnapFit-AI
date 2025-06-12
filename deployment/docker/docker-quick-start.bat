@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo ========================================
-echo   SnapFit AI Docker 快速启动
+echo   Snapifit AI Docker 快速启动
 echo ========================================
 echo.
 

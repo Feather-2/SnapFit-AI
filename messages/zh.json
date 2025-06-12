@@ -28,7 +28,8 @@
     "required": "必填",
     "yes": "是",
     "no": "否",
-    "blockedDomain": "被封禁域名"
+    "blockedDomain": "受阻域名",
+    "days": "天"
   },
   "navigation": {
     "home": "主页",
@@ -78,7 +79,7 @@
     }
   },
   "app": {
-    "title": "SnapFit AI",
+    "title": "Snapifit AI",
     "subtitle": "智能健康管理助手",
     "description": "您的个人健康管理和营养分析助手"
   },
@@ -194,6 +195,13 @@
     "validation": {
       "invalidWeight": "体重无效",
       "invalidWeightDesc": "请输入一个有效的正数作为体重。"
+    },
+    "tef": {
+      "generateSuccessTitle": "分析完成",
+      "generateSuccessDescription": "已成功生成食物热效应分析",
+      "noFoodTitle": "暂无食物记录",
+      "noFoodDescription": "请先添加食物记录后再生成热效应分析",
+      "generateFailedTitle": "分析失败"
     },
     "ui": {
       "subtitle": "记录您的健康数据，获得智能建议",
@@ -332,6 +340,51 @@
       "protein": "蛋白质",
       "fat": "脂肪",
       "micronutrients": "主要微量元素",
+      "bmi": {
+        "title": "BMI指数",
+        "value": "BMI值",
+        "categories": {
+          "underweight": "偏瘦",
+          "normal": "正常",
+          "overweight": "超重",
+          "obese1": "轻度肥胖",
+          "obese2": "中度肥胖",
+          "obese3": "重度肥胖"
+        },
+        "description": "BMI是评估体重状况的常用指标，仅供参考。",
+        "here": "您在这里",
+        "guideTitle": "健康建议",
+        "guides": {
+          "underweight": "保持均衡饮食，适当增加能量摄入并加强力量训练。",
+          "normal": "继续保持健康饮食与规律运动，关注整体生活方式。",
+          "overweight": "建议控制热量摄入，增加有氧及力量训练，逐步减脂。",
+          "obese1": "建议在专业医生或营养师指导下制定减重计划并坚持运动。",
+          "obese2": "肥胖风险较高，请及时就医并在专业指导下进行体重管理。",
+          "obese3": "严重肥胖，需在医疗团队指导下综合干预并监测并发症。"
+        }
+      },
+      "weightPredictor": {
+        "title": "体重变化预测",
+        "trend": {
+          "gain": "预期增重",
+          "loss": "预期减重",
+          "maintain": "维持体重"
+        },
+        "surplus": "热量盈余",
+        "deficit": "热量缺口",
+        "balanced": "热量平衡",
+        "predictions": "预测变化",
+        "daily": "每日",
+        "weekly": "每周",
+        "monthly": "每月",
+        "goalWeight": "目标体重",
+        "difference": "差距",
+        "estimatedTime": "预计时间",
+        "alreadyAchieved": "您已达到或超过目标体重，请检查并更新计划！",
+        "directionMismatch": "当前热量趋势无法在该方向达到目标体重",
+        "balancedDescription": "当前热量摄入与消耗基本平衡，体重预期保持稳定。",
+        "description": "基于热量缺口/盈余的体重变化预测，实际效果因个体差异而异。"
+      },
       "tef": {
         "title": "食物热效应 (TEF)",
         "enhancementFactors": "增强因子",
@@ -346,7 +399,17 @@
         "enhancementFactorsLabel": "增强因素:",
         "analyzing": "分析中",
         "analyzingDescription": "正在分析您的膳食以计算个性化 TEF...",
+        "analyzingLabel": "分析中 {seconds}s",
         "remainingTime": "剩余 {seconds} 秒",
+        "generate": "生成分析",
+        "regenerate": "重新分析",
+        "generating": "生成中…",
+        "noAnalysis": "尚未生成 TEF 分析",
+        "generateSuccessTitle": "分析完成",
+        "generateSuccessDescription": "已成功生成食物热效应分析",
+        "noFoodTitle": "暂无食物记录",
+        "noFoodDescription": "请先添加食物记录后再生成热效应分析",
+        "generateFailedTitle": "分析失败",
         "description": "TEF 是消化和代谢食物所需的额外能量，{analyzed, select, true {已通过 AI 分析您的膳食进行个性化计算} other {将在食物记录稳定后自动分析}}。"
       }
     },
@@ -467,7 +530,7 @@
     "title": "智能对话",
     "subtitle": "与AI健康助手对话",
     "expertDescriptions": {
-      "general": "SnapFit AI 健康助手",
+      "general": "Snapifit AI 健康助手",
       "nutrition": "注册营养师 (RD)",
       "exercise": "SF认证运动生理学家",
       "metabolism": "内分泌代谢专家",
@@ -493,10 +556,10 @@
     "experts": {
       "general": {
         "name": "通用助手",
-        "title": "SnapFit AI 健康助手",
+        "title": "Snapifit AI 健康助手",
         "description": "全方位健康管理助手，可以回答各种健康相关问题",
         "welcomeMessage": {
-          "title": "欢迎使用 SnapFit AI 健康助手",
+          "title": "欢迎使用 Snapifit AI 健康助手",
           "subtitle": "我是您的全方位健康管理顾问，可以帮助您解答营养、运动、代谢等各方面的健康问题",
           "features": [
             "🎯 综合分析您的健康数据",
@@ -583,7 +646,7 @@
       }
     },
     "systemPrompts": {
-      "general": "你是SnapFit AI，一位经验丰富的健康管理顾问。我拥有营养学、运动科学、行为心理学的综合知识背景。\n\n我的使命是帮助用户实现健康目标，无论是减重、增肌、改善体能还是养成健康习惯。我会：\n\n🎯 **我的专长**：\n- 综合分析用户的营养、运动、代谢数据\n- 提供平衡且实用的健康建议\n- 帮助制定可持续的健康计划\n- 解答各类健康疑问\n\n💬 **我的沟通风格**：\n- 用温和、鼓励的语气与用户交流\n- 将复杂的健康知识用简单易懂的方式解释\n- 基于用户的实际数据给出个性化建议\n- 始终以用户的健康和安全为第一优先\n\n请告诉我您的健康问题或目标，我会基于您的数据为您提供最适合的建议！"
+      "general": "你是Snapifit AI，一位经验丰富的健康管理顾问。我拥有营养学、运动科学、行为心理学的综合知识背景。\n\n我的使命是帮助用户实现健康目标，无论是减重、增肌、改善体能还是养成健康习惯。我会：\n\n🎯 **我的专长**：\n- 综合分析用户的营养、运动、代谢数据\n- 提供平衡且实用的健康建议\n- 帮助制定可持续的健康计划\n- 解答各类健康疑问\n\n💬 **我的沟通风格**：\n- 用温和、鼓励的语气与用户交流\n- 将复杂的健康知识用简单易懂的方式解释\n- 基于用户的实际数据给出个性化建议\n- 始终以用户的健康和安全为第一优先\n\n请告诉我您的健康问题或目标，我会基于您的数据为您提供最适合的建议！"
     },
     "suggestions": {
       "categories": {
@@ -853,7 +916,7 @@
       "usage4": "在 AI 配置页面设置您的模型参数",
       "usage5": "定期导出您的数据以防数据丢失",
       "versionTitle": "版本信息",
-      "versionInfo": "SnapFit AI 社区版"
+      "versionInfo": "Snapifit AI 社区版"
     },
     "ai": {
       "title": "AI 配置",

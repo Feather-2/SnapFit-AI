@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SnapFit AI Docker 构建脚本
+# Snapifit AI Docker 构建脚本
 set -e
 
 # 颜色定义
@@ -14,7 +14,7 @@ IMAGE_NAME="snapfit-ai"
 TAG=${1:-latest}
 FULL_IMAGE_NAME="${IMAGE_NAME}:${TAG}"
 
-echo -e "${GREEN}🚀 开始构建 SnapFit AI Docker 镜像...${NC}"
+echo -e "${GREEN}🚀 开始构建 Snapifit AI Docker 镜像...${NC}"
 echo -e "${YELLOW}镜像名称: ${FULL_IMAGE_NAME}${NC}"
 
 # 检查 Docker 是否运行
@@ -50,11 +50,11 @@ docker build \
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Docker 镜像构建成功！${NC}"
     echo -e "${GREEN}镜像名称: ${FULL_IMAGE_NAME}${NC}"
-    
+
     # 显示镜像信息
     echo -e "${YELLOW}📊 镜像信息:${NC}"
     docker images "${IMAGE_NAME}" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
-    
+
     echo -e "${GREEN}🎉 构建完成！${NC}"
     echo -e "${YELLOW}运行命令:${NC}"
     echo -e "  开发环境: ${GREEN}docker-compose up${NC}"

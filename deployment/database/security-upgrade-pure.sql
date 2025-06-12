@@ -1,4 +1,4 @@
--- SnapFit AI 安全系统升级脚本 (纯SQL版本)
+-- Snapifit AI 安全系统升级脚本 (纯SQL版本)
 -- 添加IP封禁功能和增强安全事件表
 -- 执行前请备份数据库
 --
@@ -349,7 +349,7 @@ BEGIN
     AND routine_schema = 'public';
 
     RAISE NOTICE '========================================';
-    RAISE NOTICE 'SnapFit AI Security System Upgrade Complete!';
+    RAISE NOTICE 'Snapifit AI Security System Upgrade Complete!';
     RAISE NOTICE '========================================';
     RAISE NOTICE 'Tables created: % (expected: 2)', table_count;
     RAISE NOTICE 'Functions created: % (expected: 4)', function_count;

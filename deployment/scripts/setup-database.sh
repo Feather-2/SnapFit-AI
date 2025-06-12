@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SnapFit AI 数据库初始化脚本
+# Snapifit AI 数据库初始化脚本
 set -e
 
 # 颜色定义
@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 
 # 显示帮助信息
 show_help() {
-    echo -e "${GREEN}SnapFit AI 数据库初始化脚本${NC}"
+    echo -e "${GREEN}Snapifit AI 数据库初始化脚本${NC}"
     echo ""
     echo "用法: $0 [选项]"
     echo ""
@@ -38,22 +38,22 @@ show_help() {
 # 检查依赖
 check_dependencies() {
     echo -e "${YELLOW}🔍 检查依赖...${NC}"
-    
+
     if ! command -v psql &> /dev/null; then
         echo -e "${RED}❌ PostgreSQL 客户端 (psql) 未安装${NC}"
         echo "请安装 PostgreSQL 客户端工具"
         exit 1
     fi
-    
+
     echo -e "${GREEN}✅ 依赖检查通过${NC}"
 }
 
 # 检查数据库连接
 check_database_connection() {
     local db_url="$1"
-    
+
     echo -e "${YELLOW}🔗 测试数据库连接...${NC}"
-    
+
     if psql "$db_url" -c "SELECT 1;" > /dev/null 2>&1; then
         echo -e "${GREEN}✅ 数据库连接成功${NC}"
     else
@@ -67,9 +67,9 @@ check_database_connection() {
 backup_database() {
     local db_url="$1"
     local backup_file="backup_$(date +%Y%m%d_%H%M%S).sql"
-    
+
     echo -e "${YELLOW}💾 备份数据库到 $backup_file...${NC}"
-    
+
     if pg_dump "$db_url" > "$backup_file"; then
         echo -e "${GREEN}✅ 数据库备份完成${NC}"
     else
@@ -81,23 +81,23 @@ backup_database() {
 # 检查表是否存在
 check_existing_tables() {
     local db_url="$1"
-    
+
     local table_count=$(psql "$db_url" -t -c "
-        SELECT COUNT(*) 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public' 
+        SELECT COUNT(*)
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
         AND table_name IN ('users', 'shared_keys', 'daily_logs');
     " | tr -d ' ')
-    
+
     echo "$table_count"
 }
 
 # 强制清理数据库
 force_cleanup() {
     local db_url="$1"
-    
+
     echo -e "${YELLOW}🧹 清理现有数据库结构...${NC}"
-    
+
     psql "$db_url" << 'EOF'
 -- 删除触发器
 DROP TRIGGER IF EXISTS trigger_users_updated_at ON users;
@@ -156,19 +156,19 @@ EOF
 run_initialization() {
     local db_url="$1"
     local include_demo="$2"
-    
+
     echo -e "${YELLOW}🚀 开始数据库初始化...${NC}"
-    
+
     # 执行初始化脚本
     echo -e "${BLUE}📋 执行表结构初始化...${NC}"
     psql "$db_url" -f database/init.sql
-    
+
     echo -e "${BLUE}📋 执行函数初始化...${NC}"
     psql "$db_url" -f database/functions.sql
-    
+
     echo -e "${BLUE}📋 执行触发器初始化...${NC}"
     psql "$db_url" -f database/triggers.sql
-    
+
     # 如果需要演示数据
     if [ "$include_demo" = true ]; then
         echo -e "${BLUE}📋 插入演示数据...${NC}"
@@ -199,39 +199,39 @@ INSERT INTO shared_keys (
 \echo '✅ 演示数据插入完成'
 EOF
     fi
-    
+
     echo -e "${GREEN}✅ 数据库初始化完成${NC}"
 }
 
 # 验证初始化结果
 verify_initialization() {
     local db_url="$1"
-    
+
     echo -e "${YELLOW}🔍 验证初始化结果...${NC}"
-    
+
     # 检查表数量
     local table_count=$(psql "$db_url" -t -c "
-        SELECT COUNT(*) FROM information_schema.tables 
+        SELECT COUNT(*) FROM information_schema.tables
         WHERE table_schema = 'public';
     " | tr -d ' ')
-    
+
     # 检查函数数量
     local function_count=$(psql "$db_url" -t -c "
-        SELECT COUNT(*) FROM information_schema.routines 
+        SELECT COUNT(*) FROM information_schema.routines
         WHERE routine_schema = 'public' AND routine_type = 'FUNCTION';
     " | tr -d ' ')
-    
+
     # 检查触发器数量
     local trigger_count=$(psql "$db_url" -t -c "
-        SELECT COUNT(*) FROM information_schema.triggers 
+        SELECT COUNT(*) FROM information_schema.triggers
         WHERE trigger_schema = 'public';
     " | tr -d ' ')
-    
+
     echo -e "${GREEN}📊 初始化结果:${NC}"
     echo -e "  表数量: $table_count"
     echo -e "  函数数量: $function_count"
     echo -e "  触发器数量: $trigger_count"
-    
+
     if [ "$table_count" -ge 6 ] && [ "$function_count" -ge 10 ]; then
         echo -e "${GREEN}✅ 初始化验证通过${NC}"
     else
@@ -247,7 +247,7 @@ main() {
     local do_backup=false
     local force_init=false
     local include_demo=false
-    
+
     # 解析参数
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -286,14 +286,14 @@ main() {
                 ;;
         esac
     done
-    
+
     # 检查参数
     if [ -z "$db_type" ]; then
         echo -e "${RED}❌ 请指定数据库类型 (--supabase 或 --postgresql)${NC}"
         show_help
         exit 1
     fi
-    
+
     # 确定数据库连接字符串
     if [ -z "$db_url" ]; then
         if [ "$db_type" = "supabase" ]; then
@@ -302,20 +302,20 @@ main() {
             db_url="$DATABASE_URL"
         fi
     fi
-    
+
     if [ -z "$db_url" ]; then
         echo -e "${RED}❌ 请提供数据库连接字符串${NC}"
         echo "使用 --url 参数或设置相应的环境变量"
         exit 1
     fi
-    
-    echo -e "${GREEN}🚀 开始 SnapFit AI 数据库初始化...${NC}"
+
+    echo -e "${GREEN}🚀 开始 Snapifit AI 数据库初始化...${NC}"
     echo -e "${BLUE}数据库类型: $db_type${NC}"
-    
+
     # 执行初始化流程
     check_dependencies
     check_database_connection "$db_url"
-    
+
     # 检查现有表
     local existing_tables=$(check_existing_tables "$db_url")
     if [ "$existing_tables" -gt 0 ]; then
@@ -330,10 +330,10 @@ main() {
             exit 1
         fi
     fi
-    
+
     run_initialization "$db_url" "$include_demo"
     verify_initialization "$db_url"
-    
+
     echo -e "${GREEN}🎉 数据库初始化完成！${NC}"
     echo -e "${YELLOW}下一步:${NC}"
     echo "1. 配置应用环境变量"

@@ -1,9 +1,9 @@
--- SnapFit AI 安全系统升级脚本
+-- Snapifit AI 安全系统升级脚本
 -- 添加IP封禁功能和增强安全事件表
 -- 执行前请备份数据库
 
 -- ========================================
--- SnapFit AI Security System Upgrade
+-- Snapifit AI Security System Upgrade
 -- Adding IP ban functionality and enhanced security events
 -- ========================================
 

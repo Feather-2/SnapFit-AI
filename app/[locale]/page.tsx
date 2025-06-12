@@ -41,6 +41,8 @@ import { useTranslation } from "@/hooks/use-i18n"
 import { useSync } from '@/hooks/use-sync';
 import { v4 as uuidv4 } from 'uuid';
 import { WelcomeGuide, useWelcomeGuide } from "@/components/onboarding/welcome-guide"
+// @ts-ignore -- 第三方库缺少类型声明
+import autoAnimate from "@formkit/auto-animate"
 
 // 图片预览类型
 interface ImagePreview {
@@ -140,7 +142,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   })
 
   // 使用 IndexedDB 钩子获取日志数据
-  const { getData: getDailyLog, saveData: saveDailyLog, isLoading } = useIndexedDB("healthLogs")
+  const { getData: getDailyLog, saveData: saveDailyLog, isLoading, isInitializing: dbInitializing } = useIndexedDB("healthLogs")
 
   // 使用导出提醒Hook
   const exportReminder = useExportReminder()
@@ -170,6 +172,15 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     calculatedTDEE: undefined,
   }))
 
+  // 用于控制首页第一次加载的骨架屏展示
+  const [initialLoading, setInitialLoading] = useState(true)
+
+  // 标记首帧渲染，避免首帧空日志覆盖真实数据
+  const firstRenderRef = useRef(true)
+
+  // 防止自动同步重复触发的标记（跨 loadDailyLog 调用持久化）
+  const hasTriggeredCloudSyncRef = useRef(false)
+
   // 创建一个包装函数，用于更新本地状态和数据库
   const setDailyLogAndSave = (newLog: DailyLog) => {
     setDailyLog(newLog);
@@ -193,9 +204,10 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   };
 
   // 封装加载日志的逻辑，以便重用
-  const loadDailyLog = useCallback((date: Date) => {
+  const loadDailyLog = useCallback(async (date: Date) => {
     const dateKey = format(date, "yyyy-MM-dd");
-    getDailyLog(dateKey).then((data) => {
+    try {
+      const data = await getDailyLog(dateKey)
       console.log("从IndexedDB为日期加载数据:", dateKey, data);
       const defaultActivity = userProfile.activityLevel || "moderate";
       if (data) {
@@ -209,6 +221,8 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         setDailyLog(cleanedData);
         setCurrentDayWeight(data.weight ? data.weight.toString() : "");
         setCurrentDayActivityLevelForSelect(data.activityLevel || defaultActivity);
+        // 一旦成功加载到数据，允许后续再次自动同步（例如切换到新日期）
+        hasTriggeredCloudSyncRef.current = false;
       } else {
         setDailyLog({
           date: dateKey,
@@ -227,9 +241,21 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         });
         setCurrentDayWeight("");
         setCurrentDayActivityLevelForSelect(defaultActivity);
+
+        // 如果本地没有任何数据，且当前未在同步，则自动尝试从云端拉取
+        if (!isSyncing && !hasTriggeredCloudSyncRef.current) {
+          console.log('[Auto Sync] Local data empty, triggering cloud pull...');
+          hasTriggeredCloudSyncRef.current = true;
+          syncAll(true).catch(err => console.warn('[Auto Sync] Failed:', err));
+        }
       }
-    });
-  }, [getDailyLog, userProfile.activityLevel]);
+    } finally {
+      // 只在同步完成后再关闭骨架屏，避免空白
+      if (!isSyncing) {
+        setInitialLoading(false)
+      }
+    }
+  }, [getDailyLog, userProfile.activityLevel, isSyncing]);
 
   // 当选择的日期变化时，加载对应日期的数据
   useEffect(() => {
@@ -250,6 +276,14 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
           loadDailyLog(selectedDate);
         }, 300);
       }
+
+      // 🔄 如果是云同步事件，同时刷新日历记录点
+      if (source === 'cloudSync') {
+        console.log(`[Page] Refreshing calendar records due to cloud sync`);
+        setTimeout(() => {
+          refreshRecords();
+        }, 500); // 给数据写入更多时间
+      }
     };
 
     window.addEventListener('forceDataRefresh', handleForceRefresh as EventListener);
@@ -257,7 +291,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     return () => {
       window.removeEventListener('forceDataRefresh', handleForceRefresh as EventListener);
     };
-  }, [selectedDate, loadDailyLog]);
+  }, [selectedDate, loadDailyLog, refreshRecords]);
 
   // 订阅缓存更新事件，用于在缓存被刷新后自动更新UI
   useEffect(() => {
@@ -787,11 +821,20 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   const tefAnalysisTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 是否启用自动 15 秒 TEF 分析
+  const ENABLE_AUTO_TEF_ANALYSIS = false;
+
+  // 手动生成 TEF 分析的加载状态
+  const [isGeneratingTEF, setIsGeneratingTEF] = useState(false);
+
   // 用于跟踪食物条目的实际内容变化
   const previousFoodEntriesHashRef = useRef<string>('');
 
   // 当食物条目变化时，使用防抖机制重新分析TEF
   useEffect(() => {
+    // 已关闭自动 TEF 分析，直接返回
+    if (!ENABLE_AUTO_TEF_ANALYSIS) return;
+
     const currentHash = tefCacheManager.generateFoodEntriesHash(dailyLog.foodEntries);
 
     // 检查是否已有缓存的分析结果
@@ -926,6 +969,14 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
   // 当用户配置或每日日志（特别是体重、日期和活动水平）变化时，重新计算BMR和TDEE
   useEffect(() => {
+    // 避免首屏默认空日志覆盖已有数据
+    if (firstRenderRef.current) {
+      if ((dailyLog.foodEntries?.length || 0) === 0 && (dailyLog.exerciseEntries?.length || 0) === 0) {
+        return;
+      }
+      firstRenderRef.current = false;
+    }
+
     if (userProfile && dailyLog.date) {
       // 计算额外的TEF增强
       const additionalTEF = dailyLog.tefAnalysis
@@ -1386,9 +1437,72 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     updateLogAndPush(patch);
   }
 
-  // 如果组件尚未挂载，渲染占位，避免 SSR/CSR 不一致导致水合错误
-  if (!hasMounted) {
-    return <div className="min-h-screen bg-white dark:bg-slate-900" />
+  // 手动触发 TEF 分析
+  const handleGenerateTEFAnalysis = async () => {
+    if (dailyLog.foodEntries.length === 0) {
+      toast({
+        title: t('tef.noFoodTitle') || '暂无食物记录',
+        description: t('tef.noFoodDescription') || '请先添加食物记录后再生成热效应分析',
+        variant: 'default',
+      });
+      return;
+    }
+
+    setIsGeneratingTEF(true);
+    try {
+      const tefResult = await performTEFAnalysis(dailyLog.foodEntries);
+      if (tefResult) {
+        const localTEFAnalysis = generateTEFAnalysis(
+          dailyLog.foodEntries,
+          tefResult.enhancementMultiplier
+        );
+
+        const finalAnalysis = {
+          ...localTEFAnalysis,
+          enhancementFactors: tefResult.enhancementFactors && tefResult.enhancementFactors.length > 0
+            ? tefResult.enhancementFactors
+            : localTEFAnalysis.enhancementFactors,
+          analysisTimestamp: tefResult.analysisTimestamp || localTEFAnalysis.analysisTimestamp,
+        } as typeof localTEFAnalysis;
+
+        // 缓存分析结果
+        tefCacheManager.setCachedAnalysis(dailyLog.foodEntries, finalAnalysis);
+
+        setDailyLog(currentLog => {
+          const updatedLog = {
+            ...currentLog,
+            tefAnalysis: finalAnalysis,
+            last_modified: new Date().toISOString(),
+          } as DailyLog;
+          saveDailyLog(updatedLog.date, updatedLog);
+          return updatedLog;
+        });
+
+        toast({
+          title: t('tef.generateSuccessTitle') || '分析完成',
+          description: t('tef.generateSuccessDescription') || '已成功生成食物热效应分析',
+          variant: 'default',
+        });
+      }
+    } catch (error) {
+      console.error('[TEF] 手动分析失败:', error);
+      toast({
+        title: t('tef.generateFailedTitle') || '分析失败',
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingTEF(false);
+    }
+  };
+
+  // 如果组件尚未挂载或本地数据库仍在初始化，渲染骨架屏，避免闪白
+  if (!hasMounted || dbInitializing || initialLoading || isSyncing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900">
+        <RefreshCw className="h-8 w-8 text-emerald-500 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -1470,14 +1584,14 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
             <div className="flex items-center space-x-4 md:space-x-6">
               <div className="flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg">
                 <img
-                  src="/placeholder.svg"
-                  alt="SnapFit AI Logo"
+                  src="/snapifit-pure.svg"
+                  alt="Snapifit AI Logo"
                   className="w-8 h-8 md:w-10 md:h-10 object-contain filter invert"
                 />
               </div>
               <div>
                 <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-1 md:mb-2">
-                  SnapFit AI
+                  Snapifit AI
                 </h1>
                 <p className="text-muted-foreground text-base md:text-lg">
                   {t('ui.subtitle')}
@@ -1514,6 +1628,12 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                       onClick={() => {
                         console.log('[Manual Sync] User triggered manual sync');
                         syncAll(true).then(() => {
+                          // 🔄 手动同步完成后刷新日历记录点
+                          console.log('[Manual Sync] Refreshing calendar records after manual sync');
+                          setTimeout(() => {
+                            refreshRecords();
+                          }, 1000); // 给数据同步充足时间
+
                           toast({
                             title: "同步完成",
                             description: "数据已从云端更新",
@@ -1871,7 +1991,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                     {uploadedImages.map((img, index) => (
                       <div key={index} className="relative w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border-2 border-white dark:border-slate-700 shadow-md hover:shadow-lg transition-all group">
                         <img
-                          src={img.url || "/placeholder.svg"}
+                          src={img.url || "/snapifit-pure.svg"}
                           alt={`预览 ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
@@ -2047,6 +2167,10 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
               tefAnalysis={dailyLog.tefAnalysis}
               tefAnalysisCountdown={tefAnalysisCountdown}
               selectedDate={selectedDate}
+              onGenerateTEF={handleGenerateTEFAnalysis}
+              isGeneratingTEF={isGeneratingTEF}
+              userProfile={userProfile}
+              currentWeight={dailyLog.weight}
             />
           </div>
           <div className="scale-in">
@@ -2069,6 +2193,15 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
               {t('ui.healthDisclaimer')}
             </p>
           </div>
+        </div>
+        {/* 底部Logo */}
+        <div className="mt-6 flex justify-center">
+          <img
+            src="/snapifit.svg"
+            alt="Snapifit AI Logo"
+            className="h-18 md:h-24 w-auto select-none opacity-75 hover:opacity-100 transition-opacity duration-300"
+            style={{ filter: 'invert(34%) sepia(61%) saturate(504%) hue-rotate(90deg) brightness(95%) contrast(92%)' }}
+          />
         </div>
       </div>
 

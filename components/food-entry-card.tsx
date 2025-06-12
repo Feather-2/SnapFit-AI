@@ -94,10 +94,10 @@ export function FoodEntryCard({ entry, onDelete, onUpdate }: FoodEntryCardProps)
 
   return (
     <div className={cn(
-      "bg-card rounded-xl border transition-all duration-300 shadow-md hover:shadow-xl hover:shadow-emerald-100/50 dark:hover:shadow-emerald-900/30",
+      "bg-card rounded-lg border transition-all duration-200 ease-out shadow-sm hover:shadow-md hover:translate-y-[-1px] hover:shadow-emerald-100/30 dark:hover:shadow-emerald-900/20",
       entry.is_estimated && "border-amber-300 dark:border-amber-600 bg-amber-50/50 dark:bg-amber-900/10"
     )}>
-      <div className="p-4 md:p-6">
+      <div className="p-3 md:p-4">
         {isEditing ? (
           <div className="space-y-3 md:space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SnapFit AI 服务器初始化脚本
+# Snapifit AI 服务器初始化脚本
 # 支持 CentOS 7/8/9, Ubuntu 18.04/20.04/22.04, Debian 10/11
 # 用法: curl -fsSL https://your-domain.com/server-init.sh | bash
 
@@ -24,7 +24,7 @@ LOG_FILE="/var/log/snapfit-init.log"
 show_banner() {
     echo -e "${GREEN}"
     echo "=================================================="
-    echo "    SnapFit AI 服务器初始化脚本"
+    echo "    Snapifit AI 服务器初始化脚本"
     echo "=================================================="
     echo -e "${NC}"
     echo "本脚本将自动配置服务器环境，包括："
@@ -61,7 +61,7 @@ detect_os() {
         log_error "无法检测操作系统"
         exit 1
     fi
-    
+
     log "检测到操作系统: $OS $VER"
 }
 
@@ -77,7 +77,7 @@ check_root() {
 # 系统更新
 update_system() {
     log "🔄 更新系统包..."
-    
+
     case "$OS" in
         *"CentOS"*|*"Red Hat"*|*"Rocky"*|*"AlmaLinux"*)
             yum update -y
@@ -94,20 +94,20 @@ update_system() {
             exit 1
             ;;
     esac
-    
+
     log "✅ 系统更新完成"
 }
 
 # 安装 Docker
 install_docker() {
     log "🐳 安装 Docker..."
-    
+
     # 检查是否已安装
     if command -v docker &> /dev/null; then
         log_warning "Docker 已安装，跳过安装步骤"
         return
     fi
-    
+
     case "$OS" in
         *"CentOS"*|*"Red Hat"*|*"Rocky"*|*"AlmaLinux"*)
             # 安装 Docker CE
@@ -130,11 +130,11 @@ install_docker() {
             apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
             ;;
     esac
-    
+
     # 启动并启用 Docker
     systemctl start docker
     systemctl enable docker
-    
+
     # 验证安装
     if docker --version && docker compose version; then
         log "✅ Docker 安装成功"
@@ -147,17 +147,17 @@ install_docker() {
 # 创建应用用户
 create_app_user() {
     log "👤 创建应用用户..."
-    
+
     if id "$APP_USER" &>/dev/null; then
         log_warning "用户 $APP_USER 已存在"
     else
         useradd -r -s /bin/bash -d "$APP_DIR" "$APP_USER"
         log "✅ 用户 $APP_USER 创建成功"
     fi
-    
+
     # 将用户添加到 docker 组
     usermod -aG docker "$APP_USER"
-    
+
     # 创建应用目录
     mkdir -p "$APP_DIR"
     chown -R "$APP_USER:$APP_USER" "$APP_DIR"
@@ -166,7 +166,7 @@ create_app_user() {
 # 配置防火墙
 configure_firewall() {
     log "🔥 配置防火墙..."
-    
+
     case "$OS" in
         *"CentOS"*|*"Red Hat"*|*"Rocky"*|*"AlmaLinux"*)
             if systemctl is-active --quiet firewalld; then
@@ -197,30 +197,30 @@ configure_firewall() {
 # 系统优化
 optimize_system() {
     log "⚡ 系统优化..."
-    
+
     # 增加文件描述符限制
     cat >> /etc/security/limits.conf << EOF
 $APP_USER soft nofile 65536
 $APP_USER hard nofile 65536
 EOF
-    
+
     # 优化内核参数
     cat >> /etc/sysctl.conf << EOF
-# SnapFit AI 优化
+# Snapifit AI 优化
 net.core.somaxconn = 65535
 net.ipv4.tcp_max_syn_backlog = 65535
 vm.max_map_count = 262144
 EOF
-    
+
     sysctl -p
-    
+
     log "✅ 系统优化完成"
 }
 
 # 安装监控工具
 install_monitoring() {
     log "📊 安装监控工具..."
-    
+
     case "$OS" in
         *"CentOS"*|*"Red Hat"*|*"Rocky"*|*"AlmaLinux"*)
             yum install -y htop iotop nethogs
@@ -229,17 +229,17 @@ install_monitoring() {
             apt-get install -y htop iotop nethogs
             ;;
     esac
-    
+
     log "✅ 监控工具安装完成"
 }
 
 # 创建部署脚本
 create_deploy_script() {
     log "📝 创建部署脚本..."
-    
+
     cat > "$APP_DIR/deploy.sh" << 'EOF'
 #!/bin/bash
-# SnapFit AI 快速部署脚本
+# Snapifit AI 快速部署脚本
 
 set -e
 
@@ -263,22 +263,22 @@ docker compose up -d
 echo "✅ 部署完成！"
 echo "访问地址: http://$(curl -s ifconfig.me):3000"
 EOF
-    
+
     chmod +x "$APP_DIR/deploy.sh"
     chown "$APP_USER:$APP_USER" "$APP_DIR/deploy.sh"
-    
+
     log "✅ 部署脚本创建完成"
 }
 
 # 主函数
 main() {
     show_banner
-    
+
     # 创建日志文件
     touch "$LOG_FILE"
-    
+
     log "🚀 开始服务器初始化..."
-    
+
     check_root
     detect_os
     update_system
@@ -288,9 +288,9 @@ main() {
     optimize_system
     install_monitoring
     create_deploy_script
-    
+
     log "🎉 服务器初始化完成！"
-    
+
     echo ""
     echo -e "${GREEN}=================================================="
     echo "           初始化完成！"

@@ -6,7 +6,7 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "SnapFit AI",
+  title: "Snapifit AI",
   description: "AI-based Personal Health Management Tool. Your personal cyber coach and nutritionist.",
     generator: 'Feather-2'
 }

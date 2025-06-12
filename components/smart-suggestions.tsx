@@ -418,7 +418,7 @@ export function SmartSuggestions({
     return (
       <Card className="health-card h-full flex flex-col">
         <CardHeader>
-          <CardTitle className="flex items-center">
+          <CardTitle className="flex items-center text-xl md:text-2xl font-semibold">
             <Brain className="mr-2 h-5 w-5 text-primary" />
             {t('title')}
           </CardTitle>
@@ -437,20 +437,22 @@ export function SmartSuggestions({
       return (
         <Card className="health-card h-full flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center text-base">
-              <Brain className="mr-2 h-4 w-4 text-primary" />
-              {t('title')}
-              {suggestions?.isPartial && (
-                <span className="ml-2 text-xs text-primary">
-                  {t('partialResults')}
-                </span>
-              )}
+            <CardTitle className="flex items-center justify-between text-xl md:text-2xl font-semibold">
+              <div className="flex items-center min-w-0 flex-1">
+                <Brain className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                <span className="truncate">{t('title')}</span>
+                {suggestions?.isPartial && (
+                  <span className="ml-2 text-xs text-primary flex-shrink-0">
+                    {t('partialResults')}
+                  </span>
+                )}
+              </div>
               {onRefresh && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={onRefresh}
-                  className="ml-auto h-6 w-6 p-0"
+                  className="ml-2 h-6 w-6 p-0 flex-shrink-0"
                   disabled={isLoading}
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -498,10 +500,12 @@ export function SmartSuggestions({
     return (
       <Card className="health-card h-full flex flex-col">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center text-base">
-            <Brain className="mr-2 h-4 w-4 text-primary" />
-            {t('title')}
-            <div className="ml-auto">
+          <CardTitle className="flex items-center justify-between text-xl md:text-2xl font-semibold">
+            <div className="flex items-center min-w-0 flex-1">
+              <Brain className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+              <span className="truncate">{t('title')}</span>
+            </div>
+            <div className="ml-2 flex-shrink-0">
               <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
             </div>
           </CardTitle>
@@ -564,10 +568,12 @@ export function SmartSuggestions({
     return (
       <Card className="health-card h-full flex flex-col">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center text-base">
-            <Brain className="mr-2 h-4 w-4 text-primary" />
-            {t('title')}
-            <div className="ml-auto">
+          <CardTitle className="flex items-center justify-between text-xl md:text-2xl font-semibold">
+            <div className="flex items-center min-w-0 flex-1">
+              <Brain className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+              <span className="truncate">{t('title')}</span>
+            </div>
+            <div className="ml-2 flex-shrink-0">
               <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
             </div>
           </CardTitle>
@@ -584,11 +590,11 @@ export function SmartSuggestions({
       <Card className="health-card h-full flex flex-col">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center justify-between text-xl md:text-2xl font-semibold">
-            <div className="flex items-center">
-              <Brain className="mr-2 h-4 w-4 text-primary" />
-              {t('title')}
+            <div className="flex items-center min-w-0 flex-1">
+              <Brain className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+              <span className="truncate">{t('title')}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-2 flex-shrink-0">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -654,17 +660,17 @@ export function SmartSuggestions({
     <Card className="health-card h-full flex flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between text-xl md:text-2xl font-semibold">
-          <div className="flex items-center">
-            <Brain className="mr-2 h-4 w-4 text-primary" />
-            {t('title')}
+          <div className="flex items-center min-w-0 flex-1">
+            <Brain className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+            <span className="truncate">{t('title')}</span>
             {suggestions?.isPartial && (
-              <span className="ml-2 text-xs text-primary">
+              <span className="ml-2 text-xs text-primary flex-shrink-0">
                 {t('partialResults')}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-2 flex-shrink-0">
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -704,7 +710,7 @@ export function SmartSuggestions({
                 variant="ghost"
                 size="sm"
                 onClick={onRefresh}
-                className="ml-auto h-6 w-6 p-0"
+                className="h-6 w-6 p-0"
                 disabled={isLoading}
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />

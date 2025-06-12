@@ -192,7 +192,29 @@ export async function POST(req: Request) {
 
     // 构建系统提示词
     let systemPrompt = customSystemPrompt ||
-      "你是SnapFit AI健康助手，一个专业的健康管理AI。你可以基于用户的健康数据提供个性化的建议，包括营养、运动、生活方式等各个方面。请用专业但易懂的语言回答用户问题。"
+      "你是Snapifit AI健康助手，一个专业的健康管理AI。你可以基于用户的健康数据提供个性化的建议，包括营养、运动、生活方式等各个方面。请用专业但易懂的语言回答用户问题。"
+
+    // === 计算 BMI 与体重变化预测（供后续插入 systemPrompt） ===
+    const heightCmForBMI = userProfile?.height;
+    const currentWeightForBMI = healthData?.weight ?? userProfile?.weight;
+
+    let bmiValue: number | undefined = undefined;
+    if (heightCmForBMI && currentWeightForBMI) {
+      const h = heightCmForBMI / 100;
+      bmiValue = currentWeightForBMI / (h * h);
+    }
+
+    let weightChangePrediction: { dailyCalorieDiff: number; weeklyKg: number; monthlyKg: number } | undefined;
+    if (healthData?.summary && typeof healthData.calculatedTDEE === 'number') {
+      const net = (healthData.summary.totalCaloriesConsumed || 0) - (healthData.summary.totalCaloriesBurned || 0);
+      const diff = net - healthData.calculatedTDEE; // 正值=盈余，负值=缺口
+      const kgPerKcal = 1 / 7700; // 7700kcal ≈ 1kg
+      weightChangePrediction = {
+        dailyCalorieDiff: diff,
+        weeklyKg: -(diff * 7 * kgPerKcal),
+        monthlyKg: -(diff * 30 * kgPerKcal)
+      };
+    }
 
     //console.log("Using expert role:", expertRole?.name || "通用助手")
     //console.log("System prompt length:", systemPrompt.length)
@@ -295,6 +317,8 @@ export async function POST(req: Request) {
             ? (healthData.calculatedTDEE - (healthData.summary.totalCaloriesConsumed - healthData.summary.totalCaloriesBurned)).toFixed(0)
             : "无法计算"
         } kcal (正数为缺口，负数为盈余)
+        ${bmiValue ? `- 体重指数(BMI): ${bmiValue.toFixed(1)}` : ""}
+        ${weightChangePrediction ? `- 预测体重变化: 日差 ${weightChangePrediction.dailyCalorieDiff.toFixed(0)} kcal → 约每周 ${weightChangePrediction.weeklyKg.toFixed(2)}kg, 每月 ${weightChangePrediction.monthlyKg.toFixed(2)}kg` : ""}
         - 宏量营养素摄入:
           * 蛋白质: ${healthData.summary?.macros?.protein?.toFixed(1) || "0"} g (${healthData.summary?.macros?.protein && healthData.summary?.totalCaloriesConsumed ? ((healthData.summary.macros.protein * 4 / healthData.summary.totalCaloriesConsumed) * 100).toFixed(1) : "0"}%)
           * 碳水化合物: ${healthData.summary?.macros?.carbs?.toFixed(1) || "0"} g (${healthData.summary?.macros?.carbs && healthData.summary?.totalCaloriesConsumed ? ((healthData.summary.macros.carbs * 4 / healthData.summary.totalCaloriesConsumed) * 100).toFixed(1) : "0"}%)
@@ -432,7 +456,7 @@ export async function POST(req: Request) {
       }
 
       systemPrompt += `
-        SnapFit AI(简称SF）是一个健康管理平台，可以实现AI交互的快速饮食、运动和状态日记及专业分析，而你是SF雇佣的AI健康专家。
+        Snapifit AI(简称SF）是一个健康管理平台，可以实现AI交互的快速饮食、运动和状态日记及专业分析，而你是SF雇佣的AI健康专家。
         请根据以上详细信息，以${expertRole?.name || "专业健康助手"}的身份提供个性化的回答和建议。
         ${expertRole?.description ? `专业领域: ${expertRole.description}` : ""}
 

@@ -871,6 +871,11 @@ function SettingsContent() {
   const handleClearAllData = useCallback(async () => {
     try {
       await clearAllData()
+
+      // 🔄 清除数据后，同时清除同步节流状态，允许立即自动同步
+      console.log('[Settings] Clearing sync throttle state after data clear');
+      clearThrottleState();
+
       toast({
         title: t('data.clearSuccessTitle'),
         description: t('data.clearSuccessDescription'),
@@ -883,7 +888,7 @@ function SettingsContent() {
         variant: "destructive",
       })
     }
-  }, [clearAllData, toast])
+  }, [clearAllData, clearThrottleState, toast])
 
   // 渲染模型选择器
   const renderModelSelector = useCallback(
@@ -1957,7 +1962,7 @@ function SettingsContent() {
           <div>
             <h3 className="text-lg font-medium">使用引导</h3>
             <p className="text-sm text-muted-foreground mb-3">
-              重新查看初次使用时的引导说明，了解SnapFit AI社区版的特色功能。
+              重新查看初次使用时的引导说明，了解Snapifit AI社区版的特色功能。
             </p>
             <Button
               variant="outline"

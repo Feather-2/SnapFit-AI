@@ -59,7 +59,7 @@ export function MobileNav({ locale }: MobileNavProps) {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">S</span>
               </div>
-              <span className="font-semibold text-lg">SnapFit AI</span>
+              <span className="font-semibold text-lg">Snapifit AI</span>
             </SheetTitle>
           </SheetHeader>
 

@@ -1,8 +1,8 @@
-# SnapFit AI Database (Production Version)
+# Snapifit AI Database (Production Version)
 
 ## 概述
 
-本目录包含 SnapFit AI 的完整数据库结构，基于 2025-06-10 从 Supabase 生产环境导出的真实数据库。
+本目录包含 Snapifit AI 的完整数据库结构，基于 2025-06-10 从 Supabase 生产环境导出的真实数据库。
 
 ## 文件结构
 
@@ -74,10 +74,10 @@ psql -d your_database -f database/setup_production.sql
    ```sql
    -- 检查函数数量
    SELECT COUNT(*) FROM information_schema.routines WHERE routine_schema = 'public';
-   
+
    -- 检查触发器数量
    SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema = 'public';
-   
+
    -- 检查表数量
    SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';
    ```
@@ -142,10 +142,10 @@ psql -d snapfit_ai_dev -f database/validation-queries.sql
    ```bash
    # 删除旧结构（谨慎操作）
    psql -d your_database -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-   
+
    # 安装新结构
    psql -d your_database -f database/setup_production.sql
-   
+
    # 恢复数据（如果需要）
    psql -d your_database -f your_data_backup.sql
    ```
@@ -170,11 +170,11 @@ psql -d snapfit_ai_dev -f database/validation-queries.sql
 
 ```sql
 -- 检查所有函数
-SELECT routine_name, routine_type FROM information_schema.routines 
+SELECT routine_name, routine_type FROM information_schema.routines
 WHERE routine_schema = 'public' ORDER BY routine_name;
 
 -- 检查所有触发器
-SELECT trigger_name, event_object_table FROM information_schema.triggers 
+SELECT trigger_name, event_object_table FROM information_schema.triggers
 WHERE trigger_schema = 'public' ORDER BY trigger_name;
 
 -- 检查表结构

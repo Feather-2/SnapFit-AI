@@ -46,11 +46,11 @@ const expertRoles: ExpertRole[] = [
   {
     id: "general",
     name: "通用助手",
-    title: "SnapFit AI 健康助手",
+    title: "Snapifit AI 健康助手",
     description: "全方位健康管理助手，可以回答各种健康相关问题",
     icon: User,
     color: "bg-blue-500",
-    systemPrompt: `你是SnapFit AI，一位经验丰富的健康管理顾问。我拥有营养学、运动科学、行为心理学的综合知识背景。
+    systemPrompt: `你是Snapifit AI，一位经验丰富的健康管理顾问。我拥有营养学、运动科学、行为心理学的综合知识背景。
 
 我的使命是帮助用户实现健康目标，无论是减重、增肌、改善体能还是养成健康习惯。我会：
 
@@ -586,7 +586,7 @@ export default function ChatPage() {
             <span style="color: white; font-size: 20px;">${getExpertIcon(currentExpert.id)}</span>
           </div>
           <div>
-            <h1 style="font-size: 24px; font-weight: 700; margin: 0; color: #1f2937;">SnapFit AI</h1>
+            <h1 style="font-size: 24px; font-weight: 700; margin: 0; color: #1f2937;">Snapifit AI</h1>
             <p style="font-size: 14px; color: #6b7280; margin: 0;">${expertInfo.title} - 对话记录</p>
           </div>
         </div>
@@ -688,10 +688,10 @@ export default function ChatPage() {
       `
       logoSection.innerHTML = `
         <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-          <img src="/placeholder.svg" alt="SnapFit AI Logo" width="20" height="20" style="filter: brightness(0) invert(1);" />
+          <img src="/snapifit-pure.svg" alt="Snapifit AI Logo" width="20" height="20" style="filter: brightness(0) invert(1);" />
         </div>
         <div style="display: flex; flex-direction: column;">
-          <div style="font-weight: bold; font-size: 16px; background: linear-gradient(to right, #059669 0%, #047857 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">SnapFit AI</div>
+          <div style="font-weight: bold; font-size: 16px; background: linear-gradient(to right, #059669 0%, #047857 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Snapifit AI</div>
           <div style="font-size: 12px; color: #6b7280;">智能健康管理助手</div>
         </div>
       `
@@ -1213,10 +1213,10 @@ export default function ChatPage() {
       `
       logoSection.innerHTML = `
         <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-right: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-          <img src="/placeholder.svg" alt="SnapFit AI Logo" width="20" height="20" style="filter: brightness(0) invert(1);" />
+          <img src="/snapifit-pure.svg" alt="Snapifit AI Logo" width="20" height="20" style="filter: brightness(0) invert(1);" />
         </div>
         <div style="display: flex; flex-direction: column;">
-          <div style="font-weight: bold; font-size: 16px; background: linear-gradient(to right, #059669 0%, #047857 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">SnapFit AI</div>
+          <div style="font-weight: bold; font-size: 16px; background: linear-gradient(to right, #059669 0%, #047857 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Snapifit AI</div>
           <div style="font-size: 12px; color: #6b7280;">智能健康管理助手</div>
         </div>
       `
@@ -1932,7 +1932,7 @@ export default function ChatPage() {
                     <div className="flex items-center space-x-2">
                       <CardTitle className="text-base">{getExpertDisplayInfo(currentExpert).name}</CardTitle>
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                        SnapFit AI
+                        Snapifit AI
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">{getExpertDisplayInfo(currentExpert).title}</p>

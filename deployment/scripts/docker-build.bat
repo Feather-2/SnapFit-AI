@@ -1,8 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM SnapFit AI Docker 构建脚本 (Windows)
-echo 🚀 开始构建 SnapFit AI Docker 镜像...
+REM Snapifit AI Docker 构建脚本 (Windows)
+echo 🚀 开始构建 Snapifit AI Docker 镜像...
 
 REM 配置
 set IMAGE_NAME=snapfit-ai

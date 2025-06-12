@@ -1,4 +1,4 @@
-# SnapFit AI 数据库结构验证指南
+# Snapifit AI 数据库结构验证指南
 
 ## 验证步骤
 
@@ -12,7 +12,7 @@
 
 **必须存在的表：**
 - ✅ `users` - 用户账户表
-- ✅ `user_profiles` - 用户健康档案表  
+- ✅ `user_profiles` - 用户健康档案表
 - ✅ `shared_keys` - 共享API密钥表
 - ✅ `daily_logs` - 每日健康日志表
 - ✅ `ai_memories` - AI对话记忆表
@@ -50,7 +50,7 @@
 
 **外键约束：**
 - `user_profiles.user_id` → `users.id`
-- `shared_keys.user_id` → `users.id`  
+- `shared_keys.user_id` → `users.id`
 - `daily_logs.user_id` → `users.id`
 - `ai_memories.user_id` → `users.id`
 
@@ -67,7 +67,7 @@
 ```sql
 -- 用户表
 idx_users_linux_do_id
-idx_users_active  
+idx_users_active
 idx_users_trust_level
 
 -- 共享密钥表
@@ -108,7 +108,7 @@ idx_ai_memories_last_updated
 
 ```sql
 -- 如果需要修复，执行：
-ALTER TABLE users 
+ALTER TABLE users
 ALTER COLUMN created_at TYPE timestamp with time zone,
 ALTER COLUMN updated_at TYPE timestamp with time zone,
 ALTER COLUMN last_login_at TYPE timestamp with time zone;
@@ -175,7 +175,7 @@ DELETE FROM users WHERE linux_do_id = 'test123';
 当前的 `database/init.sql` 基本能够复刻 Supabase 数据库结构，但需要注意：
 
 1. **时间戳类型统一性**
-2. **缺失的 coach_snapshots 表**  
+2. **缺失的 coach_snapshots 表**
 3. **RLS 策略的正确配置**
 4. **扩展的安装顺序**
 

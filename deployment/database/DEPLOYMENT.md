@@ -1,8 +1,8 @@
-# SnapFit AI Database Deployment Guide
+# Snapifit AI Database Deployment Guide
 
 ## 📋 概述
 
-本指南提供了 SnapFit AI 数据库的完整部署步骤。数据库基于 2025-06-10 从 Supabase 生产环境导出的真实结构。
+本指南提供了 Snapifit AI 数据库的完整部署步骤。数据库基于 2025-06-10 从 Supabase 生产环境导出的真实结构。
 
 ## 📁 文件说明
 
@@ -253,7 +253,7 @@ PostgreSQL版本：15.x
 
 ## 🎉 部署完成
 
-部署成功后，您的 SnapFit AI 数据库将包含：
+部署成功后，您的 Snapifit AI 数据库将包含：
 
 - ✅ **完整的表结构**（6个表）
 - ✅ **所有业务逻辑函数**（18个函数）
@@ -261,4 +261,4 @@ PostgreSQL版本：15.x
 - ✅ **生产级索引和约束**
 - ✅ **可选的生产数据**
 
-数据库现在可以支持 SnapFit AI 应用的所有功能！
+数据库现在可以支持 Snapifit AI 应用的所有功能！

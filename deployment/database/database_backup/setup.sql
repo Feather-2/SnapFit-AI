@@ -1,17 +1,17 @@
--- SnapFit AI 数据库完整初始化脚本
+-- Snapifit AI 数据库完整初始化脚本
 -- 执行顺序：setup.sql -> init.sql -> functions.sql -> triggers.sql
 
 -- ========================================
 -- 1. 数据库信息
 -- ========================================
 \echo '========================================='
-\echo 'SnapFit AI Database Setup'
+\echo 'Snapifit AI Database Setup'
 \echo 'Version: 1.0.0'
 \echo 'Date: 2024-01-01'
 \echo '========================================='
 
 -- 显示当前数据库信息
-SELECT 
+SELECT
   current_database() as database_name,
   current_user as current_user,
   version() as postgresql_version;
@@ -93,40 +93,40 @@ INSERT INTO shared_keys (
 \echo '🔍 Final verification...'
 
 -- 检查表结构
-SELECT 
+SELECT
   schemaname,
   tablename,
   rowsecurity as rls_enabled
-FROM pg_tables 
+FROM pg_tables
 WHERE schemaname = 'public'
 ORDER BY tablename;
 
 -- 检查函数数量
-SELECT 
+SELECT
   COUNT(*) as function_count
-FROM information_schema.routines 
+FROM information_schema.routines
 WHERE routine_schema = 'public' AND routine_type = 'FUNCTION';
 
 -- 检查触发器数量
-SELECT 
+SELECT
   COUNT(*) as trigger_count
-FROM information_schema.triggers 
+FROM information_schema.triggers
 WHERE trigger_schema = 'public';
 
 -- 检查定时任务
-SELECT 
+SELECT
   jobname,
   schedule,
   command
-FROM cron.job 
+FROM cron.job
 WHERE jobname LIKE '%shared-keys%' OR jobname LIKE '%memory%';
 
 -- 检查权限设置
 SELECT DISTINCT
   grantee,
   COUNT(*) as permission_count
-FROM information_schema.table_privileges 
-WHERE table_schema = 'public' 
+FROM information_schema.table_privileges
+WHERE table_schema = 'public'
   AND grantee IN ('anon', 'authenticated', 'service_role')
 GROUP BY grantee
 ORDER BY grantee;

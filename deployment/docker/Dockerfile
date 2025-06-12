@@ -1,4 +1,4 @@
-# 多阶段构建 Dockerfile for SnapFit AI Health App
+# 多阶段构建 Dockerfile for Snapifit AI Health App
 
 # 阶段1: 依赖安装
 FROM node:20-alpine AS deps

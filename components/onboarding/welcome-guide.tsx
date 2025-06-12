@@ -30,7 +30,7 @@ export function WelcomeGuide({ isOpen, onClose }: WelcomeGuideProps) {
   const steps = [
     {
       icon: <Heart className="w-8 h-8 text-red-500" />,
-      title: "欢迎来到 SnapFit AI 社区版",
+      title: "欢迎来到 Snapifit AI 社区版",
       content: "这是一个为L站（Linux.do）设计的特殊版本，佬可以在此记录您的健康数据，获得智能建议。佬们的团课赛博私教。",
       highlight: "专为Linux.do社区定制"
     },

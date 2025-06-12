@@ -1,7 +1,7 @@
--- SnapFit AI Production Database Schema
+-- Snapifit AI Production Database Schema
 -- Exported from Supabase production environment on 2025-06-10
 -- Project: vdjnnaunrtjhfnpuarrw
--- 
+--
 -- This file contains the complete production database structure including:
 -- - 18 functions (all business logic)
 -- - 4 triggers (automatic timestamp updates)
@@ -10,7 +10,7 @@
 --
 -- Statistics:
 -- - Functions: 18 个
--- - Triggers: 4 个  
+-- - Triggers: 4 个
 -- - Tables: 6 个
 -- - Schema file size: 50KB
 --

@@ -1,4 +1,4 @@
--- SnapFit AI 安全系统独立部署脚本
+-- Snapifit AI 安全系统独立部署脚本
 -- 仅部署安全相关功能，适用于现有数据库升级
 --
 -- 使用方法：
@@ -7,7 +7,7 @@
 -- 注意：此脚本会备份现有的 security_events 表数据
 
 -- =========================================
--- SnapFit AI Security System Deployment
+-- Snapifit AI Security System Deployment
 -- Version: 1.0.0
 -- Date: 2025-01-01
 -- =========================================
@@ -146,7 +146,7 @@ BEGIN
 END $$;
 
 -- =========================================
--- 🎉 SnapFit AI Security System deployment completed successfully!
+-- 🎉 Snapifit AI Security System deployment completed successfully!
 --
 -- 📋 Deployment summary:
 --   ✅ Enhanced security_events table
@@ -168,5 +168,5 @@ END $$;
 --   3. Test the IP ban functionality
 --   4. Configure monitoring and alerts
 --
--- 🚀 Your SnapFit AI security system is ready!
+-- 🚀 Your Snapifit AI security system is ready!
 -- =========================================

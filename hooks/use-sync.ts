@@ -308,16 +308,42 @@ export const useSync = () => {
           return filteredLog;
         });
 
+        console.log(`[Sync] About to save ${filteredLogs.length} filtered logs to IndexedDB...`);
+        console.log(`[Sync] Filtered logs summary:`, filteredLogs.map(log => ({
+          date: log.date,
+          foodEntries: log.foodEntries?.length || 0,
+          exerciseEntries: log.exerciseEntries?.length || 0,
+          last_modified: log.last_modified
+        })));
+
         await batchSave(filteredLogs);
         console.log(`[Sync] Successfully saved logs to IndexedDB (with deleted entries filtered)`);
+
+        // 🔍 验证数据是否真的保存了
+        console.log(`[Sync] Verifying saved data...`);
+        for (const log of filteredLogs) {
+          try {
+            const savedLog = await getData(log.date);
+            if (savedLog) {
+              console.log(`[Sync] Verified data for ${log.date}: food=${savedLog.foodEntries?.length || 0}, exercise=${savedLog.exerciseEntries?.length || 0}`);
+            } else {
+              console.error(`[Sync] Failed to verify data for ${log.date}: no data found after save!`);
+            }
+          } catch (verifyError) {
+            console.error(`[Sync] Failed to verify data for ${log.date}:`, verifyError);
+          }
+        }
 
         // 🔄 触发数据刷新事件，确保UI及时更新
         const updatedDates = new Set(logsToUpdate.map(log => log.date));
         updatedDates.forEach(date => {
-          console.log(`[Sync] Triggering UI refresh for date: ${date}`);
-          window.dispatchEvent(new CustomEvent('forceDataRefresh', {
-            detail: { date, source: 'cloudSync' }
-          }));
+          console.log(`[Sync] Scheduling UI refresh for date: ${date}`);
+          // 使用 setTimeout 0，确保组件已完成 useEffect 挂载后再触发事件，避免事件丢失
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('forceDataRefresh', {
+              detail: { date, source: 'cloudSync' }
+            }));
+          }, 0);
         });
 
         // 只在手动同步时显示toast，完整同步时静默处理
@@ -629,7 +655,9 @@ export const useSync = () => {
       console.log(`[Sync] Successfully removed ${entryType} entry ${logId} using logical deletion`);
 
       // 🔄 触发UI刷新以反映删除操作
-      window.dispatchEvent(new CustomEvent('forceDataRefresh', { detail: { date } }));
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('forceDataRefresh', { detail: { date } }));
+      }, 0);
 
     } catch (error) {
       console.error('[Sync] Remove entry error:', error);
@@ -641,7 +669,9 @@ export const useSync = () => {
           await saveData(date, originalLog);
 
           // 触发UI刷新以显示回滚后的数据
-          window.dispatchEvent(new CustomEvent('forceDataRefresh', { detail: { date } }));
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('forceDataRefresh', { detail: { date } }));
+          }, 0);
 
           console.log(`[Sync] Successfully rolled back local changes`);
         } catch (rollbackError) {

@@ -1,6 +1,6 @@
-# SnapFit AI 部署指南
+# Snapifit AI 部署指南
 
-本目录包含了 SnapFit AI 项目的所有部署相关文件和脚本。
+本目录包含了 Snapifit AI 项目的所有部署相关文件和脚本。
 
 ## 目录结构
 
@@ -103,5 +103,5 @@ deployment/
 
 ## 更多信息
 
-- 项目主页：[SnapFit AI](https://github.com/your-repo/snapfit-ai)
+- 项目主页：[Snapifit AI](https://github.com/your-repo/snapfit-ai)
 - 问题反馈：[Issues](https://github.com/your-repo/snapfit-ai/issues)

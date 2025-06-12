@@ -1,11 +1,11 @@
-# SnapFit AI Makefile
+# Snapifit AI Makefile
 # 简化 Docker 操作的快捷命令
 
 .PHONY: help build up down logs restart clean dev prod health
 
 # 默认目标
 help:
-	@echo "SnapFit AI Docker 管理命令:"
+	@echo "Snapifit AI Docker 管理命令:"
 	@echo ""
 	@echo "  build     - 构建 Docker 镜像"
 	@echo "  dev       - 启动开发环境"

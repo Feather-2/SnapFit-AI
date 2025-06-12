@@ -1,7 +1,7 @@
--- SnapFit AI Database Schema-Only Deployment
+-- Snapifit AI Database Schema-Only Deployment
 -- Version: 2.0.0 (Production Export)
 -- Date: 2025-06-10
--- 
+--
 -- This script deploys only the database structure without data
 -- Ideal for development environments or fresh installations
 --
@@ -10,7 +10,7 @@
 --   psql -d snapfit_ai_dev -f database/deploy_schema_only.sql
 
 \echo '========================================='
-\echo 'SnapFit AI Schema-Only Deployment'
+\echo 'Snapifit AI Schema-Only Deployment'
 \echo 'Version: 2.0.0 (Production Export)'
 \echo 'Date: 2025-06-10'
 \echo '========================================='
@@ -18,7 +18,7 @@
 -- Check database connection
 \echo ''
 \echo '🔍 Checking database connection...'
-SELECT 
+SELECT
   current_database() as database_name,
   current_user as current_user,
   version() as postgresql_version,
@@ -44,26 +44,26 @@ SELECT
 -- Count objects
 \echo ''
 \echo '📋 Database objects summary:'
-SELECT 
+SELECT
   'Tables' as object_type,
   COUNT(*) as count
-FROM information_schema.tables 
+FROM information_schema.tables
 WHERE table_schema = 'public'
 
 UNION ALL
 
-SELECT 
+SELECT
   'Functions' as object_type,
   COUNT(*) as count
-FROM information_schema.routines 
+FROM information_schema.routines
 WHERE routine_schema = 'public' AND routine_type = 'FUNCTION'
 
 UNION ALL
 
-SELECT 
+SELECT
   'Triggers' as object_type,
   COUNT(*) as count
-FROM information_schema.triggers 
+FROM information_schema.triggers
 WHERE trigger_schema = 'public'
 
 ORDER BY object_type;
@@ -71,20 +71,20 @@ ORDER BY object_type;
 -- List all tables
 \echo ''
 \echo '📋 Tables created:'
-SELECT 
+SELECT
   tablename as table_name,
   tableowner as owner
-FROM pg_tables 
+FROM pg_tables
 WHERE schemaname = 'public'
 ORDER BY tablename;
 
 -- List all functions
 \echo ''
 \echo '📋 Functions created:'
-SELECT 
+SELECT
   routine_name as function_name,
   data_type as return_type
-FROM information_schema.routines 
+FROM information_schema.routines
 WHERE routine_schema = 'public' AND routine_type = 'FUNCTION'
 ORDER BY routine_name;
 
@@ -97,43 +97,43 @@ DECLARE
     func_count INTEGER;
 BEGIN
     -- Check atomic_usage_check_and_increment
-    SELECT COUNT(*) INTO func_count 
-    FROM information_schema.routines 
+    SELECT COUNT(*) INTO func_count
+    FROM information_schema.routines
     WHERE routine_name = 'atomic_usage_check_and_increment' AND routine_schema = 'public';
-    
+
     IF func_count > 0 THEN
         RAISE NOTICE '✅ atomic_usage_check_and_increment (Usage control)';
     ELSE
         RAISE NOTICE '❌ atomic_usage_check_and_increment (MISSING)';
     END IF;
-    
+
     -- Check upsert_log_patch
-    SELECT COUNT(*) INTO func_count 
-    FROM information_schema.routines 
+    SELECT COUNT(*) INTO func_count
+    FROM information_schema.routines
     WHERE routine_name = 'upsert_log_patch' AND routine_schema = 'public';
-    
+
     IF func_count > 0 THEN
         RAISE NOTICE '✅ upsert_log_patch (Optimistic locking)';
     ELSE
         RAISE NOTICE '❌ upsert_log_patch (MISSING)';
     END IF;
-    
+
     -- Check jsonb_deep_merge
-    SELECT COUNT(*) INTO func_count 
-    FROM information_schema.routines 
+    SELECT COUNT(*) INTO func_count
+    FROM information_schema.routines
     WHERE routine_name = 'jsonb_deep_merge' AND routine_schema = 'public';
-    
+
     IF func_count > 0 THEN
         RAISE NOTICE '✅ jsonb_deep_merge (JSON utilities)';
     ELSE
         RAISE NOTICE '❌ jsonb_deep_merge (MISSING)';
     END IF;
-    
+
     -- Check get_user_profile
-    SELECT COUNT(*) INTO func_count 
-    FROM information_schema.routines 
+    SELECT COUNT(*) INTO func_count
+    FROM information_schema.routines
     WHERE routine_name = 'get_user_profile' AND routine_schema = 'public';
-    
+
     IF func_count > 0 THEN
         RAISE NOTICE '✅ get_user_profile (User management)';
     ELSE
@@ -149,7 +149,7 @@ DECLARE
     table_name TEXT;
     row_count INTEGER;
 BEGIN
-    FOR table_name IN 
+    FOR table_name IN
         SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename
     LOOP
         EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO row_count;
@@ -158,7 +158,7 @@ BEGIN
 END $$;
 
 \echo ''
-\echo '🎉 SnapFit AI Schema deployment completed successfully!'
+\echo '🎉 Snapifit AI Schema deployment completed successfully!'
 \echo ''
 \echo '📋 Deployment summary:'
 \echo '  ✅ Database structure deployed'
@@ -166,5 +166,5 @@ END $$;
 \echo '  ✅ Tables created (empty)'
 \echo '  ✅ All constraints and indexes created'
 \echo ''
-\echo '🚀 Your SnapFit AI database schema is ready!'
+\echo '🚀 Your Snapifit AI database schema is ready!'
 \echo '💡 To add data later, run: psql -d your_database -f database/data.sql'

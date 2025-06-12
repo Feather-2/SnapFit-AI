@@ -313,7 +313,32 @@ export async function POST(req: Request) {
       preferPrivate: !isSharedMode // 私有模式优先使用私有配置
     })
 
-    // 准备数据摘要（与原版相同）
+    // 计算 BMI 和体重变化预测
+    const heightCm = userProfile?.height;
+    const currentWeight = dailyLog.weight ?? userProfile?.weight;
+
+    let bmi: number | undefined = undefined;
+    if (heightCm && currentWeight) {
+      const h = heightCm / 100;
+      bmi = currentWeight / (h * h);
+    }
+
+    // 体重变化预测（基于当前热量差距，按每日差值推算）
+    let weightChangePrediction: { dailyCalorieDiff: number; weeklyKg: number; monthlyKg: number } | undefined;
+    const totalIn = (dailyLog.summary.totalCaloriesConsumed ?? dailyLog.summary.totalCalories) || 0;
+    const totalOut = (dailyLog.summary.totalCaloriesBurned ?? dailyLog.summary.totalExerciseCalories) || 0;
+    const netCalories = totalIn - totalOut;
+    if (dailyLog.calculatedTDEE) {
+      const dailyCalorieDiff = netCalories - dailyLog.calculatedTDEE; // 正值=盈余，负值=缺口
+      const kgPerKcal = 1 / 7700; // 7700 kcal ≈ 1kg 脂肪
+      weightChangePrediction = {
+        dailyCalorieDiff,
+        weeklyKg: -(dailyCalorieDiff * 7 * kgPerKcal),
+        monthlyKg: -(dailyCalorieDiff * 30 * kgPerKcal)
+      };
+    }
+
+    // 准备数据摘要，加入 BMI 与体重变化预测
     const dataSummary = {
       today: {
         date: dailyLog.date,
@@ -326,6 +351,8 @@ export async function POST(req: Request) {
         bmr: dailyLog.calculatedBMR,
         tdee: dailyLog.calculatedTDEE,
         tefAnalysis: dailyLog.tefAnalysis,
+        bmi,
+        weightChangePrediction,
         foodEntries: dailyLog.foodEntries.map((entry: any) => ({
           name: entry.food_name,
           mealType: entry.meal_type,

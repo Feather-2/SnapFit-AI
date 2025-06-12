@@ -28,7 +28,8 @@
     "required": "Required",
     "yes": "Yes",
     "no": "No",
-    "blockedDomain": "Blocked Domain"
+    "blockedDomain": "Blocked Domain",
+    "days": "days"
   },
   "navigation": {
     "home": "Home",
@@ -78,7 +79,7 @@
     }
   },
   "app": {
-    "title": "SnapFit AI",
+    "title": "Snapifit AI",
     "subtitle": "Smart Health Management Assistant",
     "description": "Your personal health management and nutrition analysis assistant"
   },
@@ -139,6 +140,13 @@
     "validation": {
       "invalidWeight": "Invalid Weight",
       "invalidWeightDesc": "Please enter a valid positive number for weight."
+    },
+    "tef": {
+      "generateSuccessTitle": "Analysis Completed",
+      "generateSuccessDescription": "Thermic Effect of Food analysis generated successfully",
+      "noFoodTitle": "No Food Records",
+      "noFoodDescription": "Please add food records before generating TEF analysis",
+      "generateFailedTitle": "Analysis Failed"
     },
     "handleSaveDailyWeight": {
       "success": {
@@ -312,8 +320,8 @@
       "demoDataNote": "Currently showing demo data",
       "weight": "Weight",
       "calories": "Calories",
-      "exercise": "Exercise Burn",
-      "deficit": "Calorie Deficit",
+      "exercise": "Exercise",
+      "deficit": "Deficit",
       "caloriesIn": "Calories In",
       "caloriesOut": "Exercise Burn",
       "calorieDeficit": "Calorie Deficit",
@@ -343,6 +351,51 @@
       "protein": "Protein",
       "fat": "Fat",
       "micronutrients": "Key Micronutrients",
+      "bmi": {
+        "title": "BMI Index",
+        "value": "BMI Value",
+        "categories": {
+          "underweight": "Underweight",
+          "normal": "Normal",
+          "overweight": "Overweight",
+          "obese1": "Obese I",
+          "obese2": "Obese II",
+          "obese3": "Obese III"
+        },
+        "description": "BMI is a common indicator for assessing weight status, for reference only.",
+        "here": "You are here",
+        "guideTitle": "Health Advice",
+        "guides": {
+          "underweight": "Maintain a balanced diet, increase calorie intake appropriately, and engage in strength training.",
+          "normal": "Continue a healthy diet and regular exercise to maintain overall well-being.",
+          "overweight": "Consider reducing calorie intake and increasing both cardio and strength training to gradually reduce fat.",
+          "obese1": "Consult healthcare professionals to develop a weight-loss plan and keep exercising.",
+          "obese2": "High obesity risk, seek medical advice promptly and manage weight under professional supervision.",
+          "obese3": "Severe obesity, comprehensive intervention and monitoring of complications under medical guidance are necessary."
+        }
+      },
+      "weightPredictor": {
+        "title": "Weight Change Prediction",
+        "trend": {
+          "gain": "Expected Weight Gain",
+          "loss": "Expected Weight Loss",
+          "maintain": "Maintain Weight"
+        },
+        "surplus": "Calorie Surplus",
+        "deficit": "Calorie Deficit",
+        "balanced": "Calorie Balance",
+        "predictions": "Predicted Changes",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "goalWeight": "Goal Weight",
+        "difference": "Difference",
+        "estimatedTime": "Estimated Time",
+        "alreadyAchieved": "You have reached or exceeded your goal weight, please review your plan!",
+        "directionMismatch": "Current calorie trend cannot reach the goal weight in this direction",
+        "balancedDescription": "Current calorie intake and expenditure are balanced, weight is expected to remain stable.",
+        "description": "Weight change predictions based on calorie deficit/surplus, actual results may vary due to individual differences."
+      },
       "tef": {
         "title": "TEF (Thermic Effect of Food)",
         "enhancementFactors": "Enhancement Factors",
@@ -357,6 +410,16 @@
         "enhancementFactorsLabel": "Enhancement Factors:",
         "analyzing": "Analyzing",
         "analyzingDescription": "Analyzing your meals to calculate personalized TEF...",
+        "analyzingLabel": "Analyzing {seconds}s",
+        "generate": "Generate Analysis",
+        "regenerate": "Regenerate",
+        "generating": "Generating…",
+        "noAnalysis": "No TEF analysis yet",
+        "generateSuccessTitle": "Analysis Completed",
+        "generateSuccessDescription": "Thermic Effect of Food analysis generated successfully",
+        "noFoodTitle": "No Food Records",
+        "noFoodDescription": "Please add food records before generating TEF analysis",
+        "generateFailedTitle": "Analysis Failed",
         "remainingTime": "{seconds} seconds remaining",
         "description": "TEF is the additional energy required to digest and metabolize food, {analyzed, select, true {personalized calculation based on AI analysis of your meals} other {will be automatically analyzed once food records are stable}}."
       }
@@ -532,7 +595,7 @@
     "title": "AI Chat",
     "subtitle": "Chat with AI Health Assistant",
     "expertDescriptions": {
-      "general": "SnapFit AI Health Assistant",
+      "general": "Snapifit AI Health Assistant",
       "nutrition": "Registered Dietitian (RD)",
       "exercise": "SF Certified Exercise Physiologist",
       "metabolism": "Endocrine Metabolism Specialist",
@@ -558,10 +621,10 @@
     "experts": {
       "general": {
         "name": "General Assistant",
-        "title": "SnapFit AI Health Assistant",
+        "title": "Snapifit AI Health Assistant",
         "description": "Comprehensive health management assistant that can answer various health-related questions",
         "welcomeMessage": {
-          "title": "Welcome to SnapFit AI",
+          "title": "Welcome to Snapifit AI",
           "subtitle": "Your comprehensive health consultant for nutrition, exercise, metabolism and wellness",
           "features": [
             "🎯 Analyze your health data",
@@ -648,7 +711,7 @@
       }
     },
     "systemPrompts": {
-      "general": "You are SnapFit AI, an experienced health management consultant. I have comprehensive knowledge in nutrition, exercise science, and behavioral psychology.\n\nMy mission is to help users achieve their health goals, whether it's weight loss, muscle building, fitness improvement, or developing healthy habits. I will:\n\n🎯 **My Expertise**:\n- Comprehensive analysis of users' nutrition, exercise, and metabolic data\n- Provide balanced and practical health advice\n- Help develop sustainable health plans\n- Answer various health questions\n\n💬 **My Communication Style**:\n- Communicate with users in a gentle and encouraging tone\n- Explain complex health knowledge in simple and understandable ways\n- Provide personalized advice based on users' actual data\n- Always prioritize users' health and safety\n\nPlease tell me your health concerns or goals, and I will provide the most suitable advice based on your data!"
+      "general": "You are Snapifit AI, an experienced health management consultant. I have comprehensive knowledge in nutrition, exercise science, and behavioral psychology.\n\nMy mission is to help users achieve their health goals, whether it's weight loss, muscle building, fitness improvement, or developing healthy habits. I will:\n\n🎯 **My Expertise**:\n- Comprehensive analysis of users' nutrition, exercise, and metabolic data\n- Provide balanced and practical health advice\n- Help develop sustainable health plans\n- Answer various health questions\n\n💬 **My Communication Style**:\n- Communicate with users in a gentle and encouraging tone\n- Explain complex health knowledge in simple and understandable ways\n- Provide personalized advice based on users' actual data\n- Always prioritize users' health and safety\n\nPlease tell me your health concerns or goals, and I will provide the most suitable advice based on your data!"
     },
     "suggestions": {
       "categories": {
@@ -836,7 +899,7 @@
       "usage4": "Set your model parameters on the AI configuration page",
       "usage5": "Regularly export your data to prevent data loss",
       "versionTitle": "Version Information",
-      "versionInfo": "SnapFit AI Community Edition"
+      "versionInfo": "Snapifit AI Community Edition"
     },
     "ai": {
       "title": "AI Configuration",

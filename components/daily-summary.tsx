@@ -2,11 +2,13 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import type { DailySummaryType, TEFAnalysis } from "@/lib/types"
+import type { DailySummaryType, TEFAnalysis, UserProfile } from "@/lib/types"
 import { Utensils, Flame, Sigma, Calculator, BedDouble, Target, TrendingUp, TrendingDown, Minus, PieChart, Info, Sparkles, Brain, Zap, ExternalLink } from "lucide-react"
 import { useTranslation } from "@/hooks/use-i18n"
 import Link from "next/link"
 import ClientOnly from "@/components/client-only"
+import { BMIIndicator } from "@/components/bmi-indicator"
+import { WeightChangePredictor } from "@/components/weight-change-predictor"
 
 interface DailySummaryProps {
   summary: DailySummaryType
@@ -15,6 +17,10 @@ interface DailySummaryProps {
   tefAnalysis?: TEFAnalysis
   tefAnalysisCountdown?: number
   selectedDate?: Date
+  onGenerateTEF?: () => void
+  isGeneratingTEF?: boolean
+  userProfile?: UserProfile
+  currentWeight?: number
 }
 
 const defaultSummary: DailySummaryType = {
@@ -24,7 +30,14 @@ const defaultSummary: DailySummaryType = {
   micronutrients: {},
 };
 
-export function DailySummary({ summary = defaultSummary, calculatedBMR, calculatedTDEE, tefAnalysis, tefAnalysisCountdown, selectedDate }: DailySummaryProps) {
+// ▶️ 宏量营养素推荐区间 (占总能量百分比)
+const MACRO_RANGES = {
+  carbs: { min: 45, max: 65 },    // 碳水化合物 45-65 %
+  protein: { min: 10, max: 35 },  // 蛋白质 10-35 %
+  fat: { min: 20, max: 35 },      // 脂肪 20-35 %
+}
+
+export function DailySummary({ summary = defaultSummary, calculatedBMR, calculatedTDEE, tefAnalysis, tefAnalysisCountdown, selectedDate, onGenerateTEF, isGeneratingTEF, userProfile, currentWeight }: DailySummaryProps) {
   const t = useTranslation('dashboard.summary')
   const tSummary = useTranslation('summary')
   const { totalCaloriesConsumed, totalCaloriesBurned, macros } = summary
@@ -34,6 +47,11 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
   const carbsPercent = totalMacros > 0 ? (macros.carbs / totalMacros) * 100 : 0
   const proteinPercent = totalMacros > 0 ? (macros.protein / totalMacros) * 100 : 0
   const fatPercent = totalMacros > 0 ? (macros.fat / totalMacros) * 100 : 0
+
+  // 新增：计算每个宏量营养素是否低于下限或高于上限
+  const carbsStatus = carbsPercent < MACRO_RANGES.carbs.min ? 'low' : carbsPercent > MACRO_RANGES.carbs.max ? 'high' : 'ok'
+  const proteinStatus = proteinPercent < MACRO_RANGES.protein.min ? 'low' : proteinPercent > MACRO_RANGES.protein.max ? 'high' : 'ok'
+  const fatStatus = fatPercent < MACRO_RANGES.fat.min ? 'low' : fatPercent > MACRO_RANGES.fat.max ? 'high' : 'ok'
 
   // 计算净卡路里
   const netCalories = totalCaloriesConsumed - totalCaloriesBurned
@@ -59,15 +77,15 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
   return (
     <ClientOnly>
       <div className="health-card h-full flex flex-col">
-        <div className="p-8">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
-                <Sparkles className="h-6 w-6" />
+        <div className="p-4 md:p-8">
+          <div className="flex items-center justify-between mb-6 md:mb-8">
+            <div className="flex items-center space-x-3 md:space-x-4">
+              <div className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-xl bg-primary text-white">
+                <Sparkles className="h-5 w-5 md:h-6 md:w-6" />
               </div>
               <div>
-                <h3 className="text-2xl font-semibold">{t('title')}</h3>
-                <p className="text-muted-foreground text-lg">{t('description')}</p>
+                <h3 className="text-xl md:text-2xl font-semibold">{t('title')}</h3>
+                <p className="text-muted-foreground text-sm md:text-lg">{t('description')}</p>
               </div>
             </div>
             <Link href={selectedDate ? `/summary?date=${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}` : "/summary"}>
@@ -145,21 +163,43 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
             </div>
           )}
 
-          {/* TEF 分析 */}
-          {(tefAnalysis || (tefAnalysisCountdown && tefAnalysisCountdown > 0)) && (
-            <div className="space-y-3 pt-4 border-t">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium flex items-center">
-                  <Zap className="mr-2 h-4 w-4 text-primary" />
-                  {t('tef.title')}
-                </h4>
-                {tefAnalysisCountdown && tefAnalysisCountdown > 0 && (
+          {/* TEF 分析（始终显示，支持手动触发） */}
+          <div className="space-y-3 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium flex items-center">
+                <Zap className="mr-2 h-4 w-4 text-primary" />
+                {t('tef.title')}
+              </h4>
+              <div className="flex items-center gap-2">
+                {(tefAnalysisCountdown ?? 0) > 0 && (
                   <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full dark:bg-blue-900/30 dark:text-blue-300">
-                    分析中 {tefAnalysisCountdown}s
+                    {t('tef.analyzingLabel', { seconds: tefAnalysisCountdown }) || `分析中 ${tefAnalysisCountdown}s`}
                   </span>
                 )}
+                {onGenerateTEF && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onGenerateTEF}
+                    disabled={isGeneratingTEF || (tefAnalysisCountdown ?? 0) > 0}
+                    className="h-7 px-3 text-xs"
+                  >
+                    {isGeneratingTEF ? t('tef.generating') || '生成中…' : (tefAnalysis ? t('tef.regenerate') || '重新分析' : t('tef.generate') || '生成分析')}
+                  </Button>
+                )}
               </div>
-              {tefAnalysis && (
+            </div>
+
+            {/* 若无分析结果且未在生成中，显示提示 */}
+            {!tefAnalysis && (tefAnalysisCountdown ?? 0) === 0 && !isGeneratingTEF && (
+              <p className="text-xs text-muted-foreground">
+                {t('tef.noAnalysis') || '尚未生成 TEF 分析'}
+              </p>
+            )}
+
+            {/* 以下内容仅在已有分析结果时显示 */}
+            {tefAnalysis && (
+              <>
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
                     <div className="flex items-center justify-center mb-1">
@@ -202,42 +242,30 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                     </div>
                   )}
                 </div>
-              )}
 
-              {tefAnalysis && tefAnalysis.enhancementFactors.length > 0 && (
-                <div className="pt-1">
-                  <p className="text-xs text-muted-foreground mb-1">{t('tef.enhancementFactorsLabel')}</p>
-                  <div className="flex flex-wrap gap-1">
-                    {tefAnalysis.enhancementFactors.map((factor, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                      >
-                        {factor}
-                      </span>
-                    ))}
+                {tefAnalysis.enhancementFactors.length > 0 && (
+                  <div className="pt-1">
+                    <p className="text-xs text-muted-foreground mb-1">{t('tef.enhancementFactorsLabel')}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {tefAnalysis.enhancementFactors.map((factor, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                        >
+                          {factor}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-              {!tefAnalysis && tefAnalysisCountdown && tefAnalysisCountdown > 0 && (
-                <div className="flex items-center justify-center py-4">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                    <p className="text-sm text-muted-foreground">
-                      {t('tef.analyzingDescription')}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t('tef.remainingTime', { seconds: tefAnalysisCountdown })}
-                    </p>
-                  </div>
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground pt-2 flex items-start">
-                <Info className="mr-1.5 h-3 w-3 flex-shrink-0 mt-0.5" />
-                <span>{t('tef.description', { analyzed: tefAnalysis ? 'true' : 'other' })}</span>
-              </p>
-            </div>
-          )}
+                )}
+              </>
+            )}
+
+            <p className="text-xs text-muted-foreground pt-2 flex items-start">
+              <Info className="mr-1.5 h-3 w-3 flex-shrink-0 mt-0.5" />
+              <span>{t('tef.description', { analyzed: tefAnalysis ? 'true' : 'other' })}</span>
+            </p>
+          </div>
 
           {/* 宏量营养素分布 */}
           {totalMacros > 0 && (
@@ -250,10 +278,22 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                   <span className="text-xs">{t('carbohydrates')}</span>
                   <span className="text-xs">
                     {macros.carbs.toFixed(1)}g ({carbsPercent.toFixed(0)}%)
+                    {carbsStatus === 'low' && (
+                      <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.carbs.min}%</span>
+                    )}
+                    {carbsStatus === 'high' && (
+                      <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.carbs.max}%</span>
+                    )}
                   </span>
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-sky-500 rounded-full" style={{ width: `${carbsPercent}%` }} />
+                <div className="h-2 bg-muted rounded-full overflow-hidden relative">
+                  {/* 推荐区间浅色背景 */}
+                  <div
+                    className="absolute top-0 h-full bg-sky-500/20 dark:bg-sky-600/20"
+                    style={{ left: `${MACRO_RANGES.carbs.min}%`, width: `${MACRO_RANGES.carbs.max - MACRO_RANGES.carbs.min}%` }}
+                  />
+                  {/* 实际摄入 */}
+                  <div className="h-full bg-sky-500 rounded-full relative" style={{ width: `${carbsPercent}%` }} />
                 </div>
               </div>
 
@@ -263,10 +303,20 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                   <span className="text-xs">{t('protein')}</span>
                   <span className="text-xs">
                     {macros.protein.toFixed(1)}g ({proteinPercent.toFixed(0)}%)
+                    {proteinStatus === 'low' && (
+                      <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.protein.min}%</span>
+                    )}
+                    {proteinStatus === 'high' && (
+                      <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.protein.max}%</span>
+                    )}
                   </span>
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${proteinPercent}%` }} />
+                <div className="h-2 bg-muted rounded-full overflow-hidden relative">
+                  <div
+                    className="absolute top-0 h-full bg-emerald-500/20 dark:bg-emerald-600/20"
+                    style={{ left: `${MACRO_RANGES.protein.min}%`, width: `${MACRO_RANGES.protein.max - MACRO_RANGES.protein.min}%` }}
+                  />
+                  <div className="h-full bg-emerald-500 rounded-full relative" style={{ width: `${proteinPercent}%` }} />
                 </div>
               </div>
 
@@ -276,12 +326,43 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                   <span className="text-xs">{t('fat')}</span>
                   <span className="text-xs">
                     {macros.fat.toFixed(1)}g ({fatPercent.toFixed(0)}%)
+                    {fatStatus === 'low' && (
+                      <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.fat.min}%</span>
+                    )}
+                    {fatStatus === 'high' && (
+                      <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.fat.max}%</span>
+                    )}
                   </span>
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-500 rounded-full" style={{ width: `${fatPercent}%` }} />
+                <div className="h-2 bg-muted rounded-full overflow-hidden relative">
+                  <div
+                    className="absolute top-0 h-full bg-amber-500/20 dark:bg-amber-600/20"
+                    style={{ left: `${MACRO_RANGES.fat.min}%`, width: `${MACRO_RANGES.fat.max - MACRO_RANGES.fat.min}%` }}
+                  />
+                  <div className="h-full bg-amber-500 rounded-full relative" style={{ width: `${fatPercent}%` }} />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* BMI指示器 */}
+          {userProfile && currentWeight && userProfile.height && (
+            <div className="space-y-3 pt-4 border-t">
+              <BMIIndicator
+                weight={currentWeight}
+                height={userProfile.height}
+              />
+            </div>
+          )}
+
+          {/* 体重变化预测 */}
+          {calorieDifference !== null && Math.abs(calorieDifference) > 0 && (
+            <div className="space-y-3 pt-4 border-t">
+              <WeightChangePredictor
+                calorieDifference={calorieDifference}
+                currentWeight={currentWeight}
+                targetWeight={userProfile?.targetWeight}
+              />
             </div>
           )}
 

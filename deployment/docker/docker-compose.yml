@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # SnapFit AI 应用
+  # Snapifit AI 应用
   snapfit-ai:
     build:
       context: .

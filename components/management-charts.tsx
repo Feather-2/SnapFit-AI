@@ -264,14 +264,14 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
   if (isLoading) {
     return (
       <div className="health-card">
-        <div className="p-8">
-          <div className="flex items-center space-x-4 mb-8">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
-              <TrendingUp className="h-6 w-6" />
+        <div className="p-4 md:p-8">
+          <div className="flex items-center space-x-3 md:space-x-4 mb-6 md:mb-8">
+            <div className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-xl bg-primary text-white">
+              <TrendingUp className="h-5 w-5 md:h-6 md:w-6" />
             </div>
             <div>
-              <h3 className="text-2xl font-semibold">{t('title')}</h3>
-              <p className="text-muted-foreground text-lg">{t('description', { days: '30日' })}</p>
+              <h3 className="text-xl md:text-2xl font-semibold">{t('title')}</h3>
+              <p className="text-muted-foreground text-sm md:text-lg">{t('description', { days: '30日' })}</p>
             </div>
           </div>
           <div className="text-center py-16">
@@ -284,14 +284,14 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
 
   return (
     <div className="health-card">
-      <div className="p-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
-              <TrendingUp className="h-6 w-6" />
+      <div className="p-4 md:p-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 md:gap-6 mb-6 md:mb-8">
+          <div className="flex items-center space-x-3 md:space-x-4">
+            <div className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-xl bg-primary text-white">
+              <TrendingUp className="h-5 w-5 md:h-6 md:w-6" />
             </div>
             <div>
-              <h3 className="text-2xl font-semibold">{t('title')}</h3>
+              <h3 className="text-xl md:text-2xl font-semibold">{t('title')}</h3>
               <p className="text-muted-foreground text-lg">
                 {isUsingMockData
                   ? t('demoDescription')
@@ -327,21 +327,21 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
 
         <Tabs defaultValue="weight" className="w-full">
           <TabsList className="grid w-full grid-cols-4 h-14">
-            <TabsTrigger value="weight" className="text-base py-4 px-4">
-              <Weight className="mr-2 h-4 w-4" />
-              {t('weight')}
+            <TabsTrigger value="weight" className="text-sm md:text-base py-3 px-2 md:px-4 flex items-center justify-center min-w-0">
+              <Weight className="mr-1 md:mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{t('weight')}</span>
             </TabsTrigger>
-            <TabsTrigger value="calories" className="text-base py-4 px-4">
-              <Utensils className="mr-2 h-4 w-4" />
-              {t('calories')}
+            <TabsTrigger value="calories" className="text-sm md:text-base py-3 px-2 md:px-4 flex items-center justify-center min-w-0">
+              <Utensils className="mr-1 md:mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{t('calories')}</span>
             </TabsTrigger>
-            <TabsTrigger value="exercise" className="text-base py-4 px-4">
-              <Dumbbell className="mr-2 h-4 w-4" />
-              {t('exercise')}
+            <TabsTrigger value="exercise" className="text-sm md:text-base py-3 px-2 md:px-4 flex items-center justify-center min-w-0">
+              <Dumbbell className="mr-1 md:mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{t('exercise')}</span>
             </TabsTrigger>
-            <TabsTrigger value="deficit" className="text-base py-4 px-4">
-              <Target className="mr-2 h-4 w-4" />
-              {t('deficit')}
+            <TabsTrigger value="deficit" className="text-sm md:text-base py-3 px-2 md:px-4 flex items-center justify-center min-w-0">
+              <Target className="mr-1 md:mr-2 h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{t('deficit')}</span>
             </TabsTrigger>
           </TabsList>
 
