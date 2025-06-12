@@ -2199,7 +2199,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
           <img
             src="/snapifit.svg"
             alt="Snapifit AI Logo"
-            className="h-18 md:h-24 w-auto select-none opacity-75 hover:opacity-100 transition-opacity duration-300"
+            className="h-12 sm:h-14 md:h-18 lg:h-24 w-auto select-none opacity-75 hover:opacity-100 transition-opacity duration-300"
             style={{ filter: 'invert(34%) sepia(61%) saturate(504%) hue-rotate(90deg) brightness(95%) contrast(92%)' }}
           />
         </div>

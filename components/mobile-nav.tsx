@@ -63,10 +63,10 @@ export function MobileNav({ locale }: MobileNavProps) {
             </SheetTitle>
           </SheetHeader>
 
-          <div className="flex flex-col h-full pt-4">
+          <div className="flex flex-col h-full pt-0">
 
             {/* Navigation Links */}
-            <nav className="flex-1 py-6">
+            <nav className="flex-1 py-2">
               <div className="space-y-2">
                 {navItems.map((item) => (
                   <Link
