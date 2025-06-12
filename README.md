@@ -8,6 +8,8 @@
 社区版：
 https://github.com/Mount-Huaguo-Holy-Tech/Snapifit-AI-Community-Edition
 ---
+![WELCOMING](https://github.com/user-attachments/assets/68369ac3-7826-464d-b5c1-d7f2aee3c9ad)
+
 ![1749089248648](https://github.com/user-attachments/assets/fe137e38-7187-4850-b88a-abb1dff22fa8)
 
 ## 引言
