@@ -989,18 +989,18 @@ function SettingsContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="weight">{t('profile.weight')}</Label>
-                  <Input id="weight" name="weight" type="number" value={formData.weight} onChange={handleInputChange} />
+                  <Input id="weight" name="weight" type="number" value={formData.weight ?? ""} onChange={handleInputChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="height">{t('profile.height')}</Label>
-                  <Input id="height" name="height" type="number" value={formData.height} onChange={handleInputChange} />
+                  <Input id="height" name="height" type="number" value={formData.height ?? ""} onChange={handleInputChange} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="age">{t('profile.age')}</Label>
-                  <Input id="age" name="age" type="number" value={formData.age} onChange={handleInputChange} />
+                  <Input id="age" name="age" type="number" value={formData.age ?? ""} onChange={handleInputChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="gender">{t('profile.gender')}</Label>
@@ -1137,7 +1137,7 @@ function SettingsContent() {
                     id="targetWeight"
                     name="targetWeight"
                     type="number"
-                    value={formData.targetWeight || ""}
+                    value={formData.targetWeight ?? ""}
                     onChange={handleInputChange}
                     placeholder={t('goals.optional')}
                   />
@@ -1148,7 +1148,7 @@ function SettingsContent() {
                     id="targetCalories"
                     name="targetCalories"
                     type="number"
-                    value={formData.targetCalories || ""}
+                    value={formData.targetCalories ?? ""}
                     onChange={handleInputChange}
                     placeholder={t('goals.optional')}
                   />

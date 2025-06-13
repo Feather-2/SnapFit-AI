@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils"
 import type { ExerciseEntry } from "@/lib/types"
 import { useTranslation } from "@/hooks/use-i18n"
+import { formatNumber } from "@/lib/number-utils"
 
 interface ExerciseEntryCardProps {
   entry: ExerciseEntry
@@ -213,7 +214,7 @@ export function ExerciseEntryCard({ entry, onDelete, onUpdate }: ExerciseEntryCa
                 {entry.sets && entry.reps && ` · ${entry.sets}${t('sets')} × ${entry.reps}${t('reps')}`}
                 {entry.weight_kg && ` · ${entry.weight_kg}${t('weight')}`}
               </p>
-              <p className="text-sm md:text-base font-medium mt-1">{entry.calories_burned_estimated?.toFixed(0) || 0} {t('calories')}</p>
+              <p className="text-sm md:text-base font-medium mt-1">{formatNumber(entry.calories_burned_estimated, 0)} {t('calories')}</p>
               {entry.muscle_groups && (
                 <p className="text-xs text-muted-foreground mt-1">{t('muscleGroups')}: {entry.muscle_groups.join(", ")}</p>
               )}

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils"
 import type { FoodEntry } from "@/lib/types"
 import { useTranslation } from "@/hooks/use-i18n"
+import { formatNumber } from "@/lib/number-utils"
 
 interface FoodEntryCardProps {
   entry: FoodEntry
@@ -178,12 +179,10 @@ export function FoodEntryCard({ entry, onDelete, onUpdate }: FoodEntryCardProps)
                 {entry.time_period && ` · ${getTimePeriodLabel(entry.time_period)}`}
               </p>
               <p className="text-sm md:text-base font-medium mt-1">
-                {entry.total_nutritional_info_consumed?.calories?.toFixed(0) || 0} {t('calories')}
+                {formatNumber(entry.total_nutritional_info_consumed?.calories, 0)} {t('calories')}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {t('carbs')}: {entry.total_nutritional_info_consumed?.carbohydrates?.toFixed(1) || 0}g · {t('protein')}:{" "}
-                {entry.total_nutritional_info_consumed?.protein?.toFixed(1) || 0}g · {t('fat')}:{" "}
-                {entry.total_nutritional_info_consumed?.fat?.toFixed(1) || 0}g
+                {t('carbs')}: {formatNumber(entry.total_nutritional_info_consumed?.carbohydrates, 1)}g · {t('protein')}: {formatNumber(entry.total_nutritional_info_consumed?.protein, 1)}g · {t('fat')}: {formatNumber(entry.total_nutritional_info_consumed?.fat, 1)}g
               </p>
             </div>
             <div className="flex space-x-1 self-end sm:self-start">

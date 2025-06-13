@@ -3,6 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { TrendingUp, TrendingDown, Minus, Info, Target, Flag } from "lucide-react"
 import { useTranslation } from "@/hooks/use-i18n"
+import { formatNumber } from "@/lib/number-utils"
 
 interface WeightChangePredictorProps {
   calorieDifference: number // 热量缺口/盈余 (kcal)
@@ -97,7 +98,7 @@ export function WeightChangePredictor({ calorieDifference, currentWeight, target
           </div>
           <div className="text-right">
             <div className={`text-lg font-bold ${trendInfo.color}`}>
-              {Math.abs(calorieDifference).toFixed(0)} kcal
+              {formatNumber(Math.abs(calorieDifference), 0)} kcal
             </div>
             <div className="text-xs text-muted-foreground">
               {calorieDifference > 0 ? t('surplus') : calorieDifference < 0 ? t('deficit') : t('balanced')}
@@ -116,21 +117,21 @@ export function WeightChangePredictor({ calorieDifference, currentWeight, target
               {/* Daily */}
               <div className="space-y-0.5">
                 <div>{t('daily')}</div>
-                <div className={`font-medium ${trendInfo.color}`}>{calorieDifference>0?'+':''}{weightChangeGrams.toFixed(0)}g</div>
+                <div className={`font-medium ${trendInfo.color}`}>{calorieDifference>0?'+':''}{formatNumber(weightChangeGrams, 0)}g</div>
               </div>
 
               {/* Weekly */}
               <div className="space-y-0.5">
                 <div>{t('weekly')}</div>
-                <div className={`font-medium ${trendInfo.color}`}>{calorieDifference>0?'+':''}{Math.abs(weeklyChange).toFixed(2)}kg</div>
-                {predictedWeightWeekly && <div className="text-muted-foreground">→ {predictedWeightWeekly.toFixed(1)}kg</div>}
+                <div className={`font-medium ${trendInfo.color}`}>{calorieDifference>0?'+':''}{formatNumber(Math.abs(weeklyChange), 2)}kg</div>
+                {predictedWeightWeekly && <div className="text-muted-foreground">→ {formatNumber(predictedWeightWeekly, 1)}kg</div>}
               </div>
 
               {/* Monthly */}
               <div className="space-y-0.5">
                 <div>{t('monthly')}</div>
-                <div className={`font-medium ${trendInfo.color}`}>{calorieDifference>0?'+':''}{Math.abs(monthlyChange).toFixed(2)}kg</div>
-                {predictedWeightMonthly && <div className="text-muted-foreground">→ {predictedWeightMonthly.toFixed(1)}kg</div>}
+                <div className={`font-medium ${trendInfo.color}`}>{calorieDifference>0?'+':''}{formatNumber(Math.abs(monthlyChange), 2)}kg</div>
+                {predictedWeightMonthly && <div className="text-muted-foreground">→ {formatNumber(predictedWeightMonthly, 1)}kg</div>}
               </div>
             </div>
           </div>
@@ -144,14 +145,14 @@ export function WeightChangePredictor({ calorieDifference, currentWeight, target
               <div className="flex items-center gap-1">
                 <Flag className="h-3 w-3" />
                 <span>{t('goalWeight') || '目标体重'}</span>
-                <span className="ml-1 font-medium">{targetWeight.toFixed(1)} kg</span>
+                <span className="ml-1 font-medium">{formatNumber(targetWeight, 1)} kg</span>
               </div>
 
               {/* 右侧：差距 */}
               {differenceKg !== null && (
                 <div className="flex items-center gap-1">
                   <span>{t('difference') || '差距'}</span>
-                  <span className={`font-medium ${differenceKg > 0 ? 'text-orange-500' : differenceKg < 0 ? 'text-green-600' : ''}`}>{differenceKg === 0 ? '已达成' : `${differenceKg > 0 ? '+' : ''}${differenceKg.toFixed(1)} kg`}</span>
+                  <span className={`font-medium ${differenceKg > 0 ? 'text-orange-500' : differenceKg < 0 ? 'text-green-600' : ''}`}>{differenceKg === 0 ? '已达成' : `${differenceKg > 0 ? '+' : ''}${formatNumber(differenceKg, 1)} kg`}</span>
                 </div>
               )}
             </div>

@@ -9,6 +9,7 @@ import Link from "next/link"
 import ClientOnly from "@/components/client-only"
 import { BMIIndicator } from "@/components/bmi-indicator"
 import { WeightChangePredictor } from "@/components/weight-change-predictor"
+import { formatNumber } from "@/lib/number-utils"
 
 interface DailySummaryProps {
   summary: DailySummaryType
@@ -103,23 +104,21 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                 <Utensils className="mr-2 h-4 w-4 text-green-500" />
                 <span>{t('caloriesIn')}</span>
               </div>
-              <span className="text-sm font-semibold">{totalCaloriesConsumed.toFixed(0)} kcal</span>
+              <span className="text-sm font-semibold">{formatNumber(totalCaloriesConsumed, 0)} kcal</span>
             </div>
             <div className="flex justify-between items-center">
               <div className="flex items-center text-sm">
                 <Flame className="mr-2 h-4 w-4 text-red-500" />
                 <span>{t('exerciseBurn')}</span>
               </div>
-              <span className="text-sm font-semibold">{totalCaloriesBurned.toFixed(0)} kcal</span>
+              <span className="text-sm font-semibold">{formatNumber(totalCaloriesBurned, 0)} kcal</span>
             </div>
             <div className="flex justify-between items-center">
               <div className="flex items-center text-sm font-medium">
                 {netCalories > 0 ? <TrendingUp className="mr-2 h-4 w-4 text-orange-500" /> : <TrendingDown className="mr-2 h-4 w-4 text-blue-500" />}
                 <span>{t('netCalories')}</span>
               </div>
-              <span className={`text-sm font-bold ${netCalories > 0 ? "text-orange-500" : "text-blue-500"}`}>
-                {netCalories.toFixed(0)} kcal
-              </span>
+              <span className={`text-sm font-bold ${netCalories > 0 ? "text-orange-500" : "text-blue-500"}`}>{formatNumber(netCalories, 0)} kcal</span>
             </div>
           </div>
 
@@ -133,7 +132,7 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                     <BedDouble className="mr-2 h-4 w-4 text-purple-500" />
                     <span>{t('bmr')}</span>
                   </div>
-                  <span className="text-sm">{calculatedBMR.toFixed(0)} kcal</span>
+                  <span className="text-sm">{formatNumber(calculatedBMR, 0)} kcal</span>
                 </div>
               )}
               {calculatedTDEE && (
@@ -142,7 +141,7 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                     <Target className="mr-2 h-4 w-4 text-indigo-500" />
                     <span>{t('tdee')}</span>
                   </div>
-                  <span className="text-sm">{calculatedTDEE.toFixed(0)} kcal</span>
+                  <span className="text-sm">{formatNumber(calculatedTDEE, 0)} kcal</span>
                 </div>
               )}
               {calorieDifference !== null && calculatedTDEE && (
@@ -207,10 +206,10 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                     </div>
                     <div className="text-xs text-muted-foreground mb-1">{t('tef.baseTEF')}</div>
                     <div className="text-sm font-medium">
-                      {tefAnalysis.baseTEF.toFixed(1)} kcal
+                      {formatNumber(tefAnalysis.baseTEF, 1)} kcal
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      ({tefAnalysis.baseTEFPercentage.toFixed(1)}%)
+                      ({formatNumber(tefAnalysis.baseTEFPercentage, 1)}%)
                     </div>
                   </div>
 
@@ -222,7 +221,7 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                         </div>
                         <div className="text-xs text-muted-foreground mb-1">增强乘数</div>
                         <div className="text-sm font-medium text-purple-600">
-                          ×{tefAnalysis.enhancementMultiplier.toFixed(2)}
+                          ×{formatNumber(tefAnalysis.enhancementMultiplier, 2)}
                         </div>
                       </div>
 
@@ -232,7 +231,7 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                         </div>
                         <div className="text-xs text-muted-foreground mb-1">{t('tef.enhancedTEF')}</div>
                         <div className="text-sm font-bold text-emerald-600">
-                          {tefAnalysis.enhancedTEF.toFixed(1)} kcal
+                          {formatNumber(tefAnalysis.enhancedTEF, 1)} kcal
                         </div>
                       </div>
                     </>
@@ -277,12 +276,12 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                 <div className="flex justify-between">
                   <span className="text-xs">{t('carbohydrates')}</span>
                   <span className="text-xs">
-                    {macros.carbs.toFixed(1)}g ({carbsPercent.toFixed(0)}%)
+                    {formatNumber(macros.carbs, 1)}g ({formatNumber(carbsPercent, 0)}%)
                     {carbsStatus === 'low' && (
-                      <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.carbs.min}%</span>
+                      <span className="text-red-500 ml-1">↓低于{formatNumber(MACRO_RANGES.carbs.min, 0)}%</span>
                     )}
                     {carbsStatus === 'high' && (
-                      <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.carbs.max}%</span>
+                      <span className="text-orange-500 ml-1">↑高于{formatNumber(MACRO_RANGES.carbs.max, 0)}%</span>
                     )}
                   </span>
                 </div>
@@ -290,10 +289,10 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                   {/* 推荐区间浅色背景 */}
                   <div
                     className="absolute top-0 h-full bg-sky-500/20 dark:bg-sky-600/20"
-                    style={{ left: `${MACRO_RANGES.carbs.min}%`, width: `${MACRO_RANGES.carbs.max - MACRO_RANGES.carbs.min}%` }}
+                    style={{ left: `${formatNumber(MACRO_RANGES.carbs.min, 0)}%`, width: `${formatNumber(MACRO_RANGES.carbs.max - MACRO_RANGES.carbs.min, 0)}%` }}
                   />
                   {/* 实际摄入 */}
-                  <div className="h-full bg-sky-500 rounded-full relative" style={{ width: `${carbsPercent}%` }} />
+                  <div className="h-full bg-sky-500 rounded-full relative" style={{ width: `${formatNumber(carbsPercent, 0)}%` }} />
                 </div>
               </div>
 
@@ -302,21 +301,21 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                 <div className="flex justify-between">
                   <span className="text-xs">{t('protein')}</span>
                   <span className="text-xs">
-                    {macros.protein.toFixed(1)}g ({proteinPercent.toFixed(0)}%)
+                    {formatNumber(macros.protein, 1)}g ({formatNumber(proteinPercent, 0)}%)
                     {proteinStatus === 'low' && (
-                      <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.protein.min}%</span>
+                      <span className="text-red-500 ml-1">↓低于{formatNumber(MACRO_RANGES.protein.min, 0)}%</span>
                     )}
                     {proteinStatus === 'high' && (
-                      <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.protein.max}%</span>
+                      <span className="text-orange-500 ml-1">↑高于{formatNumber(MACRO_RANGES.protein.max, 0)}%</span>
                     )}
                   </span>
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden relative">
                   <div
                     className="absolute top-0 h-full bg-emerald-500/20 dark:bg-emerald-600/20"
-                    style={{ left: `${MACRO_RANGES.protein.min}%`, width: `${MACRO_RANGES.protein.max - MACRO_RANGES.protein.min}%` }}
+                    style={{ left: `${formatNumber(MACRO_RANGES.protein.min, 0)}%`, width: `${formatNumber(MACRO_RANGES.protein.max - MACRO_RANGES.protein.min, 0)}%` }}
                   />
-                  <div className="h-full bg-emerald-500 rounded-full relative" style={{ width: `${proteinPercent}%` }} />
+                  <div className="h-full bg-emerald-500 rounded-full relative" style={{ width: `${formatNumber(proteinPercent, 0)}%` }} />
                 </div>
               </div>
 
@@ -325,21 +324,21 @@ export function DailySummary({ summary = defaultSummary, calculatedBMR, calculat
                 <div className="flex justify-between">
                   <span className="text-xs">{t('fat')}</span>
                   <span className="text-xs">
-                    {macros.fat.toFixed(1)}g ({fatPercent.toFixed(0)}%)
+                    {formatNumber(macros.fat, 1)}g ({formatNumber(fatPercent, 0)}%)
                     {fatStatus === 'low' && (
-                      <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.fat.min}%</span>
+                      <span className="text-red-500 ml-1">↓低于{formatNumber(MACRO_RANGES.fat.min, 0)}%</span>
                     )}
                     {fatStatus === 'high' && (
-                      <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.fat.max}%</span>
+                      <span className="text-orange-500 ml-1">↑高于{formatNumber(MACRO_RANGES.fat.max, 0)}%</span>
                     )}
                   </span>
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden relative">
                   <div
                     className="absolute top-0 h-full bg-amber-500/20 dark:bg-amber-600/20"
-                    style={{ left: `${MACRO_RANGES.fat.min}%`, width: `${MACRO_RANGES.fat.max - MACRO_RANGES.fat.min}%` }}
+                    style={{ left: `${formatNumber(MACRO_RANGES.fat.min, 0)}%`, width: `${formatNumber(MACRO_RANGES.fat.max - MACRO_RANGES.fat.min, 0)}%` }}
                   />
-                  <div className="h-full bg-amber-500 rounded-full relative" style={{ width: `${fatPercent}%` }} />
+                  <div className="h-full bg-amber-500 rounded-full relative" style={{ width: `${formatNumber(fatPercent, 0)}%` }} />
                 </div>
               </div>
             </div>

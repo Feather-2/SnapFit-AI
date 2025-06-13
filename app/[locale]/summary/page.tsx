@@ -39,6 +39,7 @@ import { FoodEntryCard } from "@/components/food-entry-card"
 import { ExerciseEntryCard } from "@/components/exercise-entry-card"
 import { BMIIndicator } from "@/components/bmi-indicator"
 import { WeightChangePredictor } from "@/components/weight-change-predictor"
+import { formatNumber } from "@/lib/number-utils"
 
 const defaultUserProfile: UserProfile = {
   weight: 70,
@@ -722,7 +723,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   <span className="text-lg font-medium">{t('caloriesIn')}</span>
                 </div>
                 <span className="text-2xl font-bold text-green-600">
-                  {totalCaloriesConsumed.toFixed(0)} kcal
+                  {formatNumber(totalCaloriesConsumed, 0)} kcal
                 </span>
               </div>
 
@@ -753,7 +754,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   <span className="text-lg font-medium">{t('exerciseBurn')}</span>
                 </div>
                 <span className="text-2xl font-bold text-red-600">
-                  {totalCaloriesBurned.toFixed(0)} kcal
+                  {formatNumber(totalCaloriesBurned, 0)} kcal
                 </span>
               </div>
 
@@ -787,7 +788,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   <span className="text-lg font-medium">{t('netCalories')}</span>
                 </div>
                 <span className={`text-2xl font-bold ${netCalories > 0 ? "text-orange-500" : "text-blue-500"}`}>
-                  {netCalories.toFixed(0)} kcal
+                  {formatNumber(netCalories, 0)} kcal
                 </span>
               </div>
             </div>
@@ -944,7 +945,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   <div className="flex justify-between">
                     <span className="text-xs">{tDashboard('summary.carbohydrates')}</span>
                     <span className="text-xs">
-                      {macros.carbs.toFixed(1)}g ({carbsPercent.toFixed(0)}%)
+                      {formatNumber(macros.carbs, 1)}g ({formatNumber(carbsPercent, 0)}%)
                       {carbsStatus === 'low' && <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.carbs.min}%</span>}
                       {carbsStatus === 'high' && <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.carbs.max}%</span>}
                     </span>
@@ -960,7 +961,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   <div className="flex justify-between">
                     <span className="text-xs">{tDashboard('summary.protein')}</span>
                     <span className="text-xs">
-                      {macros.protein.toFixed(1)}g ({proteinPercent.toFixed(0)}%)
+                      {formatNumber(macros.protein, 1)}g ({formatNumber(proteinPercent, 0)}%)
                       {proteinStatus === 'low' && <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.protein.min}%</span>}
                       {proteinStatus === 'high' && <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.protein.max}%</span>}
                     </span>
@@ -976,7 +977,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   <div className="flex justify-between">
                     <span className="text-xs">{tDashboard('summary.fat')}</span>
                     <span className="text-xs">
-                      {macros.fat.toFixed(1)}g ({fatPercent.toFixed(0)}%)
+                      {formatNumber(macros.fat, 1)}g ({formatNumber(fatPercent, 0)}%)
                       {fatStatus === 'low' && <span className="text-red-500 ml-1">↓低于{MACRO_RANGES.fat.min}%</span>}
                       {fatStatus === 'high' && <span className="text-orange-500 ml-1">↑高于{MACRO_RANGES.fat.max}%</span>}
                     </span>
