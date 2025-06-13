@@ -73,6 +73,11 @@ function recalculateSummary(log: DailyLog): DailyLog['summary'] {
   }
 }
 
+// 🧹 数组去重工具函数，确保逻辑删除 ID 不会重复保存
+function uniqArray<T>(arr: T[]): T[] {
+  return Array.from(new Set(arr));
+}
+
 export const useSync = () => {
   const { data: session } = useSession();
   const userId = session?.user?.id;
@@ -630,11 +635,15 @@ export const useSync = () => {
         if (!updatedLog.deletedFoodIds.includes(logId)) {
           updatedLog.deletedFoodIds.push(logId);
         }
+        // ✨ 去重，确保没有重复 ID
+        updatedLog.deletedFoodIds = uniqArray(updatedLog.deletedFoodIds);
       } else {
         updatedLog.deletedExerciseIds = updatedLog.deletedExerciseIds || [];
         if (!updatedLog.deletedExerciseIds.includes(logId)) {
           updatedLog.deletedExerciseIds.push(logId);
         }
+        // ✨ 去重，确保没有重复 ID
+        updatedLog.deletedExerciseIds = uniqArray(updatedLog.deletedExerciseIds);
       }
 
       // 🔄 重新计算汇总数据
