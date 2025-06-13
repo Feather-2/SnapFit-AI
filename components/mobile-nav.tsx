@@ -56,17 +56,23 @@ export function MobileNav({ locale }: MobileNavProps) {
         <SheetContent side="right" className="w-[300px] sm:w-[400px]">
           <SheetHeader>
             <SheetTitle className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
-              </div>
-              <span className="font-semibold text-lg">Snapifit AI</span>
+              <img
+                src="/snapifit-pure.svg"
+                alt="Snapifit AI Logo"
+                className="h-8 w-auto select-none"
+                style={{
+                  filter:
+                    "invert(45%) sepia(93%) saturate(690%) hue-rotate(108deg) brightness(92%) contrast(90%)",
+                }}
+              />
+              <span className="font-semibold text-lg text-emerald-600 dark:text-emerald-400">Snapifit AI</span>
             </SheetTitle>
           </SheetHeader>
 
           <div className="flex flex-col h-full pt-0">
 
             {/* Navigation Links */}
-            <nav className="flex-1 py-2">
+            <nav className="flex-1 py-2 overflow-y-auto">
               <div className="space-y-2">
                 {navItems.map((item) => (
                   <Link
@@ -88,7 +94,7 @@ export function MobileNav({ locale }: MobileNavProps) {
             </nav>
 
             {/* Footer Actions */}
-            <div className="border-t pt-4 space-y-4">
+            <div className="border-t pt-4 pb-4 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">{t('theme')}</span>
                 <ThemeToggle />

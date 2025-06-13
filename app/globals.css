@@ -388,3 +388,30 @@ img[src="/snapifit-pure.svg"] {
     height: 48px;
   }
 }
+
+/* =============================
+   Snapifit 带文字 Logo 颜色调优
+   ============================= */
+img[src="/snapifit.svg"] {
+  /* 默认（浅色模式）保持与原先一致 */
+  filter: invert(34%) sepia(61%) saturate(504%) hue-rotate(90deg) brightness(95%) contrast(92%);
+}
+
+.dark img[src="/snapifit.svg"] {
+  /* 深色模式下进一步提升亮度、饱和度和对比度，使 Logo 更加清晰可见 */
+  filter: invert(34%) sepia(61%) saturate(650%) hue-rotate(90deg) brightness(160%) contrast(105%) !important;
+  opacity: 1 !important;
+}
+
+/* =============================
+   Snapifit Summary Logo 颜色调优
+   ============================= */
+img[src="/snapifit_summary.svg"] {
+  /* 默认滤镜，与导航一致 */
+  filter: invert(34%) sepia(61%) saturate(504%) hue-rotate(90deg) brightness(95%) contrast(92%);
+}
+
+.dark img[src="/snapifit_summary.svg"] {
+  /* 深色模式下提高亮度饱和度，使 Logo 更亮 */
+  filter: invert(34%) sepia(61%) saturate(650%) hue-rotate(90deg) brightness(160%) contrast(105%) !important;
+}
