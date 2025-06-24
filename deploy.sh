@@ -39,6 +39,11 @@ docker run -d \
     --network snapifit-network \
     -p 3000:3000 \
     --env-file ${ENV_FILE} \
+    --health-cmd="wget --spider -q http://localhost:3000" \
+    --health-interval=30s \
+    --health-timeout=10s \
+    --health-retries=3 \
+    --health-start-period=10s \
     ${IMAGE_NAME}:latest
 
 echo "部署完成！应用正在运行在 http://localhost:3000" 

@@ -9,10 +9,15 @@ services:
     environment:
       - NODE_ENV=production
       # 其他环境变量将从.env文件加载
-    volumes:
-      - app_data:/app/data
     networks:
       - app_network
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     # 在生产环境中，我们不直接暴露应用端口，而是通过nginx代理
 
   nginx:
@@ -25,7 +30,8 @@ services:
       - ./ssl:/etc/nginx/ssl  # 如果配置了HTTPS
       - nginx_logs:/var/log/nginx
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - app_network
@@ -35,5 +41,4 @@ networks:
     driver: bridge
 
 volumes:
-  app_data:
   nginx_logs: 

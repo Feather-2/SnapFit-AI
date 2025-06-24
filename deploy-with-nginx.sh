@@ -43,7 +43,6 @@ docker rm ${NGINX_CONTAINER_NAME} 2>/dev/null || true
 
 # 创建数据卷（如果不存在）
 docker volume create nginx-logs 2>/dev/null || true
-docker volume create app-data 2>/dev/null || true
 
 # 运行应用容器
 echo "启动应用容器..."
@@ -52,8 +51,25 @@ docker run -d \
     --restart unless-stopped \
     --network ${NETWORK_NAME} \
     --env-file ${ENV_FILE} \
-    -v app-data:/app/data \
+    --health-cmd="wget --spider -q http://localhost:3000" \
+    --health-interval=30s \
+    --health-timeout=10s \
+    --health-retries=3 \
+    --health-start-period=10s \
     ${IMAGE_NAME}:latest
+
+# 等待应用容器健康检查通过
+echo "等待应用容器启动..."
+while [ "$(docker inspect -f {{.State.Health.Status}} ${CONTAINER_NAME} 2>/dev/null)" != "healthy" ]; do
+    if [ "$(docker inspect -f {{.State.Health.Status}} ${CONTAINER_NAME} 2>/dev/null)" == "unhealthy" ]; then
+        echo "错误：应用容器健康检查失败。请检查容器日志。"
+        echo "运行 'docker logs ${CONTAINER_NAME}' 查看详细信息。"
+        exit 1
+    fi
+    echo -n "."
+    sleep 2
+done
+echo " 应用容器已就绪！"
 
 # 运行NGINX容器
 echo "启动NGINX容器..."

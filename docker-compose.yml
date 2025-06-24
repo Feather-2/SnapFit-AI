@@ -11,4 +11,11 @@ services:
     environment:
       - NODE_ENV=production
       # 在这里添加您的环境变量
-      # - API_KEY=your_api_key 
+      # - API_KEY=your_api_key
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s 
