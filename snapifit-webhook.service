@@ -1,0 +1,20 @@
+[Unit]
+Description=Snapifit GitHub Webhook Deployment Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/snapifit
+ExecStart=/usr/bin/node /opt/snapifit/webhook-deploy.js
+Restart=on-failure
+Environment=PORT=9000
+Environment=DEPLOY_SCRIPT=/opt/snapifit/deploy.sh
+Environment=WEBHOOK_SECRET=your_webhook_secret
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target 
