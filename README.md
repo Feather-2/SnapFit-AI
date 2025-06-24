@@ -62,6 +62,9 @@ Snapifit-AI 旨在通过一套直观而强大的工具赋能用户：
 ## 许可证
 
 本项目为开源项目，并根据 [Apache 2.0 许可证](LICENSE) 发布。
+简要说明：
+在此发布的个人版/L站社区版，均为Apache 2.0开源
+未来发布的 [社区版](https://github.com/Feather-2/Snapfit-AI-Community-Edition) ，采用社区友好授权，允许一切个人用途使用并支持多租户服务，但商用形式需授权，详情请移步查看。
 
 ---
 
