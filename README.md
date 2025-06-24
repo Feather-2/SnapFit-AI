@@ -6,7 +6,7 @@
 
 ---
 社区版：
-https://github.com/Mount-Huaguo-Holy-Tech/Snapifit-AI-Community-Edition
+https://github.com/Feather-2/Snapfit-AI-Community-Edition
 ---
 ![WELCOMING](https://github.com/user-attachments/assets/68369ac3-7826-464d-b5c1-d7f2aee3c9ad)
 
