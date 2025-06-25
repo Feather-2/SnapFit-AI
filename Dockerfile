@@ -32,6 +32,8 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV NEXT_PUBLIC_STORAGE_MODE=server
+ENV DATABASE_URL="file:./dev.db"
 # 禁用Next.js遥测（可选）
 # ENV NEXT_TELEMETRY_DISABLED=1
 

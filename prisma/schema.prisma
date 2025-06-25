@@ -1,0 +1,146 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 用户配置文件
+  profile   UserProfile?
+  // 用户的日志记录
+  dailyLogs DailyLog[]
+  // AI配置
+  aiConfig  AIConfig?
+
+  @@map("users")
+}
+
+model UserProfile {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  age               Int?
+  gender            String?
+  height            Float?  // cm
+  weight            Float?  // kg
+  activityLevel     String? // sedentary, light, moderate, active, very_active
+  goal              String? // lose_weight, maintain, gain_weight
+  targetWeight      Float?  // kg
+  targetCalories    Int?
+  allergies         String? // JSON string
+  medicalConditions String? // JSON string
+  medications       String? // JSON string
+  familyHistory     String? // JSON string
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model AIConfig {
+  id        String @id @default(cuid())
+  userId    String @unique
+  
+  // 工作模型配置
+  agentModelName    String?
+  agentModelBaseUrl String?
+  agentModelApiKey  String?
+  
+  // 视觉模型配置
+  visionModelName    String?
+  visionModelBaseUrl String?
+  visionModelApiKey  String?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_configs")
+}
+
+model DailyLog {
+  id          String   @id @default(cuid())
+  userId      String
+  date        String   // YYYY-MM-DD format
+  weight      Float?   // kg
+  totalCaloriesConsumed Int @default(0)
+  totalCaloriesBurned   Int @default(0)
+  netCalories           Int @default(0)
+  
+  // 状态信息
+  mood         String? // happy, neutral, sad, stressed, etc.
+  stress       String? // low, medium, high
+  sleepQuality String? // poor, fair, good, excellent
+  sleepHours   Float?  // hours
+  notes        String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联的食物和运动记录
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodEntries   FoodEntry[]
+  exerciseEntries ExerciseEntry[]
+
+  @@unique([userId, date])
+  @@map("daily_logs")
+}
+
+model FoodEntry {
+  id          String @id @default(cuid())
+  logId       String
+  name        String
+  calories    Float
+  protein     Float? // g
+  carbs       Float? // g
+  fat         Float? // g
+  fiber       Float? // g
+  sugar       Float? // g
+  sodium      Float? // mg
+  amount      String? // 描述数量，如 "1个", "100g"
+  description String?
+  createdAt   DateTime @default(now())
+
+  dailyLog DailyLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@map("food_entries")
+}
+
+model ExerciseEntry {
+  id           String @id @default(cuid())
+  logId        String
+  name         String
+  type         String? // cardio, strength, flexibility, sports
+  duration     Int?    // minutes
+  calories     Float
+  intensity    String? // low, medium, high
+  description  String?
+  createdAt    DateTime @default(now())
+
+  dailyLog DailyLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@map("exercise_entries")
+}
+
+model AIMemory {
+  id        String   @id @default(cuid())
+  userId    String
+  category  String   // user_info, preferences, health_data, etc.
+  key       String
+  value     String   // JSON string
+  context   String?  // additional context
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, category, key])
+  @@map("ai_memories")
+} 

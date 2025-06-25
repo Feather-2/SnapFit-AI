@@ -99,13 +99,13 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     },
   })
 
-  // 使用 IndexedDB 钩子获取日志数据
+  // 使用IndexedDB存储钩子
   const { getData: getDailyLog, saveData: saveDailyLog, isLoading } = useIndexedDB("healthLogs")
 
   // 使用导出提醒Hook
   const exportReminder = useExportReminder()
 
-  // 使用日期记录检查Hook
+  // 使用日期记录Hook
   const { hasRecord, refreshRecords } = useDateRecords()
 
   // 使用移动端检测Hook
@@ -130,13 +130,13 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   // 当选择的日期变化时，加载对应日期的数据
   useEffect(() => {
     const dateKey = format(selectedDate, "yyyy-MM-dd")
-    getDailyLog(dateKey).then((data) => {
-      console.log("从IndexedDB读取到的数据：", data)
+    getDailyLog(dateKey).then((loadedData) => {
+      console.log("从HealthData读取到的数据：", loadedData)
       const defaultActivity = userProfile.activityLevel || "moderate"
-      if (data) {
-        setDailyLog(data)
-        setCurrentDayWeight(data.weight ? data.weight.toString() : "")
-        setCurrentDayActivityLevelForSelect(data.activityLevel || defaultActivity)
+      if (loadedData) {
+        setDailyLog(loadedData)
+        setCurrentDayWeight(loadedData.weight ? loadedData.weight.toString() : "")
+        setCurrentDayActivityLevelForSelect(loadedData.activityLevel || defaultActivity)
       } else {
         setDailyLog({
           date: dateKey,
@@ -447,12 +447,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
     if (!modelConfig.name || !modelConfig.baseUrl || !modelConfig.apiKey) {
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.aiConfigIncomplete')}
-          </span>
-        ),
+        title: t('errors.aiConfigIncomplete'),
         description: t('errors.configureModelFirst', {
           modelType: uploadedImages.length > 0 ? t('modelTypes.vision') : t('modelTypes.work')
         }),
@@ -470,12 +465,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
     if (uploadedImages.length + files.length > 5) {
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.imageCountExceeded')}
-          </span>
-        ),
+        title: t('errors.imageCountExceeded'),
         description: t('errors.maxImagesAllowed'),
         variant: "destructive",
       })
@@ -492,12 +482,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
         if (!file.type.startsWith("image/")) {
           toast({
-            title: (
-              <span className="flex items-center">
-                <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-                {t('errors.invalidFileType')}
-              </span>
-            ),
+            title: t('errors.invalidFileType'),
             description: t('errors.notImageFile', { fileName: file.name }),
             variant: "destructive",
           })
@@ -518,12 +503,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     } catch (error) {
       console.error("Error processing images:", error)
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.imageProcessingFailed')}
-          </span>
-        ),
+        title: t('errors.imageProcessingFailed'),
         description: t('errors.cannotProcessImages'),
         variant: "destructive",
       })
@@ -549,12 +529,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   const handleSubmit = async () => {
     if (!inputText.trim() && uploadedImages.length === 0) {
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.emptyInput')}
-          </span>
-        ),
+        title: t('errors.emptyInput'),
         description: t('errors.enterTextOrUpload'),
         variant: "destructive",
       })
@@ -630,23 +605,13 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       setUploadedImages([])
 
       toast({
-        title: (
-          <span className="flex items-center">
-            <CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />
-            {t('success.recordAdded')}
-          </span>
-        ),
+        title: t('success.recordAdded'),
         description: activeTab === "food" ? t('success.foodAdded') : t('success.exerciseAdded'),
       })
     } catch (error: any) {
       console.error("Error:", error)
       toast({
-        title: (
-          <span className="flex items-center">
-            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            处理失败
-          </span>
-        ),
+        title: "处理失败",
         description: error.message || "无法解析您的输入，请重试。",
         variant: "destructive",
       })
@@ -674,12 +639,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     refreshRecords()
 
     toast({
-      title: (
-        <span className="flex items-center">
-          <Trash2 className="mr-2 h-5 w-5 text-green-500" />
-          {t('success.recordDeleted')}
-        </span>
-      ),
+      title: t('success.recordDeleted'),
       description: type === "food" ? t('success.foodDeleted') : t('success.exerciseDeleted'),
     })
   }
@@ -707,12 +667,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     refreshRecords()
 
     toast({
-      title: (
-        <span className="flex items-center">
-          <Edit3 className="mr-2 h-5 w-5 text-green-500" />
-          {t('success.recordUpdated')}
-        </span>
-      ),
+      title: t('success.recordUpdated'),
       description: type === "food" ? t('success.foodUpdated') : t('success.exerciseUpdated'),
     })
   }
@@ -760,7 +715,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       // 刷新日期记录状态
       refreshRecords()
       toast({
-        title: <span className="flex items-center"><Info className="mr-2 h-5 w-5" />{t('success.weightCleared')}</span>,
+        title: t('success.weightCleared'),
         description: t('success.weightClearedDesc', { date: dateKey })
       })
       return
@@ -769,7 +724,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     const weightValue = parseFloat(currentDayWeight)
     if (isNaN(weightValue) || weightValue <= 0) {
       toast({
-        title: <span className="flex items-center"><AlertCircle className="mr-2 h-5 w-5 text-destructive" />{t('validation.invalidWeight')}</span>,
+        title: t('validation.invalidWeight'),
         description: t('validation.invalidWeightDesc'),
         variant: "destructive"
       })
@@ -784,7 +739,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     // 刷新日期记录状态
     refreshRecords()
     toast({
-      title: <span className="flex items-center"><CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />{t('success.weightSaved')}</span>,
+      title: t('success.weightSaved'),
       description: t('success.weightSavedDesc', { date: dateKey, weight: weightValue })
     })
   }
@@ -798,7 +753,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     // 刷新日期记录状态
     refreshRecords()
     toast({
-      title: <span className="flex items-center"><CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />每日状态已保存</span>,
+      title: "每日状态已保存",
       description: `已保存 ${dateKey} 的状态记录`
     })
   }
@@ -938,7 +893,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                   </div>
 
                   {/* 导出提醒 */}
-                  {exportReminder.shouldRemind && exportReminder.hasEnoughData && (
+                  {exportReminder && exportReminder.hasEnoughData && (
                     <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-md border border-amber-200 dark:border-amber-800">
                       <AlertTriangle className="h-3 w-3" />
                       <span>

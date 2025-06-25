@@ -367,64 +367,7 @@ export default function ChatPage() {
     return true
   }
 
-  // 处理AI记忆更新请求
-  const handleMemoryUpdateRequest = async (newContent: string, reason?: string) => {
-    try {
-      await updateMemory({
-        expertId: selectedExpert,
-        newContent,
-        reason
-      })
-
-      toast({
-        title: "记忆已更新",
-        description: `${currentExpert.name}的记忆已成功更新`,
-      })
-
-      setPendingMemoryUpdate(null)
-    } catch (error) {
-      console.error("更新记忆失败:", error)
-      toast({
-        title: "记忆更新失败",
-        description: error instanceof Error ? error.message : "未知错误",
-        variant: "destructive",
-      })
-    }
-  }
-
-  // 设置客户端状态和移动端检测
-  useEffect(() => {
-    setIsClient(true)
-
-    // 检测移动设备
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-
-    // 点击外部关闭下拉菜单
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showExpertDropdown && !(event.target as Element).closest('.expert-dropdown')) {
-        // 延迟关闭，避免与流式回复冲突
-        setTimeout(() => {
-          setShowExpertDropdown(false)
-        }, 0)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside, { passive: true })
-
-    return () => {
-      window.removeEventListener('resize', checkMobile)
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showExpertDropdown])
-
-
-
-  // 获取今日日志
+  // 获取今天的健康数据
   useEffect(() => {
     const today = format(new Date(), "yyyy-MM-dd")
     getData(today).then((data) => {
@@ -600,6 +543,61 @@ export default function ChatPage() {
       console.error("useChat error:", error)
     }
   }, [error])
+
+  // 处理AI记忆更新请求
+  const handleMemoryUpdateRequest = async (newContent: string, reason?: string) => {
+    try {
+      await updateMemory({
+        expertId: selectedExpert,
+        newContent,
+        reason
+      })
+
+      toast({
+        title: "记忆已更新",
+        description: `${currentExpert.name}的记忆已成功更新`,
+      })
+
+      setPendingMemoryUpdate(null)
+    } catch (error) {
+      console.error("更新记忆失败:", error)
+      toast({
+        title: "记忆更新失败",
+        description: error instanceof Error ? error.message : "未知错误",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // 设置客户端状态和移动端检测
+  useEffect(() => {
+    setIsClient(true)
+
+    // 检测移动设备
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+
+    // 点击外部关闭下拉菜单
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showExpertDropdown && !(event.target as Element).closest('.expert-dropdown')) {
+        // 延迟关闭，避免与流式回复冲突
+        setTimeout(() => {
+          setShowExpertDropdown(false)
+        }, 0)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside, { passive: true })
+
+    return () => {
+      window.removeEventListener('resize', checkMobile)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExpertDropdown])
 
   return (
     <div className="container mx-auto py-3 md:py-6 max-w-7xl min-w-0 px-4 md:px-6">
