@@ -37,6 +37,7 @@ import { tefCacheManager } from "@/lib/tef-cache"
 import type { SmartSuggestionsResponse } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTranslation } from "@/hooks/use-i18n"
+import { AuthGuard } from "@/components/auth-guard"
 
 // 图片预览类型
 interface ImagePreview {
@@ -420,7 +421,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
             calculatedTDEE: newTdee,
           };
           // 只有在实际值发生变化时才保存，避免不必要的写入
-          if (currentLogState.calculatedBMR !== newBmr || currentLogState.calculatedTDEE !== newTdee || (rates && (!currentLogState.calculatedBMR || !currentLogState.calculatedTDEE))){
+          if (currentLogState.calculatedBMR !== newBmr || currentLogState.calculatedTDEE !== newTdee || (rates && (!currentLogState.calculatedBMR || !currentLogState.calculatedTDEE))) {
             saveDailyLog(updatedLogWithNewRates.date, updatedLogWithNewRates);
           }
           return updatedLogWithNewRates;
@@ -804,17 +805,18 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   }
 
   return (
-    <div className="min-h-screen relative bg-white dark:bg-slate-900">
-      {/* 弥散绿色背景效果 - 带动画 */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -left-40 top-20 w-96 h-96 bg-emerald-300/40 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -right-40 top-40 w-80 h-80 bg-emerald-400/35 rounded-full blur-3xl animate-bounce-slow"></div>
-        <div className="absolute left-20 bottom-20 w-72 h-72 bg-emerald-200/45 rounded-full blur-3xl animate-breathing"></div>
-        <div className="absolute right-32 bottom-40 w-64 h-64 bg-emerald-300/40 rounded-full blur-3xl animate-float"></div>
-        <div className="absolute left-1/2 top-1/3 w-56 h-56 bg-emerald-200/30 rounded-full blur-3xl transform -translate-x-1/2 animate-glow"></div>
-      </div>
+    <AuthGuard>
+      <div className="min-h-screen relative bg-white dark:bg-slate-900">
+        {/* 弥散绿色背景效果 - 带动画 */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -left-40 top-20 w-96 h-96 bg-emerald-300/40 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -right-40 top-40 w-80 h-80 bg-emerald-400/35 rounded-full blur-3xl animate-bounce-slow"></div>
+          <div className="absolute left-20 bottom-20 w-72 h-72 bg-emerald-200/45 rounded-full blur-3xl animate-breathing"></div>
+          <div className="absolute right-32 bottom-40 w-64 h-64 bg-emerald-300/40 rounded-full blur-3xl animate-float"></div>
+          <div className="absolute left-1/2 top-1/3 w-56 h-56 bg-emerald-200/30 rounded-full blur-3xl transform -translate-x-1/2 animate-glow"></div>
+        </div>
 
-      <style jsx>{`
+        <style jsx>{`
         @keyframes breathing {
           0%, 100% {
             transform: scale(1) rotate(0deg);
@@ -876,437 +878,438 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
           animation: bounce-slow 7s ease-in-out infinite;
         }
       `}</style>
-      <div className="relative z-10 container mx-auto py-12 px-6 sm:px-8 lg:px-12 max-w-6xl">
-        <header className="mb-16 fade-in">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-8">
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg">
-                <img
-                  src="/placeholder.svg"
-                  alt="SnapFit AI Logo"
-                  className="w-10 h-10 object-contain filter invert"
-                />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold tracking-tight mb-2">
-                  SnapFit AI
-                </h1>
-                <p className="text-muted-foreground text-lg">
-                  {t('ui.subtitle')}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-              <div className="flex flex-col gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full sm:w-[280px] justify-start text-left font-normal text-base h-12"
-                    >
-                      <CalendarDays className="mr-3 h-5 w-5 text-primary" />
-                      {format(selectedDate, "PPP (eeee)", { locale: currentLocale })}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => date && setSelectedDate(date)}
-                      initialFocus
-                      locale={currentLocale}
-                      hasRecord={hasRecord}
-                    />
-                  </PopoverContent>
-                </Popover>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-                    <Settings2 className="h-3 w-3" />
-                    <Link
-                      href={`/${resolvedParams.locale}/settings?tab=ai`}
-                      className="hover:text-primary transition-colors underline-offset-2 hover:underline"
-                    >
-                      {t('ui.quickConfig')}
-                    </Link>
-                    <span>/</span>
-                    <Link
-                      href={`/${resolvedParams.locale}/settings?tab=data`}
-                      className="hover:text-primary transition-colors underline-offset-2 hover:underline"
-                    >
-                      {t('ui.dataExport')}
-                    </Link>
-                  </div>
-
-                  {/* 导出提醒 */}
-                  {exportReminder.shouldRemind && exportReminder.hasEnoughData && (
-                    <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-md border border-amber-200 dark:border-amber-800">
-                      <AlertTriangle className="h-3 w-3" />
-                      <span>
-                        {exportReminder.lastExportDate === null
-                          ? t('ui.neverExported')
-                          : t('ui.exportReminder', { days: exportReminder.daysSinceLastExport })
-                        }
-                      </span>
-                      <Clock className="h-3 w-3 ml-1" />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 新布局：左侧图表，右侧体重和活动水平 */}
-          <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* 左侧：管理图表 (占2列) */}
-            <div className="lg:col-span-2">
-              <ManagementCharts selectedDate={selectedDate} refreshTrigger={chartRefreshTrigger} />
-            </div>
-
-            {/* 右侧：体重和活动水平 (占1列) */}
-            <div className="space-y-8">
-              <div className="health-card p-8 space-y-6">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
-                    <Weight className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">{t('ui.todayWeight')}</h3>
-                    <p className="text-muted-foreground">{t('ui.recordWeightChanges')}</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <Input
-                    id="daily-weight"
-                    type="number"
-                    placeholder={t('placeholders.weightExample')}
-                    value={currentDayWeight}
-                    onChange={(e) => setCurrentDayWeight(e.target.value)}
-                    className="w-full h-12 text-base"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSaveDailyWeight()
-                        // 聚焦到活动水平选择器
-                        const activitySelect = document.getElementById('daily-activity-level')
-                        if (activitySelect) {
-                          activitySelect.click()
-                        }
-                      }
-                    }}
+        <div className="relative z-10 container mx-auto py-12 px-6 sm:px-8 lg:px-12 max-w-6xl">
+          <header className="mb-16 fade-in">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-8">
+              <div className="flex items-center space-x-6">
+                <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg">
+                  <img
+                    src="/placeholder.svg"
+                    alt="SnapFit AI Logo"
+                    className="w-10 h-10 object-contain filter invert"
                   />
-                  <Button
-                    onClick={handleSaveDailyWeight}
-                    disabled={isProcessing}
-                    className="btn-gradient-primary w-full h-12"
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    {t('ui.saveWeight')}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="health-card p-8 space-y-6">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
-                    <UserCheck className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">{t('ui.activityLevel')}</h3>
-                    <p className="text-muted-foreground">{t('ui.setTodayActivity')}</p>
-                  </div>
-                </div>
-                <Select
-                  value={currentDayActivityLevelForSelect}
-                  onValueChange={(value) => {
-                    handleDailyActivityLevelChange(value)
-                    // 选择完活动水平后，聚焦到输入区域
-                    setTimeout(() => {
-                      const textarea = document.querySelector('textarea')
-                      if (textarea) {
-                        textarea.focus()
-                      }
-                    }, 100)
-                  }}
-                >
-                  <SelectTrigger className="w-full h-12 text-base" id="daily-activity-level">
-                    <SelectValue placeholder={t('ui.selectActivityLevel')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sedentary">{t('activityLevels.sedentary')}</SelectItem>
-                    <SelectItem value="light">{t('activityLevels.light')}</SelectItem>
-                    <SelectItem value="moderate">{t('activityLevels.moderate')}</SelectItem>
-                    <SelectItem value="active">{t('activityLevels.active')}</SelectItem>
-                    <SelectItem value="very_active">{t('activityLevels.very_active')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* 输入区域 */}
-        <div className="health-card mb-16 slide-up">
-          <div className="p-8">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
-                  <ClipboardPenLine className="h-6 w-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-semibold">{t('ui.recordHealthData')}</h2>
-                  <p className="text-muted-foreground text-lg">{t('ui.recordHealthDataDesc')}</p>
+                  <h1 className="text-4xl font-bold tracking-tight mb-2">
+                    SnapFit AI
+                  </h1>
+                  <p className="text-muted-foreground text-lg">
+                    {t('ui.subtitle')}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {!isMobile && <span className="text-sm text-muted-foreground">今日记录</span>}
-                <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                  {(() => {
-                    let count = 0
-                    if (dailyLog.foodEntries.length > 0) count++
-                    if (dailyLog.exerciseEntries.length > 0) count++
-                    if (dailyLog.dailyStatus) count++
-                    return `${count}/3`
-                  })()}
-                </span>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                <div className="flex flex-col gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full sm:w-[280px] justify-start text-left font-normal text-base h-12"
+                      >
+                        <CalendarDays className="mr-3 h-5 w-5 text-primary" />
+                        {format(selectedDate, "PPP (eeee)", { locale: currentLocale })}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => date && setSelectedDate(date)}
+                        initialFocus
+                        locale={currentLocale}
+                        hasRecord={hasRecord}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+                      <Settings2 className="h-3 w-3" />
+                      <Link
+                        href={`/${resolvedParams.locale}/settings?tab=ai`}
+                        className="hover:text-primary transition-colors underline-offset-2 hover:underline"
+                      >
+                        {t('ui.quickConfig')}
+                      </Link>
+                      <span>/</span>
+                      <Link
+                        href={`/${resolvedParams.locale}/settings?tab=data`}
+                        className="hover:text-primary transition-colors underline-offset-2 hover:underline"
+                      >
+                        {t('ui.dataExport')}
+                      </Link>
+                    </div>
+
+                    {/* 导出提醒 */}
+                    {exportReminder.shouldRemind && exportReminder.hasEnoughData && (
+                      <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-md border border-amber-200 dark:border-amber-800">
+                        <AlertTriangle className="h-3 w-3" />
+                        <span>
+                          {exportReminder.lastExportDate === null
+                            ? t('ui.neverExported')
+                            : t('ui.exportReminder', { days: exportReminder.daysSinceLastExport })
+                          }
+                        </span>
+                        <Clock className="h-3 w-3 ml-1" />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-              <TabsList className="grid w-full grid-cols-3 h-14">
-                <TabsTrigger value="food" className="text-base py-4 px-8">
-                  <Utensils className="mr-2 h-5 w-5" />{t('ui.dietRecord')}
-                </TabsTrigger>
-                <TabsTrigger value="exercise" className="text-base py-4 px-8">
-                  <Dumbbell className="mr-2 h-5 w-5" />{t('ui.exerciseRecord')}
-                </TabsTrigger>
-                <TabsTrigger value="status" className="text-base py-4 px-8">
-                  <Activity className="mr-2 h-5 w-5" />{t('ui.dailyStatus')}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {/* 新布局：左侧图表，右侧体重和活动水平 */}
+            <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* 左侧：管理图表 (占2列) */}
+              <div className="lg:col-span-2">
+                <ManagementCharts selectedDate={selectedDate} refreshTrigger={chartRefreshTrigger} />
+              </div>
 
-            <div className="space-y-6">
-              {activeTab === "status" ? (
-                <DailyStatusCard
-                  date={format(selectedDate, "yyyy-MM-dd")}
-                  initialStatus={dailyLog.dailyStatus}
-                  onSave={handleSaveDailyStatus}
-                />
-              ) : (
-                <Textarea
-                  placeholder={
-                    activeTab === "food"
-                      ? t('placeholders.foodExample')
-                      : t('placeholders.exerciseExample')
-                  }
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  className="min-h-[140px] text-base p-6 rounded-xl"
-                />
-              )}
+              {/* 右侧：体重和活动水平 (占1列) */}
+              <div className="space-y-8">
+                <div className="health-card p-8 space-y-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
+                      <Weight className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">{t('ui.todayWeight')}</h3>
+                      <p className="text-muted-foreground">{t('ui.recordWeightChanges')}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <Input
+                      id="daily-weight"
+                      type="number"
+                      placeholder={t('placeholders.weightExample')}
+                      value={currentDayWeight}
+                      onChange={(e) => setCurrentDayWeight(e.target.value)}
+                      className="w-full h-12 text-base"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSaveDailyWeight()
+                          // 聚焦到活动水平选择器
+                          const activitySelect = document.getElementById('daily-activity-level')
+                          if (activitySelect) {
+                            activitySelect.click()
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={handleSaveDailyWeight}
+                      disabled={isProcessing}
+                      className="btn-gradient-primary w-full h-12"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {t('ui.saveWeight')}
+                    </Button>
+                  </div>
+                </div>
 
-              {activeTab !== "status" && uploadedImages.length > 0 && (
-                <div className="p-6 rounded-xl bg-muted/30 border">
-                  <p className="text-muted-foreground mb-4 flex items-center font-medium">
-                    <ImageIcon className="mr-2 h-5 w-5" /> {t('images.uploaded', { count: uploadedImages.length })}
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    {uploadedImages.map((img, index) => (
-                      <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-white dark:border-slate-700 shadow-md hover:shadow-lg transition-all group">
-                        <img
-                          src={img.url || "/placeholder.svg"}
-                          alt={`预览 ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImage(index)}
-                          className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-600 shadow-lg"
-                          aria-label="删除图片"
+                <div className="health-card p-8 space-y-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
+                      <UserCheck className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">{t('ui.activityLevel')}</h3>
+                      <p className="text-muted-foreground">{t('ui.setTodayActivity')}</p>
+                    </div>
+                  </div>
+                  <Select
+                    value={currentDayActivityLevelForSelect}
+                    onValueChange={(value) => {
+                      handleDailyActivityLevelChange(value)
+                      // 选择完活动水平后，聚焦到输入区域
+                      setTimeout(() => {
+                        const textarea = document.querySelector('textarea')
+                        if (textarea) {
+                          textarea.focus()
+                        }
+                      }, 100)
+                    }}
+                  >
+                    <SelectTrigger className="w-full h-12 text-base" id="daily-activity-level">
+                      <SelectValue placeholder={t('ui.selectActivityLevel')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sedentary">{t('activityLevels.sedentary')}</SelectItem>
+                      <SelectItem value="light">{t('activityLevels.light')}</SelectItem>
+                      <SelectItem value="moderate">{t('activityLevels.moderate')}</SelectItem>
+                      <SelectItem value="active">{t('activityLevels.active')}</SelectItem>
+                      <SelectItem value="very_active">{t('activityLevels.very_active')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* 输入区域 */}
+          <div className="health-card mb-16 slide-up">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
+                    <ClipboardPenLine className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-semibold">{t('ui.recordHealthData')}</h2>
+                    <p className="text-muted-foreground text-lg">{t('ui.recordHealthDataDesc')}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!isMobile && <span className="text-sm text-muted-foreground">今日记录</span>}
+                  <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                    {(() => {
+                      let count = 0
+                      if (dailyLog.foodEntries.length > 0) count++
+                      if (dailyLog.exerciseEntries.length > 0) count++
+                      if (dailyLog.dailyStatus) count++
+                      return `${count}/3`
+                    })()}
+                  </span>
+                </div>
+              </div>
+
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
+                <TabsList className="grid w-full grid-cols-3 h-14">
+                  <TabsTrigger value="food" className="text-base py-4 px-8">
+                    <Utensils className="mr-2 h-5 w-5" />{t('ui.dietRecord')}
+                  </TabsTrigger>
+                  <TabsTrigger value="exercise" className="text-base py-4 px-8">
+                    <Dumbbell className="mr-2 h-5 w-5" />{t('ui.exerciseRecord')}
+                  </TabsTrigger>
+                  <TabsTrigger value="status" className="text-base py-4 px-8">
+                    <Activity className="mr-2 h-5 w-5" />{t('ui.dailyStatus')}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <div className="space-y-6">
+                {activeTab === "status" ? (
+                  <DailyStatusCard
+                    date={format(selectedDate, "yyyy-MM-dd")}
+                    initialStatus={dailyLog.dailyStatus}
+                    onSave={handleSaveDailyStatus}
+                  />
+                ) : (
+                  <Textarea
+                    placeholder={
+                      activeTab === "food"
+                        ? t('placeholders.foodExample')
+                        : t('placeholders.exerciseExample')
+                    }
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    className="min-h-[140px] text-base p-6 rounded-xl"
+                  />
+                )}
+
+                {activeTab !== "status" && uploadedImages.length > 0 && (
+                  <div className="p-6 rounded-xl bg-muted/30 border">
+                    <p className="text-muted-foreground mb-4 flex items-center font-medium">
+                      <ImageIcon className="mr-2 h-5 w-5" /> {t('images.uploaded', { count: uploadedImages.length })}
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {uploadedImages.map((img, index) => (
+                        <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-white dark:border-slate-700 shadow-md hover:shadow-lg transition-all group">
+                          <img
+                            src={img.url || "/placeholder.svg"}
+                            alt={`预览 ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-600 shadow-lg"
+                            aria-label="删除图片"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab !== "status" && (
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-6 pt-6">
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleImageUpload}
+                        disabled={isProcessing || isCompressing || uploadedImages.length >= 5}
+                        ref={fileInputRef}
+                      />
+                      <Button
+                        variant="outline"
+                        type="button"
+                        size="lg"
+                        disabled={isProcessing || isCompressing || uploadedImages.length >= 5}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-12 px-6"
+                      >
+                        <UploadCloud className="mr-2 h-5 w-5" />
+                        {isCompressing ? t('buttons.imageProcessing') : `${t('buttons.uploadImages')} (${uploadedImages.length}/5)`}
+                      </Button>
+                      {uploadedImages.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="lg"
+                          onClick={() => setUploadedImages([])}
+                          className="text-destructive hover:text-destructive h-12"
                         >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
+                          <Trash2 className="mr-2 h-4 w-4" /> {t('buttons.clearImages')}
+                        </Button>
+                      )}
+                    </div>
+
+                    <Button
+                      onClick={handleSubmit}
+                      size="lg"
+                      className="btn-gradient-primary w-full sm:w-auto px-12 h-12 text-base"
+                      disabled={isProcessing || isCompressing || (!inputText.trim() && uploadedImages.length === 0)}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          {t('buttons.processing')}
+                        </>
+                      ) : (
+                        <>
+                          {activeTab === "food" ? <Utensils className="mr-2 h-5 w-5" /> : <Dumbbell className="mr-2 h-5 w-5" />}
+                          {t('buttons.submitRecord')}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {isLoading && (
+            <div className="text-center py-16 fade-in">
+              <div className="flex justify-center items-center mb-4">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full border-4 border-emerald-200 dark:border-emerald-800"></div>
+                  <div className="absolute top-0 left-0 w-12 h-12 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin"></div>
+                </div>
+              </div>
+              <p className="text-lg text-slate-600 dark:text-slate-400 font-medium">{t('loading.dataLoading')}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
+            <div className="health-card scale-in">
+              <div className="p-8">
+                <div className="flex items-center space-x-4 mb-8">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
+                    <Utensils className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-semibold">{t('ui.myMeals')}</h3>
+                    <p className="text-muted-foreground text-lg">{t('ui.todayFoodCount', { count: dailyLog.foodEntries.length })}</p>
+                  </div>
+                </div>
+
+                {dailyLog.foodEntries.length === 0 ? (
+                  <div className="text-center py-16 text-muted-foreground">
+                    <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted/50">
+                      <Utensils className="h-10 w-10" />
+                    </div>
+                    <p className="text-xl font-medium mb-3">{t('ui.noFoodRecords')}</p>
+                    <p className="text-lg opacity-75">{t('ui.addFoodAbove')}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                    {dailyLog.foodEntries.map((entry) => (
+                      <FoodEntryCard
+                        key={entry.log_id}
+                        entry={entry}
+                        onDelete={() => handleDeleteEntry(entry.log_id, "food")}
+                        onUpdate={(updated) => handleUpdateEntry(updated, "food")}
+                      />
                     ))}
                   </div>
-                </div>
-              )}
-
-              {activeTab !== "status" && (
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-6 pt-6">
-                <div className="flex items-center space-x-4">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleImageUpload}
-                    disabled={isProcessing || isCompressing || uploadedImages.length >= 5}
-                    ref={fileInputRef}
-                  />
-                  <Button
-                    variant="outline"
-                    type="button"
-                    size="lg"
-                    disabled={isProcessing || isCompressing || uploadedImages.length >= 5}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-12 px-6"
-                  >
-                    <UploadCloud className="mr-2 h-5 w-5" />
-                    {isCompressing ? t('buttons.imageProcessing') : `${t('buttons.uploadImages')} (${uploadedImages.length}/5)`}
-                  </Button>
-                  {uploadedImages.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="lg"
-                      onClick={() => setUploadedImages([])}
-                      className="text-destructive hover:text-destructive h-12"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" /> {t('buttons.clearImages')}
-                    </Button>
-                  )}
-                </div>
-
-                <Button
-                  onClick={handleSubmit}
-                  size="lg"
-                  className="btn-gradient-primary w-full sm:w-auto px-12 h-12 text-base"
-                  disabled={isProcessing || isCompressing || (!inputText.trim() && uploadedImages.length === 0)}
-                >
-                  {isProcessing ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      {t('buttons.processing')}
-                    </>
-                  ) : (
-                    <>
-                      {activeTab === "food" ? <Utensils className="mr-2 h-5 w-5" /> : <Dumbbell className="mr-2 h-5 w-5" />}
-                      {t('buttons.submitRecord')}
-                    </>
-                  )}
-                </Button>
-              </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {isLoading && (
-          <div className="text-center py-16 fade-in">
-            <div className="flex justify-center items-center mb-4">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-full border-4 border-emerald-200 dark:border-emerald-800"></div>
-                <div className="absolute top-0 left-0 w-12 h-12 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin"></div>
+                )}
               </div>
             </div>
-            <p className="text-lg text-slate-600 dark:text-slate-400 font-medium">{t('loading.dataLoading')}</p>
-          </div>
-        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
-          <div className="health-card scale-in">
-            <div className="p-8">
-              <div className="flex items-center space-x-4 mb-8">
-                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
-                  <Utensils className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-semibold">{t('ui.myMeals')}</h3>
-                  <p className="text-muted-foreground text-lg">{t('ui.todayFoodCount', { count: dailyLog.foodEntries.length })}</p>
-                </div>
-              </div>
-
-              {dailyLog.foodEntries.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground">
-                  <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted/50">
-                    <Utensils className="h-10 w-10" />
+            <div className="health-card scale-in">
+              <div className="p-8">
+                <div className="flex items-center space-x-4 mb-8">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
+                    <Dumbbell className="h-6 w-6" />
                   </div>
-                  <p className="text-xl font-medium mb-3">{t('ui.noFoodRecords')}</p>
-                  <p className="text-lg opacity-75">{t('ui.addFoodAbove')}</p>
-                </div>
-              ) : (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
-                  {dailyLog.foodEntries.map((entry) => (
-                    <FoodEntryCard
-                      key={entry.log_id}
-                      entry={entry}
-                      onDelete={() => handleDeleteEntry(entry.log_id, "food")}
-                      onUpdate={(updated) => handleUpdateEntry(updated, "food")}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="health-card scale-in">
-            <div className="p-8">
-              <div className="flex items-center space-x-4 mb-8">
-                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-white">
-                  <Dumbbell className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-semibold">{t('ui.myExercise')}</h3>
-                  <p className="text-muted-foreground text-lg">{t('ui.todayExerciseCount', { count: dailyLog.exerciseEntries.length })}</p>
-                </div>
-              </div>
-
-              {dailyLog.exerciseEntries.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground">
-                  <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted/50">
-                    <Dumbbell className="h-10 w-10" />
+                  <div>
+                    <h3 className="text-2xl font-semibold">{t('ui.myExercise')}</h3>
+                    <p className="text-muted-foreground text-lg">{t('ui.todayExerciseCount', { count: dailyLog.exerciseEntries.length })}</p>
                   </div>
-                  <p className="text-xl font-medium mb-3">{t('ui.noExerciseRecords')}</p>
-                  <p className="text-lg opacity-75">{t('ui.addExerciseAbove')}</p>
                 </div>
-              ) : (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
-                  {dailyLog.exerciseEntries.map((entry) => (
-                    <ExerciseEntryCard
-                      key={entry.log_id}
-                      entry={entry}
-                      onDelete={() => handleDeleteEntry(entry.log_id, "exercise")}
-                      onUpdate={(updated) => handleUpdateEntry(updated, "exercise")}
-                    />
-                  ))}
-                </div>
-              )}
+
+                {dailyLog.exerciseEntries.length === 0 ? (
+                  <div className="text-center py-16 text-muted-foreground">
+                    <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted/50">
+                      <Dumbbell className="h-10 w-10" />
+                    </div>
+                    <p className="text-xl font-medium mb-3">{t('ui.noExerciseRecords')}</p>
+                    <p className="text-lg opacity-75">{t('ui.addExerciseAbove')}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                    {dailyLog.exerciseEntries.map((entry) => (
+                      <ExerciseEntryCard
+                        key={entry.log_id}
+                        entry={entry}
+                        onDelete={() => handleDeleteEntry(entry.log_id, "exercise")}
+                        onUpdate={(updated) => handleUpdateEntry(updated, "exercise")}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          <div className="scale-in">
-            <DailySummary
-              summary={dailyLog.summary}
-              calculatedBMR={dailyLog.calculatedBMR}
-              calculatedTDEE={dailyLog.calculatedTDEE}
-              tefAnalysis={dailyLog.tefAnalysis}
-              tefAnalysisCountdown={tefAnalysisCountdown}
-              selectedDate={selectedDate}
-            />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <div className="scale-in">
+              <DailySummary
+                summary={dailyLog.summary}
+                calculatedBMR={dailyLog.calculatedBMR}
+                calculatedTDEE={dailyLog.calculatedTDEE}
+                tefAnalysis={dailyLog.tefAnalysis}
+                tefAnalysisCountdown={tefAnalysisCountdown}
+                selectedDate={selectedDate}
+              />
+            </div>
+            <div className="scale-in">
+              <SmartSuggestions
+                suggestions={smartSuggestions[dailyLog.date]}
+                isLoading={smartSuggestionsLoading}
+                onRefresh={() => generateSmartSuggestions(dailyLog.date)}
+                currentDate={dailyLog.date}
+              />
+            </div>
           </div>
-          <div className="scale-in">
-            <SmartSuggestions
-              suggestions={smartSuggestions[dailyLog.date]}
-              isLoading={smartSuggestionsLoading}
-              onRefresh={() => generateSmartSuggestions(dailyLog.date)}
-              currentDate={dailyLog.date}
-            />
-          </div>
-        </div>
 
-        {/* 免责声明 */}
-        <div className="mt-12 pt-6 border-t border-slate-200/50 dark:border-slate-700/50">
-          <div className="text-center">
-            <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed">
-              本应用基于AI技术，仅为您提供健康管理参考。请注意：AI分析可能存在偏差，特别是营养数据方面。您的健康很重要，在做出重要的饮食或运动决策前，建议咨询专业的医生、营养师或健身教练。
-            </p>
+          {/* 免责声明 */}
+          <div className="mt-12 pt-6 border-t border-slate-200/50 dark:border-slate-700/50">
+            <div className="text-center">
+              <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed">
+                本应用基于AI技术，仅为您提供健康管理参考。请注意：AI分析可能存在偏差，特别是营养数据方面。您的健康很重要，在做出重要的饮食或运动决策前，建议咨询专业的医生、营养师或健身教练。
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </AuthGuard>
   )
 }

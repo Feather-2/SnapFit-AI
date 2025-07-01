@@ -39,6 +39,10 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# 创建数据目录
+RUN mkdir -p /app/data /app/logs /app/public/uploads
+RUN chown -R nextjs:nodejs /app/data /app/logs /app/public/uploads
+
 # 复制公共资源
 COPY --from=builder /app/public ./public
 

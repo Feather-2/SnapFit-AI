@@ -180,19 +180,47 @@ services:
       - app
 ```
 
-### 持久化数据
+### 数据持久化配置
 
-如果您的应用需要持久化数据，可以在`docker-compose.yml`中添加卷配置：
+应用已经配置了完整的数据持久化支持：
+
+#### SQLite 数据库（默认）
+
+默认配置使用SQLite数据库，数据会持久化到Docker卷中：
 
 ```yaml
-services:
-  app:
-    # 现有配置...
-    volumes:
-      - app_data:/app/data
-
 volumes:
-  app_data:
+  - app_data:/app/data        # 数据库文件
+  - app_uploads:/app/public/uploads  # 上传文件
+  - app_logs:/app/logs        # 日志文件
+```
+
+#### PostgreSQL 数据库（推荐生产环境）
+
+对于生产环境，建议使用PostgreSQL：
+
+```bash
+# 使用PostgreSQL配置启动
+docker-compose -f docker-compose.postgres.yml up -d --build
+```
+
+需要在`.env`文件中添加：
+```
+POSTGRES_PASSWORD=your_secure_password_here
+```
+
+#### 数据备份
+
+备份SQLite数据库：
+```bash
+# 备份数据卷
+docker run --rm -v snapifit-ai_app_data:/data -v $(pwd):/backup alpine tar czf /backup/backup.tar.gz /data
+```
+
+备份PostgreSQL数据库：
+```bash
+# 备份PostgreSQL
+docker-compose exec postgres pg_dump -U snapifit snapifit > backup.sql
 ```
 
 ---

@@ -8,12 +8,10 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/data/prod.db
+      - DATABASE_URL=postgresql://snapifit:${POSTGRES_PASSWORD}@postgres:5432/snapifit
     env_file:
       - .env
     volumes:
-      # 持久化数据库文件
-      - app_data:/app/data
       # 持久化上传文件
       - app_uploads:/app/public/uploads
       # 持久化日志文件
@@ -28,24 +26,46 @@ services:
       retries: 3
       start_period: 10s
     depends_on:
-      - db-init
-    # 在生产环境中，我们不直接暴露应用端口，而是通过nginx代理
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
 
-  # 数据库初始化服务
-  db-init:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=snapifit
+      - POSTGRES_USER=snapifit
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snapifit -d snapifit"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # 数据库迁移服务
+  db-migrate:
     build:
       context: .
       dockerfile: Dockerfile
-    volumes:
-      - app_data:/app/data
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/data/prod.db
+      - DATABASE_URL=postgresql://snapifit:${POSTGRES_PASSWORD}@postgres:5432/snapifit
     env_file:
       - .env
     networks:
       - app_network
-    command: ["sh", "-c", "npx prisma generate && npx prisma db push && echo 'Database initialized'"]
+    command: ["sh", "-c", "npx prisma generate && npx prisma db push && echo 'Database migrated'"]
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: "no"
 
   nginx:
@@ -69,7 +89,7 @@ networks:
     driver: bridge
 
 volumes:
-  app_data:
+  postgres_data:
     driver: local
   app_uploads:
     driver: local

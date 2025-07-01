@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联的数据
+  profile      UserProfile?
+  dailyLogs    DailyLog[]
+  aiMemories   AIMemory[]
+  aiConfig     AIConfig?
+
+  @@map("users")
+}
+
+// 用户配置表
+model UserProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  weight                Float
+  height                Float
+  age                   Int
+  gender                String
+  activityLevel         String
+  goal                  String
+  targetWeight          Float?
+  targetCalories        Float?
+  notes                 String?
+  bmrFormula            String?  @default("mifflin-st-jeor") // 'mifflin-st-jeor' | 'harris-benedict'
+  bmrCalculationBasis   String?  @default("totalWeight") // 'totalWeight' | 'leanBodyMass'
+  bodyFatPercentage     Float?
+  professionalMode      Boolean? @default(false)
+  medicalHistory        String?
+  lifestyle             String?
+  healthAwareness       String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// 每日日志表
+model DailyLog {
+  id               String    @id @default(cuid())
+  userId           String
+  date             String    // yyyy-MM-dd 格式
+  weight           Float?
+  activityLevel    String?
+  calculatedBMR    Float?
+  calculatedTDEE   Float?
+  tefAnalysis      String?   // JSON 字符串存储 TEF 分析
+  dailyStatus      String?   // JSON 字符串存储每日状态
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodEntries     FoodEntry[]
+  exerciseEntries ExerciseEntry[]
+
+  @@unique([userId, date])
+  @@map("daily_logs")
+}
+
+// 食物记录表
+model FoodEntry {
+  id                              String   @id @default(cuid())
+  logId                          String
+  userId                         String
+  foodName                       String
+  consumedGrams                  Float
+  mealType                       String   // breakfast, lunch, dinner, snack
+  timePeriod                     String?  // morning, noon, afternoon, evening
+  nutritionalInfoPer100g         String   // JSON 字符串存储营养信息
+  totalNutritionalInfoConsumed   String   // JSON 字符串存储总营养信息
+  isEstimated                    Boolean
+  timestamp                      String?
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
+
+  dailyLog DailyLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@map("food_entries")
+}
+
+// 运动记录表
+model ExerciseEntry {
+  id                        String   @id @default(cuid())
+  logId                     String
+  userId                    String
+  exerciseName              String
+  exerciseType              String   // cardio, strength, flexibility, other
+  durationMinutes           Int
+  distanceKm                Float?
+  sets                      Int?
+  reps                      Int?
+  weightKg                  Float?
+  estimatedMets             Float
+  userWeight                Float
+  caloriesBurnedEstimated   Float
+  muscleGroups              String?  // JSON 字符串存储肌肉群数组
+  isEstimated               Boolean
+  timestamp                 String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  dailyLog DailyLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@map("exercise_entries")
+}
+
+// AI 记忆表
+model AIMemory {
+  id                String   @id @default(cuid())
+  userId            String
+  expertId          String   // general, nutrition, fitness, etc.
+  conversationCount Int      @default(0)
+  lastUpdated       DateTime @default(now())
+  keyInsights       String?  // JSON 字符串存储关键洞察
+  userPreferences   String?  // JSON 字符串存储用户偏好
+  healthPatterns    String?  // JSON 字符串存储健康模式
+  goals             String?  // JSON 字符串存储目标
+  concerns          String?  // JSON 字符串存储关注点
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, expertId])
+  @@map("ai_memories")
+}
+
+// AI 配置表
+model AIConfig {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  chatModel       String?  // JSON 字符串存储聊天模型配置
+  parseModel      String?  // JSON 字符串存储解析模型配置
+  adviceModel     String?  // JSON 字符串存储建议模型配置
+  tefModel        String?  // JSON 字符串存储 TEF 模型配置
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_configs")
+}

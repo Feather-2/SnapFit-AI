@@ -3,18 +3,21 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, MessageSquare, Settings, Moon, Sun } from "lucide-react"
+import { Home, MessageSquare, Settings, Moon, Sun, User, LogOut, Database } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { GitHubStar } from "@/components/github-star"
 import { useTranslation } from "@/hooks/use-i18n"
 import { locales, type Locale } from "@/i18n"
+import { useAuth } from "@/hooks/use-auth"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Image from "next/image"
 
 export function MainNav() {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
+  const { user, logout, isAuthenticated } = useAuth()
   const t = useTranslation('navigation')
 
   // 直接从路径中提取当前语言，确保准确性
@@ -39,6 +42,11 @@ export function MainNav() {
       name: t('chat'),
       href: `/${locale}/chat`,
       icon: MessageSquare,
+    },
+    {
+      name: '数据管理',
+      href: `/${locale}/data-migration`,
+      icon: Database,
     },
     {
       name: t('settings'),
@@ -98,6 +106,34 @@ export function MainNav() {
             <span className="sr-only">切换主题</span>
           </Button>
           <GitHubStar repo="Feather-2/SnapFit-AI" />
+
+          {/* 用户菜单 */}
+          {isAuthenticated && user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-10 px-3 rounded-xl hover:bg-green-50 dark:hover:bg-slate-700/50 hover:scale-105 transition-all duration-300 border border-transparent hover:border-green-200 dark:hover:border-slate-600"
+                >
+                  <User className="h-4 w-4 mr-2 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {user.username}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                  {user.username}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-red-600 dark:text-red-400">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  登出
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
     </div>
