@@ -11,12 +11,8 @@ NEXT_PUBLIC_API_URL=http://localhost:3000
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_API_MODEL=gpt-4-turbo
 
-# 数据库配置
-DATABASE_URL="file:./dev.db"
-# 生产环境可以使用：
-# DATABASE_URL="postgresql://username:password@localhost:5432/snapifit"
-# 或者 Supabase：
-# DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
+# 数据库配置（如果需要）
+# DATABASE_URL=your_database_url
 
 # 其他配置
 # 根据您的应用需求添加其他环境变量

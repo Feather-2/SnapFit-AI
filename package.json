@@ -6,16 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "db:reset": "prisma db push --force-reset"
+    "lint": "next lint"
   },
   "dependencies": {
     "@ai-sdk/openai": "latest",
     "@hookform/resolvers": "^3.9.1",
-    "@prisma/client": "^6.10.1",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
@@ -57,7 +52,6 @@
     "next": "15.2.4",
     "next-intl": "^4.1.0",
     "next-themes": "^0.4.4",
-    "prisma": "^6.10.1",
     "react": "^19",
     "react-day-picker": "8.10.1",
     "react-dom": "^19",

@@ -105,13 +105,13 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
 
       // 检查是否有任何真实数据
       const hasRealData = data.some(entry =>
-        entry.weight !== undefined || (entry.caloriesIn ?? 0) > 0 || (entry.caloriesOut ?? 0) > 0
+        entry.weight !== undefined || entry.caloriesIn > 0 || entry.caloriesOut > 0
       )
 
       if (hasRealData) {
         // 计算有效数据点的数量
         const realDataCount = data.filter(entry =>
-          entry.weight !== undefined || (entry.caloriesIn ?? 0) > 0 || (entry.caloriesOut ?? 0) > 0
+          entry.weight !== undefined || entry.caloriesIn > 0 || entry.caloriesOut > 0
         ).length
 
         // 智能调整显示策略
@@ -137,23 +137,27 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
     }
   }
 
+
+
+
+
   // 智能优化数据显示策略
   const optimizeDataForDisplay = (data: ChartData[], realDataCount: number): ChartData[] => {
     // 如果有效数据点很少，调整显示策略
     if (realDataCount <= 3) {
       // 只显示有数据的天数及其前后各一天，最少显示5天
       const dataWithRealValues = data.filter(entry =>
-        entry.weight !== undefined || (entry.caloriesIn ?? 0) > 0 || (entry.caloriesOut ?? 0) > 0
+        entry.weight !== undefined || entry.caloriesIn > 0 || entry.caloriesOut > 0
       )
 
       if (dataWithRealValues.length === 0) return data
 
       // 找到第一个和最后一个有数据的索引
       const firstRealIndex = data.findIndex(entry =>
-        entry.weight !== undefined || (entry.caloriesIn ?? 0) > 0 || (entry.caloriesOut ?? 0) > 0
+        entry.weight !== undefined || entry.caloriesIn > 0 || entry.caloriesOut > 0
       )
       const lastRealIndex = data.findLastIndex(entry =>
-        entry.weight !== undefined || (entry.caloriesIn ?? 0) > 0 || (entry.caloriesOut ?? 0) > 0
+        entry.weight !== undefined || entry.caloriesIn > 0 || entry.caloriesOut > 0
       )
 
       // 计算显示范围，确保至少显示5天
@@ -174,10 +178,10 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
     if (realDataCount < totalDays / 3) {
       // 数据稀疏，只显示有数据的区间
       const firstRealIndex = data.findIndex(entry =>
-        entry.weight !== undefined || (entry.caloriesIn ?? 0) > 0 || (entry.caloriesOut ?? 0) > 0
+        entry.weight !== undefined || entry.caloriesIn > 0 || entry.caloriesOut > 0
       )
       const lastRealIndex = data.findLastIndex(entry =>
-        entry.weight !== undefined || (entry.caloriesIn ?? 0) > 0 || (entry.caloriesOut ?? 0) > 0
+        entry.weight !== undefined || entry.caloriesIn > 0 || entry.caloriesOut > 0
       )
 
       if (firstRealIndex !== -1 && lastRealIndex !== -1) {
@@ -193,7 +197,6 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
     // 数据充足，返回原始数据
     return data
   }
-
   const generateMockData = () => {
     const selectedRange = dateRangeOptions.find(option => option.value === dateRange)
     const daysToGenerate = selectedRange?.days || 7
@@ -320,6 +323,8 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
           </div>
         </div>
 
+
+
         <Tabs defaultValue="weight" className="w-full">
           <TabsList className="grid w-full grid-cols-4 h-14">
             <TabsTrigger value="weight" className="text-base py-4 px-4">
@@ -352,6 +357,7 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                         dataKey="date"
                         tick={{
                           fontSize: 11,
+                          angle: dateRange === '90d' ? -90 : -45,
                           textAnchor: 'end'
                         }}
                         tickLine={{ stroke: '#e2e8f0' }}
@@ -359,7 +365,6 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                         minTickGap={chartData.length <= 5 ? 10 : (dateRange === '90d' ? 20 : 35)}
                         height={(dateRange === '7d' || dateRange === '14d') || chartData.length <= 10 ? 70 : 50}
                         tickFormatter={formatXAxisLabel}
-                        angle={dateRange === '90d' ? -90 : -45}
                       />
                       <YAxis
                         tick={{ fontSize: 12 }}
@@ -398,6 +403,7 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                         dataKey="date"
                         tick={{
                           fontSize: 11,
+                          angle: dateRange === '90d' ? -90 : -45,
                           textAnchor: 'end'
                         }}
                         tickLine={{ stroke: '#e2e8f0' }}
@@ -405,7 +411,6 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                         minTickGap={chartData.length <= 5 ? 10 : (dateRange === '90d' ? 20 : 35)}
                         height={(dateRange === '7d' || dateRange === '14d') || chartData.length <= 10 ? 70 : 50}
                         tickFormatter={formatXAxisLabel}
-                        angle={dateRange === '90d' ? -90 : -45}
                       />
                       <YAxis
                         tick={{ fontSize: 12 }}
@@ -445,6 +450,7 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                         dataKey="date"
                         tick={{
                           fontSize: 11,
+                          angle: dateRange === '90d' ? -90 : -45,
                           textAnchor: 'end'
                         }}
                         tickLine={{ stroke: '#e2e8f0' }}
@@ -452,7 +458,6 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                         minTickGap={chartData.length <= 5 ? 10 : (dateRange === '90d' ? 20 : 35)}
                         height={(dateRange === '7d' || dateRange === '14d') || chartData.length <= 10 ? 70 : 50}
                         tickFormatter={formatXAxisLabel}
-                        angle={dateRange === '90d' ? -90 : -45}
                       />
                       <YAxis
                         tick={{ fontSize: 12 }}
@@ -491,6 +496,7 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                         dataKey="date"
                         tick={{
                           fontSize: 11,
+                          angle: dateRange === '90d' ? -90 : -45,
                           textAnchor: 'end'
                         }}
                         tickLine={{ stroke: '#e2e8f0' }}
@@ -498,7 +504,6 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                         minTickGap={chartData.length <= 5 ? 10 : (dateRange === '90d' ? 20 : 35)}
                         height={(dateRange === '7d' || dateRange === '14d') || chartData.length <= 10 ? 70 : 50}
                         tickFormatter={formatXAxisLabel}
-                        angle={dateRange === '90d' ? -90 : -45}
                       />
                       <YAxis
                         tick={{ fontSize: 12 }}
@@ -548,6 +553,8 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
                 </div>
               </div>
             )}
+
+
           </div>
         </Tabs>
       </div>
