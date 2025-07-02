@@ -29,4 +29,23 @@ pnpm-debug.log*
 
 # 系统文件
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Docker 相关
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# 测试和文档
+README.md
+*.md
+test
+tests
+__tests__
+coverage
+
+# 临时文件和缓存
+*.tmp
+*.temp
+.cache
+.turbo
