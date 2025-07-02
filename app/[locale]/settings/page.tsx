@@ -14,7 +14,8 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useIndexedDB } from "@/hooks/use-indexed-db"
+import { useDailyLogServer } from "@/hooks/use-daily-log-server"
+import { useAIMemoryServer } from "@/hooks/use-ai-memory-server"
 import { useAIMemory } from "@/hooks/use-ai-memory"
 import type { AIConfig, ModelConfig } from "@/lib/types"
 import type { OpenAIModel } from "@/lib/openai-client"
@@ -83,7 +84,8 @@ function SettingsContent() {
     return ['profile', 'goals', 'ai', 'data'].includes(tabParam || '') ? tabParam : 'profile'
   })
 
-  const { clearAllData } = useIndexedDB("healthLogs")
+  const { getAllDailyLogs } = useDailyLogServer()
+  const { getAllMemories: getAllServerMemories } = useAIMemoryServer()
   const { memories, updateMemory, clearMemory, clearAllMemories } = useAIMemory()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -485,61 +487,24 @@ function SettingsContent() {
   const handleExportData = useCallback(async () => {
     try {
       // 获取所有健康日志
-      const db = await window.indexedDB.open("healthApp", 2)
-      const request = new Promise((resolve, reject) => {
-        db.onsuccess = (event) => {
-          const database = (event.target as IDBOpenDBRequest).result
-          const transaction = database.transaction(["healthLogs"], "readonly")
-          const objectStore = transaction.objectStore("healthLogs")
-          const allData: Record<string, any> = {}
-
-          objectStore.openCursor().onsuccess = (cursorEvent) => {
-            const cursor = (cursorEvent.target as IDBRequest).result
-            if (cursor) {
-              allData[cursor.key as string] = cursor.value
-              cursor.continue()
-            } else {
-              resolve(allData)
-            }
-          }
-
-          transaction.onerror = () => reject(new Error("无法读取数据"))
-        }
-        db.onerror = () => reject(new Error("无法打开数据库"))
+      const healthLogsArray = await getAllDailyLogs()
+      const healthLogs: Record<string, any> = {}
+      healthLogsArray.forEach(log => {
+        healthLogs[log.date] = log
       })
-
-      const healthLogs = await request
 
       // 获取AI记忆数据
-      const aiMemoriesRequest = new Promise((resolve, reject) => {
-        const db2 = window.indexedDB.open("healthApp", 2)
-        db2.onsuccess = (event) => {
-          const database = (event.target as IDBOpenDBRequest).result
-          if (!database.objectStoreNames.contains("aiMemories")) {
-            resolve({})
-            return
-          }
-
-          const transaction = database.transaction(["aiMemories"], "readonly")
-          const objectStore = transaction.objectStore("aiMemories")
-          const allMemories: Record<string, any> = {}
-
-          objectStore.openCursor().onsuccess = (cursorEvent) => {
-            const cursor = (cursorEvent.target as IDBRequest).result
-            if (cursor) {
-              allMemories[cursor.key as string] = cursor.value
-              cursor.continue()
-            } else {
-              resolve(allMemories)
-            }
-          }
-
-          transaction.onerror = () => resolve({}) // 如果出错，返回空对象
-        }
-        db2.onerror = () => resolve({}) // 如果出错，返回空对象
-      })
-
-      const aiMemories = await aiMemoriesRequest
+      let aiMemories: Record<string, any> = {}
+      try {
+        const memoriesArray = await getAllServerMemories()
+        memoriesArray.forEach(memory => {
+          aiMemories[memory.expertId] = memory
+        })
+      } catch (error) {
+        console.warn('获取服务端AI记忆失败，尝试从本地获取:', error)
+        // 如果服务端获取失败，尝试从本地IndexedDB获取
+        aiMemories = memories
+      }
 
       // 创建导出对象
       const exportData = {
@@ -575,7 +540,7 @@ function SettingsContent() {
         variant: "destructive",
       })
     }
-  }, [userProfile, aiConfig, toast])
+  }, [userProfile, aiConfig, getAllDailyLogs, getAllServerMemories, memories, toast])
 
   // 导入数据
   const handleImportData = useCallback(
@@ -594,111 +559,38 @@ function SettingsContent() {
             throw new Error("无效的数据格式")
           }
 
-          // 更新用户配置
-          setUserProfile(importedData.userProfile)
+          // 使用数据迁移API导入数据到服务端
+          const response = await fetch('/api/db/migrate-indexeddb', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              indexedDBData: importedData
+            })
+          })
 
-          // 更新AI配置（如果存在）
+          if (!response.ok) {
+            throw new Error('数据导入失败')
+          }
+
+          const result = await response.json()
+          console.log('数据导入结果:', result)
+
+          // 更新本地状态
+          setUserProfile(importedData.userProfile)
           if (importedData.aiConfig) {
             setAIConfig(importedData.aiConfig)
           }
 
-          // 更新健康日志
-          const db = await window.indexedDB.open("healthApp", 2)
-          db.onsuccess = (event) => {
-            const database = (event.target as IDBOpenDBRequest).result
-            const transaction = database.transaction(["healthLogs"], "readwrite")
-            const objectStore = transaction.objectStore("healthLogs")
+          toast({
+            title: t('data.importSuccessTitle'),
+            description: t('data.importSuccessDescription'),
+          })
 
-            // 清除现有数据
-            objectStore.clear()
-
-            // 添加导入的数据
-            Object.entries(importedData.healthLogs).forEach(([key, value]) => {
-              objectStore.add(value, key)
-            })
-
-            transaction.oncomplete = async () => {
-              // 导入AI记忆数据（如果存在）
-              if (importedData.aiMemories && Object.keys(importedData.aiMemories).length > 0) {
-                try {
-                  const db2 = await window.indexedDB.open("healthApp", 2)
-                  db2.onsuccess = (event2) => {
-                    const database2 = (event2.target as IDBOpenDBRequest).result
-
-                    // 确保aiMemories对象存储存在
-                    if (!database2.objectStoreNames.contains("aiMemories")) {
-                      // 如果不存在，需要升级数据库版本
-                      database2.close()
-                      const upgradeRequest = window.indexedDB.open("healthApp", 2)
-                      upgradeRequest.onupgradeneeded = (upgradeEvent) => {
-                        const upgradeDb = (upgradeEvent.target as IDBOpenDBRequest).result
-                        if (!upgradeDb.objectStoreNames.contains("aiMemories")) {
-                          upgradeDb.createObjectStore("aiMemories")
-                        }
-                      }
-                      upgradeRequest.onsuccess = (upgradeEvent) => {
-                        const upgradeDb = (upgradeEvent.target as IDBOpenDBRequest).result
-                        const memoryTransaction = upgradeDb.transaction(["aiMemories"], "readwrite")
-                        const memoryStore = memoryTransaction.objectStore("aiMemories")
-
-                        // 清除现有AI记忆
-                        memoryStore.clear()
-
-                        // 添加导入的AI记忆
-                        Object.entries(importedData.aiMemories).forEach(([key, value]) => {
-                          memoryStore.add(value, key)
-                        })
-
-                        memoryTransaction.oncomplete = () => {
-                          toast({
-                            title: "导入成功",
-                            description: "您的健康数据和AI记忆已成功导入",
-                          })
-                        }
-                      }
-                    } else {
-                      const memoryTransaction = database2.transaction(["aiMemories"], "readwrite")
-                      const memoryStore = memoryTransaction.objectStore("aiMemories")
-
-                      // 清除现有AI记忆
-                      memoryStore.clear()
-
-                      // 添加导入的AI记忆
-                      Object.entries(importedData.aiMemories).forEach(([key, value]) => {
-                        memoryStore.add(value, key)
-                      })
-
-                      memoryTransaction.oncomplete = () => {
-                        toast({
-                          title: t('data.importSuccessWithMemoryTitle'),
-                          description: t('data.importSuccessWithMemoryDescription'),
-                        })
-                      }
-                    }
-                  }
-                } catch (memoryError) {
-                  console.warn("导入AI记忆失败:", memoryError)
-                  toast({
-                    title: t('data.partialImportSuccessTitle'),
-                    description: t('data.partialImportSuccessDescription'),
-                  })
-                }
-              } else {
-                toast({
-                  title: t('data.importSuccessTitle'),
-                  description: t('data.importSuccessDescription'),
-                })
-              }
-
-              // 重置文件输入
-              if (event.target) {
-                (event.target as HTMLInputElement).value = ""
-              }
-            }
-
-            transaction.onerror = () => {
-              throw new Error("导入数据到数据库失败")
-            }
+          // 重置文件输入
+          if (event.target) {
+            (event.target as HTMLInputElement).value = ""
           }
         } catch (error) {
           console.error("导入数据失败:", error)

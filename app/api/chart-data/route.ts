@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { format, parseISO, eachDayOfInterval } from "date-fns"
+import { withAuth } from '@/lib/auth-middleware'
+import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request) => {
   try {
+    const userId = request.userId!
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('start')
     const endDate = searchParams.get('end')
@@ -18,20 +21,14 @@ export async function GET(request: NextRequest) {
     // 生成日期范围内的所有日期
     const dateRange = eachDayOfInterval({ start, end })
 
-    // 从数据库或存储中获取真实数据
-    // 这里我们需要查询：
-    // 1. 每日体重记录
-    // 2. 每日食物摄入总热量
-    // 3. 每日运动消耗总热量
-    // 4. 计算热量缺口
-
+    // 从数据库获取真实数据
     const chartData = await Promise.all(
       dateRange.map(async (date) => {
         const dateStr = format(date, 'yyyy-MM-dd')
-        
-        // 获取当日数据 - 这里需要连接到你的数据存储
-        const dailyData = await getDailyHealthData(dateStr)
-        
+
+        // 获取当日数据
+        const dailyData = await getDailyHealthData(userId, dateStr)
+
         return {
           date: format(date, 'MM-dd'),
           weight: dailyData.weight,
@@ -47,33 +44,57 @@ export async function GET(request: NextRequest) {
     console.error('获取图表数据失败:', error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-}
+})
 
 // 获取指定日期的健康数据
-async function getDailyHealthData(dateStr: string) {
-  // 这里需要根据你的数据存储方式来实现
-  // 可能的数据源：
-  // 1. localStorage (客户端存储)
-  // 2. 数据库 (如果有后端)
-  // 3. 文件存储
-  
+async function getDailyHealthData(userId: string, dateStr: string) {
   try {
-    // 示例：从localStorage获取数据
-    // 注意：这在服务端不可用，需要改为其他存储方式
-    
-    // 临时返回模拟数据，直到连接真实数据源
-    const weight = 70 + Math.sin(Date.parse(dateStr) * 0.0001) * 2 + Math.random() * 1 - 0.5
-    const caloriesIn = 1800 + Math.random() * 600
-    const caloriesOut = 300 + Math.random() * 400
-    const calorieDeficit = caloriesIn - caloriesOut - 1800 // 假设TDEE为1800
-    
+    // 从数据库获取指定日期的日志数据
+    const dailyLog = await prisma.dailyLog.findUnique({
+      where: {
+        userId_date: {
+          userId,
+          date: dateStr
+        }
+      },
+      include: {
+        foodEntries: true,
+        exerciseEntries: true
+      }
+    })
+
+    if (!dailyLog) {
+      return {
+        weight: null,
+        caloriesIn: 0,
+        caloriesOut: 0,
+        calorieDeficit: 0
+      }
+    }
+
+    // 计算总摄入热量
+    const caloriesIn = dailyLog.foodEntries.reduce((total, entry) => {
+      const nutritionalInfo = JSON.parse(entry.totalNutritionalInfoConsumed)
+      return total + (nutritionalInfo.calories || 0)
+    }, 0)
+
+    // 计算总消耗热量
+    const caloriesOut = dailyLog.exerciseEntries.reduce((total, entry) => {
+      return total + (entry.caloriesBurnedEstimated || 0)
+    }, 0)
+
+    // 计算热量缺口 (摄入 - 消耗 - TDEE)
+    const tdee = dailyLog.calculatedTDEE || 1800 // 默认TDEE
+    const calorieDeficit = caloriesIn - caloriesOut - tdee
+
     return {
-      weight: Number(weight.toFixed(1)),
-      caloriesIn: Number(caloriesIn.toFixed(0)),
-      caloriesOut: Number(caloriesOut.toFixed(0)),
-      calorieDeficit: Number(calorieDeficit.toFixed(0))
+      weight: dailyLog.weight,
+      caloriesIn: Math.round(caloriesIn),
+      caloriesOut: Math.round(caloriesOut),
+      calorieDeficit: Math.round(calorieDeficit)
     }
   } catch (error) {
+    console.error('获取日志数据失败:', error)
     // 返回默认值
     return {
       weight: null,
@@ -83,6 +104,3 @@ async function getDailyHealthData(dateStr: string) {
     }
   }
 }
-
-// 如果要连接真实的localStorage数据，需要创建一个客户端API
-// 或者将数据存储迁移到服务端数据库

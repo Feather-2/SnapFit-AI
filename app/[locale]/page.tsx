@@ -24,7 +24,7 @@ import { ManagementCharts } from "@/components/management-charts"
 import { SmartSuggestions } from "@/components/smart-suggestions"
 import { DailyStatusCard } from "@/components/DailyStatusCard"
 import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useIndexedDB } from "@/hooks/use-indexed-db"
+import { useDailyLogServer } from "@/hooks/use-daily-log-server"
 import { useExportReminder } from "@/hooks/use-export-reminder"
 import { useDateRecords } from "@/hooks/use-date-records"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -100,8 +100,8 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     },
   })
 
-  // 使用 IndexedDB 钩子获取日志数据
-  const { getData: getDailyLog, saveData: saveDailyLog, isLoading } = useIndexedDB("healthLogs")
+  // 使用服务端存储钩子获取日志数据
+  const { getDailyLog, saveDailyLog, isLoading } = useDailyLogServer()
 
   // 使用导出提醒Hook
   const exportReminder = useExportReminder()
@@ -132,7 +132,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   useEffect(() => {
     const dateKey = format(selectedDate, "yyyy-MM-dd")
     getDailyLog(dateKey).then((data) => {
-      console.log("从IndexedDB读取到的数据：", data)
+      console.log("从服务端读取到的数据：", data)
       const defaultActivity = userProfile.activityLevel || "moderate"
       if (data) {
         setDailyLog(data)
@@ -157,6 +157,27 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         setCurrentDayWeight("")
         setCurrentDayActivityLevelForSelect(defaultActivity)
       }
+    }).catch((error) => {
+      console.error("加载日志数据失败：", error)
+      // 如果加载失败，设置默认数据
+      const defaultActivity = userProfile.activityLevel || "moderate"
+      setDailyLog({
+        date: dateKey,
+        foodEntries: [],
+        exerciseEntries: [],
+        summary: {
+          totalCaloriesConsumed: 0,
+          totalCaloriesBurned: 0,
+          macros: { carbs: 0, protein: 0, fat: 0 },
+          micronutrients: {},
+        },
+        weight: undefined,
+        activityLevel: defaultActivity,
+        calculatedBMR: undefined,
+        calculatedTDEE: undefined,
+      })
+      setCurrentDayWeight("")
+      setCurrentDayActivityLevelForSelect(defaultActivity)
     })
   }, [selectedDate, getDailyLog, userProfile.activityLevel])
 
@@ -275,7 +296,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
             ...currentLog,
             tefAnalysis: cachedAnalysis
           };
-          saveDailyLog(updatedLog.date, updatedLog);
+          saveDailyLog(updatedLog.date, updatedLog).catch(error => {
+            console.error('保存TEF分析结果失败：', error);
+          });
           return updatedLog;
         });
       }
@@ -351,7 +374,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                 ...currentLog,
                 tefAnalysis: finalAnalysis
               };
-              saveDailyLog(updatedLog.date, updatedLog);
+              saveDailyLog(updatedLog.date, updatedLog).catch(error => {
+                console.error('保存TEF分析结果失败：', error);
+              });
               return updatedLog;
             });
           }
@@ -365,7 +390,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       if (dailyLog.tefAnalysis) {
         setDailyLog(currentLog => {
           const updatedLog = { ...currentLog, tefAnalysis: undefined };
-          saveDailyLog(updatedLog.date, updatedLog);
+          saveDailyLog(updatedLog.date, updatedLog).catch(error => {
+            console.error('清除TEF分析结果失败：', error);
+          });
           return updatedLog;
         });
       }
@@ -422,7 +449,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
           };
           // 只有在实际值发生变化时才保存，避免不必要的写入
           if (currentLogState.calculatedBMR !== newBmr || currentLogState.calculatedTDEE !== newTdee || (rates && (!currentLogState.calculatedBMR || !currentLogState.calculatedTDEE))) {
-            saveDailyLog(updatedLogWithNewRates.date, updatedLogWithNewRates);
+            saveDailyLog(updatedLogWithNewRates.date, updatedLogWithNewRates).catch(error => {
+              console.error('保存BMR/TDEE计算结果失败：', error);
+            });
           }
           return updatedLogWithNewRates;
         });
@@ -621,7 +650,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       }
 
       setDailyLog(updatedLog)
-      saveDailyLog(updatedLog.date, updatedLog)
+      saveDailyLog(updatedLog.date, updatedLog).catch(error => {
+        console.error('保存日志数据失败：', error);
+      })
       // 触发图表刷新
       setChartRefreshTrigger(prev => prev + 1)
       // 刷新日期记录状态
@@ -668,7 +699,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
     recalculateSummary(updatedLog)
     setDailyLog(updatedLog)
-    saveDailyLog(updatedLog.date, updatedLog)
+    saveDailyLog(updatedLog.date, updatedLog).catch(error => {
+      console.error('删除条目后保存失败：', error);
+    })
     // 触发图表刷新
     setChartRefreshTrigger(prev => prev + 1)
     // 刷新日期记录状态
@@ -701,7 +734,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
     recalculateSummary(updatedLog)
     setDailyLog(updatedLog)
-    saveDailyLog(updatedLog.date, updatedLog)
+    saveDailyLog(updatedLog.date, updatedLog).catch(error => {
+      console.error('更新条目后保存失败：', error);
+    })
     // 触发图表刷新
     setChartRefreshTrigger(prev => prev + 1)
     // 刷新日期记录状态
@@ -757,7 +792,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     if (!currentDayWeight.trim()) {
       const updatedLog = { ...dailyLog, weight: undefined }
       setDailyLog(updatedLog)
-      saveDailyLog(dateKey, updatedLog)
+      saveDailyLog(dateKey, updatedLog).catch(error => {
+        console.error('清除体重数据失败：', error);
+      })
       // 刷新日期记录状态
       refreshRecords()
       toast({
@@ -779,7 +816,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
     const updatedLog = { ...dailyLog, weight: weightValue }
     setDailyLog(updatedLog)
-    saveDailyLog(dateKey, updatedLog)
+    saveDailyLog(dateKey, updatedLog).catch(error => {
+      console.error('保存体重数据失败：', error);
+    })
     // 触发图表刷新
     setChartRefreshTrigger(prev => prev + 1)
     // 刷新日期记录状态
@@ -795,7 +834,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     const dateKey = format(selectedDate, "yyyy-MM-dd")
     const updatedLog = { ...dailyLog, dailyStatus: status }
     setDailyLog(updatedLog)
-    saveDailyLog(dateKey, updatedLog)
+    saveDailyLog(dateKey, updatedLog).catch(error => {
+      console.error('保存每日状态失败：', error);
+    })
     // 刷新日期记录状态
     refreshRecords()
     toast({

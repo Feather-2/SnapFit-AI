@@ -7,7 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { TrendingUp, Weight, Utensils, Dumbbell, Target, Calendar } from "lucide-react"
 import { format, subDays, parseISO, eachDayOfInterval } from "date-fns"
 import { zhCN } from "date-fns/locale"
-import { useIndexedDB } from "@/hooks/use-indexed-db"
+import { useDailyLogServer } from "@/hooks/use-daily-log-server"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTranslation } from "@/hooks/use-i18n"
 
@@ -40,7 +40,7 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
   const [dateRange, setDateRange] = useState<DateRange>('7d')
   const [isDataOptimized, setIsDataOptimized] = useState(false)
   const [realDataCount, setRealDataCount] = useState(0)
-  const { getData: getDailyLog, isInitializing: dbInitializing } = useIndexedDB("healthLogs")
+  const { getDailyLog, isLoading: serverLoading } = useDailyLogServer()
 
   // 日期范围选项
   const dateRangeOptions: DateRangeOption[] = [
@@ -51,15 +51,13 @@ export function ManagementCharts({ selectedDate, refreshTrigger }: ManagementCha
   ]
 
   useEffect(() => {
-    // 等待 IndexedDB 初始化完成后再获取数据
-    if (!dbInitializing) {
-      const timer = setTimeout(() => {
-        fetchChartData()
-      }, 100) // 减少延迟时间
+    // 获取图表数据
+    const timer = setTimeout(() => {
+      fetchChartData()
+    }, 100) // 减少延迟时间
 
-      return () => clearTimeout(timer)
-    }
-  }, [selectedDate, refreshTrigger, dbInitializing, getDailyLog, dateRange])
+    return () => clearTimeout(timer)
+  }, [selectedDate, refreshTrigger, getDailyLog, dateRange])
 
   const fetchChartData = async () => {
     setIsLoading(true)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useDailyLogServer } from './use-daily-log-server'
 
 interface ExportReminderState {
   shouldRemind: boolean
@@ -16,6 +17,7 @@ export function useExportReminder(): ExportReminderState {
     hasEnoughData: false,
     dataSpanDays: 0
   })
+  const { getAllDailyLogs } = useDailyLogServer()
 
   useEffect(() => {
     const checkExportReminder = async () => {
@@ -73,62 +75,44 @@ export function useExportReminder(): ExportReminderState {
       }
     }
 
-    // 检查IndexedDB中数据的时间跨度
+    // 检查服务端数据的时间跨度
     const checkDataSpan = async (): Promise<{ hasData: boolean; spanDays: number }> => {
-      return new Promise((resolve) => {
-        const request = indexedDB.open('healthApp', 1)
+      try {
+        const allLogs = await getAllDailyLogs()
 
-        request.onerror = () => {
-          resolve({ hasData: false, spanDays: 0 })
+        if (!allLogs || allLogs.length === 0) {
+          return { hasData: false, spanDays: 0 }
         }
 
-        request.onsuccess = (event) => {
-          const db = (event.target as IDBOpenDBRequest).result
-          const transaction = db.transaction(['healthLogs'], 'readonly')
-          const objectStore = transaction.objectStore('healthLogs')
-          const getAllRequest = objectStore.getAll()
+        // 获取所有有数据的日期
+        const dates = allLogs
+          .filter(log => log && (
+            (log.foodEntries && log.foodEntries.length > 0) ||
+            (log.exerciseEntries && log.exerciseEntries.length > 0) ||
+            log.weight !== undefined
+          ))
+          .map(log => new Date(log.date))
+          .sort((a, b) => a.getTime() - b.getTime())
 
-          getAllRequest.onsuccess = () => {
-            const allLogs = getAllRequest.result
-
-            if (!allLogs || allLogs.length === 0) {
-              resolve({ hasData: false, spanDays: 0 })
-              return
-            }
-
-            // 获取所有有数据的日期
-            const dates = allLogs
-              .filter(log => log && (
-                (log.foodEntries && log.foodEntries.length > 0) ||
-                (log.exerciseEntries && log.exerciseEntries.length > 0) ||
-                log.weight !== undefined
-              ))
-              .map(log => new Date(log.date))
-              .sort((a, b) => a.getTime() - b.getTime())
-
-            if (dates.length === 0) {
-              resolve({ hasData: false, spanDays: 0 })
-              return
-            }
-
-            // 计算最早和最晚日期的差值
-            const earliestDate = dates[0]
-            const latestDate = dates[dates.length - 1]
-            const timeDiff = latestDate.getTime() - earliestDate.getTime()
-            const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24))
-
-            // 需要至少2天的数据跨度
-            resolve({
-              hasData: daysDiff >= 1, // 至少跨越2天（差值>=1）
-              spanDays: daysDiff + 1 // 实际天数
-            })
-          }
-
-          getAllRequest.onerror = () => {
-            resolve({ hasData: false, spanDays: 0 })
-          }
+        if (dates.length === 0) {
+          return { hasData: false, spanDays: 0 }
         }
-      })
+
+        // 计算最早和最晚日期的差值
+        const earliestDate = dates[0]
+        const latestDate = dates[dates.length - 1]
+        const timeDiff = latestDate.getTime() - earliestDate.getTime()
+        const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24))
+
+        // 需要至少2天的数据跨度
+        return {
+          hasData: daysDiff >= 1, // 至少跨越2天（差值>=1）
+          spanDays: daysDiff + 1 // 实际天数
+        }
+      } catch (error) {
+        console.error('检查数据跨度失败:', error)
+        return { hasData: false, spanDays: 0 }
+      }
     }
 
     checkExportReminder()
@@ -137,7 +121,7 @@ export function useExportReminder(): ExportReminderState {
     const interval = setInterval(checkExportReminder, 60 * 60 * 1000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [getAllDailyLogs])
 
   return reminderState
 }

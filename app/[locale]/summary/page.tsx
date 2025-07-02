@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useTranslation } from "@/hooks/use-i18n"
 import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useIndexedDB } from "@/hooks/use-indexed-db"
+import { useDailyLogServer } from "@/hooks/use-daily-log-server"
 import { useToast } from "@/hooks/use-toast"
 import type { DailyLog, UserProfile, SmartSuggestionsResponse } from "@/lib/types"
 import { format } from "date-fns"
@@ -60,7 +60,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
   const [isCapturing, setIsCapturing] = useState(false)
   const summaryContentRef = useRef<HTMLDivElement>(null)
 
-  const { getData } = useIndexedDB("healthLogs")
+  const { getDailyLog } = useDailyLogServer()
   const searchParams = useSearchParams()
 
   // 解包params Promise
@@ -87,11 +87,16 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
   useEffect(() => {
     const loadDailyLog = async () => {
       const dateKey = format(selectedDate, "yyyy-MM-dd")
-      const log = await getData(dateKey)
-      setDailyLog(log)
+      try {
+        const log = await getDailyLog(dateKey)
+        setDailyLog(log)
+      } catch (error) {
+        console.error('加载汇总页面日志数据失败：', error)
+        setDailyLog(null)
+      }
     }
     loadDailyLog()
-  }, [selectedDate, getData])
+  }, [selectedDate, getDailyLog])
 
   useEffect(() => {
     // 加载智能建议 - 使用与主页面相同的存储格式
@@ -357,7 +362,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
     } catch (error) {
       console.warn('优化容器尺寸时出错:', error)
       // 返回空的恢复函数
-      return () => {}
+      return () => { }
     }
   }
 
@@ -612,8 +617,8 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
         ignoreElements: (el) => {
           // 排除不需要截图的元素
           return el.classList.contains('no-screenshot') ||
-                 el.tagName === 'BUTTON' ||
-                 el.classList.contains('smart-suggestions-card')
+            el.tagName === 'BUTTON' ||
+            el.classList.contains('smart-suggestions-card')
         },
         // 优化截图质量
         allowTaint: true,
@@ -722,9 +727,9 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
               background: ${isDark ? '#1e293b !important' : 'white !important'};
               border: 1px solid ${isDark ? '#334155 !important' : '#e5e7eb !important'};
               box-shadow: ${isDark
-                ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important'
-                : '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06) !important'
-              };
+              ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important'
+              : '0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06) !important'
+            };
               border-radius: 12px !important;
               padding: 1.5rem !important;
               margin-bottom: 1.5rem !important;
@@ -1048,7 +1053,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
   const { summary, calculatedBMR, calculatedTDEE, foodEntries, exerciseEntries } = dailyLog
   const { totalCaloriesConsumed, totalCaloriesBurned } = summary
   const netCalories = totalCaloriesConsumed - totalCaloriesBurned
-  
+
   // 计算与TDEE的差额
   const calorieDifference = calculatedTDEE ? calculatedTDEE - netCalories : null
   let calorieStatusText = ""
@@ -1139,7 +1144,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   {totalCaloriesConsumed.toFixed(0)} kcal
                 </span>
               </div>
-              
+
               {/* 膳食列表 */}
               {foodEntries.length > 0 ? (
                 <div className="space-y-3">
@@ -1147,8 +1152,8 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                     <FoodEntryCard
                       key={entry.log_id}
                       entry={entry}
-                      onEdit={() => {}}
-                      onDelete={() => {}}
+                      onEdit={() => { }}
+                      onDelete={() => { }}
                       showActions={false}
                     />
                   ))}
@@ -1171,7 +1176,7 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                   {totalCaloriesBurned.toFixed(0)} kcal
                 </span>
               </div>
-              
+
               {/* 运动列表 */}
               {exerciseEntries.length > 0 ? (
                 <div className="space-y-3">
@@ -1179,8 +1184,8 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                     <ExerciseEntryCard
                       key={entry.log_id}
                       entry={entry}
-                      onEdit={() => {}}
-                      onDelete={() => {}}
+                      onEdit={() => { }}
+                      onDelete={() => { }}
                       showActions={false}
                     />
                   ))}
@@ -1196,8 +1201,8 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
             <div className="border-t pt-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  {netCalories > 0 ? 
-                    <TrendingUp className="mr-2 h-5 w-5 text-orange-500" /> : 
+                  {netCalories > 0 ?
+                    <TrendingUp className="mr-2 h-5 w-5 text-orange-500" /> :
                     <TrendingDown className="mr-2 h-5 w-5 text-blue-500" />
                   }
                   <span className="text-lg font-medium">{t('netCalories')}</span>
@@ -1319,13 +1324,12 @@ function SummaryPageContent({ params }: { params: Promise<{ locale: string }> })
                           <h4 className="font-medium text-base flex items-center">
                             <span className="mr-2">{category.suggestions[0]?.icon || '💡'}</span>
                             {category.category}
-                            <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
-                              category.priority === 'high' ? 'bg-red-100 text-red-700' :
+                            <span className={`ml-2 text-xs px-2 py-1 rounded-full ${category.priority === 'high' ? 'bg-red-100 text-red-700' :
                               category.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
+                                'bg-gray-100 text-gray-700'
+                              }`}>
                               {category.priority === 'high' ? '高优先级' :
-                               category.priority === 'medium' ? '中优先级' : '低优先级'}
+                                category.priority === 'medium' ? '中优先级' : '低优先级'}
                             </span>
                           </h4>
                           <p className="text-sm text-muted-foreground mt-1">{category.summary}</p>
