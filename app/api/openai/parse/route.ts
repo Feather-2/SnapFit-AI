@@ -1,25 +1,32 @@
-import { OpenAICompatibleClient } from "@/lib/openai-client"
-import { v4 as uuidv4 } from "uuid"
+import { OpenAICompatibleClient } from "@/lib/openai-client";
+import { v4 as uuidv4 } from "uuid";
 
 export async function POST(req: Request) {
   try {
-    const { text, type, userWeight } = await req.json()
+    const { text, type, userWeight } = await req.json();
 
     if (!text) {
-      return Response.json({ error: "No text provided" }, { status: 400 })
+      return Response.json({ error: "No text provided" }, { status: 400 });
     }
 
     // 获取AI配置
-    const aiConfigStr = req.headers.get("x-ai-config")
+    const aiConfigStr = req.headers.get("x-ai-config");
     if (!aiConfigStr) {
-      return Response.json({ error: "AI configuration not found" }, { status: 400 })
+      return Response.json(
+        { error: "AI configuration not found" },
+        { status: 400 }
+      );
     }
 
-    const aiConfig = JSON.parse(aiConfigStr)
-    const modelConfig = type === "food" ? aiConfig.agentModel : aiConfig.agentModel
+    const aiConfig = JSON.parse(aiConfigStr);
+    const modelConfig =
+      type === "food" ? aiConfig.agentModel : aiConfig.agentModel;
 
     // 创建客户端
-    const client = new OpenAICompatibleClient(modelConfig.baseUrl, modelConfig.apiKey)
+    const client = new OpenAICompatibleClient(
+      modelConfig.baseUrl,
+      modelConfig.apiKey
+    );
 
     // 根据类型选择不同的提示词和解析逻辑
     if (type === "food") {
@@ -28,12 +35,12 @@ export async function POST(req: Request) {
         请分析以下文本中描述的食物，并将其转换为结构化的 JSON 格式。
         文本: "${text}"
         
-        请直接输出 JSON，不要有额外文本。如果无法确定数值，请给出合理估算，并在相应字段标记 is_estimated: true。
+        请直接输出 JSON，不要有额外文本。注意字段的数据类型由\[\]包裹。如果遇到千焦需要转成千卡。如果无法确定数值，请给出合理估算，并在相应字段标记 is_estimated: true。
         
         每个食物项应包含以下字段:
         - log_id: 唯一标识符
         - food_name: 食物名称
-        - consumed_grams: 消耗的克数
+        - consumed_grams: 消耗的克数[Number]
         - meal_type: 餐次类型 (breakfast, lunch, dinner, snack)
         - time_period: 时间段 (morning, noon, afternoon, evening)，根据文本内容推断
         - nutritional_info_per_100g: 每100克的营养成分，包括 calories, carbohydrates, protein, fat 等
@@ -67,25 +74,25 @@ export async function POST(req: Request) {
             }
           ]
         }
-      `
+      `;
 
       const { text: resultText } = await client.generateText({
         model: modelConfig.name,
         prompt,
         response_format: { type: "json_object" },
-      })
+      });
 
       // 解析结果
-      const result = JSON.parse(resultText)
+      const result = JSON.parse(resultText);
 
       // 为每个食物项添加唯一 ID
       if (result.food && Array.isArray(result.food)) {
         result.food.forEach((item: any) => {
-          item.log_id = uuidv4()
-        })
+          item.log_id = uuidv4();
+        });
       }
 
-      return Response.json(result)
+      return Response.json(result);
     } else if (type === "exercise") {
       // 运动解析提示词
       const prompt = `
@@ -127,30 +134,33 @@ export async function POST(req: Request) {
             }
           ]
         }
-      `
+      `;
 
       const { text: resultText } = await client.generateText({
         model: modelConfig.name,
         prompt,
         response_format: { type: "json_object" },
-      })
+      });
 
       // 解析结果
-      const result = JSON.parse(resultText)
+      const result = JSON.parse(resultText);
 
       // 为每个运动项添加唯一 ID
       if (result.exercise && Array.isArray(result.exercise)) {
         result.exercise.forEach((item: any) => {
-          item.log_id = uuidv4()
-        })
+          item.log_id = uuidv4();
+        });
       }
 
-      return Response.json(result)
+      return Response.json(result);
     } else {
-      return Response.json({ error: "Invalid type" }, { status: 400 })
+      return Response.json({ error: "Invalid type" }, { status: 400 });
     }
   } catch (error) {
-    console.error("Error:", error)
-    return Response.json({ error: "Failed to process request" }, { status: 500 })
+    console.error("Error:", error);
+    return Response.json(
+      { error: "Failed to process request" },
+      { status: 500 }
+    );
   }
 }

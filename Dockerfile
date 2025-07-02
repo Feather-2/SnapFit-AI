@@ -21,9 +21,6 @@ COPY . .
 # 禁用Next.js遥测（可选）
 # ENV NEXT_TELEMETRY_DISABLED=1
 
-# 修改next.config.mjs以启用standalone输出
-RUN sed -i "s/const nextConfig = {/const nextConfig = {\n  output: 'standalone',/" next.config.mjs
-
 # 生成 Prisma 客户端
 RUN corepack enable pnpm && npx prisma generate
 
@@ -42,17 +39,28 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# 安装 pnpm（运行时需要）
+RUN corepack enable pnpm
+
+# 复制其他必要文件（在切换用户之前）
+COPY ./prisma ./prisma
+COPY ./messages ./messages
+COPY ./i18n.ts ./i18n.ts
+COPY ./middleware.ts ./middleware.ts
+
+# 复制依赖和构建输出
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.mjs ./next.config.mjs
+
 # 创建数据目录
 RUN mkdir -p /app/data /app/logs /app/public/uploads
 RUN chown -R nextjs:nodejs /app/data /app/logs /app/public/uploads
 
-# 复制公共资源
-COPY --from=builder /app/public ./public
-
-# 利用输出跟踪自动减小镜像大小
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# 确保 prisma 目录权限正确
+RUN chown -R nextjs:nodejs ./prisma ./messages ./i18n.ts ./middleware.ts
 
 # 切换到非root用户
 USER nextjs
@@ -62,5 +70,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# server.js由next build的standalone输出创建
-CMD ["node", "server.js"] 
+# 使用 next start 启动应用
+CMD ["pnpm", "start"]
