@@ -24,8 +24,11 @@ COPY . .
 # 修改next.config.mjs以启用standalone输出
 RUN sed -i "s/const nextConfig = {/const nextConfig = {\n  output: 'standalone',/" next.config.mjs
 
+# 生成 Prisma 客户端
+RUN corepack enable pnpm && npx prisma generate
+
 # 构建应用
-RUN corepack enable pnpm && pnpm build
+RUN pnpm build
 
 # 生产阶段
 FROM base AS runner

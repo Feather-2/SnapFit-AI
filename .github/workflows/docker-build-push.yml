@@ -2,9 +2,9 @@ name: 构建并发布Docker镜像
 
 on:
   push:
-    branches: [ main, master ]  # 当推送到主分支时触发
-    tags: [ 'v*' ]  # 当创建版本标签时触发
-  workflow_dispatch:  # 允许手动触发工作流
+    branches: [main, master] # 当推送到主分支时触发
+    tags: ["v*"] # 当创建版本标签时触发
+  workflow_dispatch: # 允许手动触发工作流
 
 env:
   REGISTRY: ghcr.io
@@ -52,4 +52,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max 
+          cache-to: type=gha,mode=max
