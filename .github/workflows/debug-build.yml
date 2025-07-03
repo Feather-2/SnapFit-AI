@@ -1,0 +1,47 @@
+name: 调试Docker构建
+
+on:
+  workflow_dispatch: # 只允许手动触发
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  debug-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 释放磁盘空间
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+
+      - name: 设置Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 尝试本地构建（调试模式）
+        run: |
+          echo "开始调试构建..."
+          docker build --progress=plain --no-cache -f Dockerfile.debug -t debug-test . || true
+          echo "构建完成，检查日志..."
+
+      - name: 检查构建环境
+        run: |
+          echo "检查 package.json..."
+          cat package.json | head -20
+          echo "检查 pnpm-lock.yaml..."
+          head -50 pnpm-lock.yaml
+          echo "检查 next.config.mjs..."
+          cat next.config.mjs
+          echo "检查 Prisma schema..."
+          cat prisma/schema.prisma | head -20

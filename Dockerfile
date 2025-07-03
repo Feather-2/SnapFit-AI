@@ -4,28 +4,53 @@ FROM node:20-alpine AS base
 
 # 安装依赖阶段
 FROM base AS deps
-# 添加libc6-compat以解决Alpine Linux中的兼容性问题
-RUN apk add --no-cache libc6-compat
+# 添加必要的构建工具和兼容性库
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    make \
+    g++ \
+    git \
+    openssl \
+    pkgconfig \
+    cairo-dev \
+    pango-dev \
+    jpeg-dev \
+    giflib-dev
+
 WORKDIR /app
 
-# 根据锁文件安装依赖
+# 复制包管理文件
 COPY package.json pnpm-lock.yaml* ./
-RUN corepack enable pnpm && pnpm i --frozen-lockfile
+
+# 启用 pnpm 并安装依赖
+RUN corepack enable pnpm && \
+    pnpm config set store-dir /app/.pnpm-store && \
+    pnpm config set node-options "--max-old-space-size=4096" && \
+    pnpm i --frozen-lockfile
 
 # 构建阶段
 FROM base AS builder
 WORKDIR /app
+
+# 复制依赖
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 禁用Next.js遥测
+# 设置环境变量
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV SKIP_ENV_VALIDATION=1
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
+# 启用 pnpm
+RUN corepack enable pnpm
 
 # 生成 Prisma 客户端
-RUN corepack enable pnpm && npx prisma generate
+RUN npx prisma generate
 
-# 构建应用
-RUN pnpm build
+# 构建应用 - 增加内存限制和详细输出
+RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm build
 
 # 生产阶段 - 使用更小的基础镜像
 FROM node:20-alpine AS runner

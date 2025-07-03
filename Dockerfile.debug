@@ -1,0 +1,56 @@
+# 调试版本的 Dockerfile - 最简化版本
+FROM node:20-alpine
+
+# 安装必要的工具
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    make \
+    g++ \
+    git \
+    openssl \
+    cairo-dev \
+    pango-dev \
+    jpeg-dev
+
+WORKDIR /app
+
+# 复制包管理文件
+COPY package.json pnpm-lock.yaml* ./
+
+# 启用 pnpm 并安装依赖
+RUN corepack enable pnpm
+RUN pnpm config set store-dir /app/.pnpm-store
+RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm i --frozen-lockfile
+
+# 复制源代码
+COPY . .
+
+# 设置环境变量
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV SKIP_ENV_VALIDATION=1
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
+# 生成 Prisma 客户端
+RUN echo "生成 Prisma 客户端..." && npx prisma generate
+
+# 检查关键文件
+RUN echo "检查关键文件..." && \
+    ls -la && \
+    ls -la prisma/ && \
+    ls -la node_modules/.prisma/ || echo "Prisma 客户端未找到"
+
+# 尝试构建 - 分步骤进行
+RUN echo "开始 Next.js 构建..." && \
+    NODE_OPTIONS="--max-old-space-size=4096" pnpm build || \
+    (echo "构建失败，显示错误信息..." && \
+     find . -name "*.log" -exec cat {} \; && \
+     exit 1)
+
+# 检查构建结果
+RUN echo "检查构建结果..." && ls -la .next/ || echo "构建输出目录不存在"
+
+EXPOSE 3000
+
+CMD ["pnpm", "start"]
