@@ -1,74 +1,137 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect, useRef, use } from "react"
-import { format } from "date-fns"
-import { zhCN, enUS } from "date-fns/locale"
-import Link from "next/link"
-import { CalendarIcon, X, ImageIcon, Brain, ClipboardPenLine, Utensils, Dumbbell, Weight, Activity, AlertCircle, CheckCircle2, Info, Settings2, UploadCloud, Trash2, Edit3, TrendingUp, TrendingDown, Sigma, Flame, BedDouble, Target, PieChart, ListChecks, Sparkles, Save, CalendarDays, UserCheck, AlertTriangle, Clock } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { Progress } from "@/components/ui/progress"
-import { useToast } from "@/hooks/use-toast"
-import type { FoodEntry, ExerciseEntry, DailyLog, AIConfig, DailyStatus } from "@/lib/types"
-import { FoodEntryCard } from "@/components/food-entry-card"
-import { ExerciseEntryCard } from "@/components/exercise-entry-card"
-import { DailySummary } from "@/components/daily-summary"
-import { ManagementCharts } from "@/components/management-charts"
-import { SmartSuggestions } from "@/components/smart-suggestions"
-import { DailyStatusCard } from "@/components/DailyStatusCard"
-import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useDailyLogServer } from "@/hooks/use-daily-log-server"
-import { useExportReminder } from "@/hooks/use-export-reminder"
-import { useDateRecords } from "@/hooks/use-date-records"
-import { useIsMobile } from "@/hooks/use-mobile"
-import { compressImage } from "@/lib/image-utils"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { calculateMetabolicRates } from "@/lib/health-utils"
-import { generateTEFAnalysis } from "@/lib/tef-utils"
-import { tefCacheManager } from "@/lib/tef-cache"
-import type { SmartSuggestionsResponse } from "@/lib/types"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useTranslation } from "@/hooks/use-i18n"
-import { AuthGuard } from "@/components/auth-guard"
+import { useState, useEffect, useRef, use } from "react";
+import { format } from "date-fns";
+import { zhCN, enUS } from "date-fns/locale";
+import Link from "next/link";
+import {
+  CalendarIcon,
+  X,
+  ImageIcon,
+  Brain,
+  ClipboardPenLine,
+  Utensils,
+  Dumbbell,
+  Weight,
+  Activity,
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  Settings2,
+  UploadCloud,
+  Trash2,
+  Edit3,
+  TrendingUp,
+  TrendingDown,
+  Sigma,
+  Flame,
+  BedDouble,
+  Target,
+  PieChart,
+  ListChecks,
+  Sparkles,
+  Save,
+  CalendarDays,
+  UserCheck,
+  AlertTriangle,
+  Clock,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+import type {
+  FoodEntry,
+  ExerciseEntry,
+  DailyLog,
+  AIConfig,
+  DailyStatus,
+} from "@/lib/types";
+import { FoodEntryCard } from "@/components/food-entry-card";
+import { ExerciseEntryCard } from "@/components/exercise-entry-card";
+import { DailySummary } from "@/components/daily-summary";
+import { ManagementCharts } from "@/components/management-charts";
+import { SmartSuggestions } from "@/components/smart-suggestions";
+import { DailyStatusCard } from "@/components/DailyStatusCard";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useDailyLogServer } from "@/hooks/use-daily-log-server";
+import { useAIConfigServer } from "@/hooks/use-ai-config-server";
+import { useExportReminder } from "@/hooks/use-export-reminder";
+import { useDateRecords } from "@/hooks/use-date-records";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useFoodEntries } from "@/hooks/use-food-entries";
+import { compressImage } from "@/lib/image-utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { calculateMetabolicRates } from "@/lib/health-utils";
+import { generateTEFAnalysis } from "@/lib/tef-utils";
+import { tefCacheManager } from "@/lib/tef-cache";
+import type { SmartSuggestionsResponse } from "@/lib/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useTranslation } from "@/hooks/use-i18n";
+import { AuthGuard } from "@/components/auth-guard";
+import { useAuth } from "@/hooks/use-auth";
 
 // 图片预览类型
 interface ImagePreview {
-  file: File
-  url: string
-  compressedFile?: File
+  file: File;
+  url: string;
+  compressedFile?: File;
 }
 
-export default function Dashboard({ params }: { params: Promise<{ locale: string }> }) {
-  const t = useTranslation('dashboard')
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+export default function Dashboard({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const t = useTranslation("dashboard");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   // 解包params Promise
-  const resolvedParams = use(params)
+  const resolvedParams = use(params);
 
   // 获取当前语言环境
-  const currentLocale = resolvedParams.locale === 'en' ? enUS : zhCN
-  const [inputText, setInputText] = useState("")
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [activeTab, setActiveTab] = useState("food")
-  const { toast } = useToast()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [currentDayWeight, setCurrentDayWeight] = useState<string>("")
-  const [currentDayActivityLevelForSelect, setCurrentDayActivityLevelForSelect] = useState<string>("")
-  const [chartRefreshTrigger, setChartRefreshTrigger] = useState<number>(0)
-  const [tefAnalysisCountdown, setTEFAnalysisCountdown] = useState(0)
-  const [smartSuggestionsLoading, setSmartSuggestionsLoading] = useState(false)
+  const currentLocale = resolvedParams.locale === "en" ? enUS : zhCN;
+  const [inputText, setInputText] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState("food");
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentDayWeight, setCurrentDayWeight] = useState<string>("");
+  const [
+    currentDayActivityLevelForSelect,
+    setCurrentDayActivityLevelForSelect,
+  ] = useState<string>("");
+  const [chartRefreshTrigger, setChartRefreshTrigger] = useState<number>(0);
+  const [tefAnalysisCountdown, setTEFAnalysisCountdown] = useState(0);
+  const [smartSuggestionsLoading, setSmartSuggestionsLoading] = useState(false);
 
   // 图片上传状态
-  const [uploadedImages, setUploadedImages] = useState<ImagePreview[]>([])
-  const [isCompressing, setIsCompressing] = useState(false)
+  const [uploadedImages, setUploadedImages] = useState<ImagePreview[]>([]);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   // 使用本地存储钩子获取用户配置
   const [userProfile] = useLocalStorage("userProfile", {
@@ -79,38 +142,56 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     activityLevel: "moderate",
     goal: "maintain",
     bmrFormula: "mifflin-st-jeor" as "mifflin-st-jeor",
-  })
+  });
 
-  // 获取AI配置
-  const [aiConfig] = useLocalStorage<AIConfig>("aiConfig", {
+  // 获取AI配置 - 使用服务器端存储
+  const { aiConfig } = useAIConfigServer();
+
+  // 提供默认配置以防服务器端配置为空
+  const defaultAIConfig: AIConfig = {
     agentModel: {
-      name: "gpt-4o",
+      name: "gpt-4.1-mini",
       baseUrl: "https://api.openai.com",
       apiKey: "",
     },
     chatModel: {
-      name: "gpt-4o",
+      name: "gpt-4.1-mini",
       baseUrl: "https://api.openai.com",
       apiKey: "",
     },
     visionModel: {
-      name: "gpt-4o",
+      name: "gpt-4.1-mini",
       baseUrl: "https://api.openai.com",
       apiKey: "",
     },
-  })
+  };
+
+  const currentAIConfig = aiConfig || defaultAIConfig;
 
   // 使用服务端存储钩子获取日志数据
-  const { getDailyLog, saveDailyLog, isLoading } = useDailyLogServer()
+  const { getDailyLog, saveDailyLog, isLoading } = useDailyLogServer();
+
+  // 使用食物条目Hook
+  const { saveFoodEntries, deleteFoodEntry, updateFoodEntry } =
+    useFoodEntries();
 
   // 使用导出提醒Hook
-  const exportReminder = useExportReminder()
+  const exportReminder = useExportReminder();
 
   // 使用日期记录检查Hook
-  const { hasRecord, refreshRecords } = useDateRecords()
+  const { hasRecord, refreshRecords } = useDateRecords();
 
   // 使用移动端检测Hook
-  const isMobile = useIsMobile()
+  const isMobile = useIsMobile();
+
+  // 使用认证状态Hook
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // 辅助函数：从完整的日志对象中提取应该保存到DailyLog表的字段
+  const extractDailyLogFields = (log: DailyLog) => {
+    const { foodEntries, exerciseEntries, ...dailyLogFields } = log;
+    return dailyLogFields;
+  };
 
   const [dailyLog, setDailyLog] = useState<DailyLog>(() => ({
     date: format(selectedDate, "yyyy-MM-dd"),
@@ -126,19 +207,50 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     activityLevel: userProfile.activityLevel || "moderate",
     calculatedBMR: undefined,
     calculatedTDEE: undefined,
-  }))
+  }));
 
   // 当选择的日期变化时，加载对应日期的数据
   useEffect(() => {
-    const dateKey = format(selectedDate, "yyyy-MM-dd")
-    getDailyLog(dateKey).then((data) => {
-      console.log("从服务端读取到的数据：", data)
-      const defaultActivity = userProfile.activityLevel || "moderate"
-      if (data) {
-        setDailyLog(data)
-        setCurrentDayWeight(data.weight ? data.weight.toString() : "")
-        setCurrentDayActivityLevelForSelect(data.activityLevel || defaultActivity)
-      } else {
+    // 只有在认证完成且已登录时才加载数据
+    if (authLoading || !isAuthenticated) {
+      return;
+    }
+
+    const dateKey = format(selectedDate, "yyyy-MM-dd");
+    getDailyLog(dateKey)
+      .then((data) => {
+        console.log("从服务端读取到的数据：", data);
+        const defaultActivity = userProfile.activityLevel || "moderate";
+        if (data) {
+          setDailyLog(data);
+          setCurrentDayWeight(data.weight ? data.weight.toString() : "");
+          setCurrentDayActivityLevelForSelect(
+            data.activityLevel || defaultActivity
+          );
+        } else {
+          setDailyLog({
+            date: dateKey,
+            foodEntries: [],
+            exerciseEntries: [],
+            summary: {
+              totalCaloriesConsumed: 0,
+              totalCaloriesBurned: 0,
+              macros: { carbs: 0, protein: 0, fat: 0 },
+              micronutrients: {},
+            },
+            weight: undefined,
+            activityLevel: defaultActivity,
+            calculatedBMR: undefined,
+            calculatedTDEE: undefined,
+          });
+          setCurrentDayWeight("");
+          setCurrentDayActivityLevelForSelect(defaultActivity);
+        }
+      })
+      .catch((error) => {
+        console.error("加载日志数据失败：", error);
+        // 如果加载失败，设置默认数据
+        const defaultActivity = userProfile.activityLevel || "moderate";
         setDailyLog({
           date: dateKey,
           foodEntries: [],
@@ -153,33 +265,17 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
           activityLevel: defaultActivity,
           calculatedBMR: undefined,
           calculatedTDEE: undefined,
-        })
-        setCurrentDayWeight("")
-        setCurrentDayActivityLevelForSelect(defaultActivity)
-      }
-    }).catch((error) => {
-      console.error("加载日志数据失败：", error)
-      // 如果加载失败，设置默认数据
-      const defaultActivity = userProfile.activityLevel || "moderate"
-      setDailyLog({
-        date: dateKey,
-        foodEntries: [],
-        exerciseEntries: [],
-        summary: {
-          totalCaloriesConsumed: 0,
-          totalCaloriesBurned: 0,
-          macros: { carbs: 0, protein: 0, fat: 0 },
-          micronutrients: {},
-        },
-        weight: undefined,
-        activityLevel: defaultActivity,
-        calculatedBMR: undefined,
-        calculatedTDEE: undefined,
-      })
-      setCurrentDayWeight("")
-      setCurrentDayActivityLevelForSelect(defaultActivity)
-    })
-  }, [selectedDate, getDailyLog, userProfile.activityLevel])
+        });
+        setCurrentDayWeight("");
+        setCurrentDayActivityLevelForSelect(defaultActivity);
+      });
+  }, [
+    selectedDate,
+    getDailyLog,
+    userProfile.activityLevel,
+    authLoading,
+    isAuthenticated,
+  ]);
 
   // 辅助 useEffect 来监控 dailyLog 状态的变化
   // useEffect(() => {
@@ -213,7 +309,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   };
 
   // 智能建议localStorage存储
-  const [smartSuggestions, setSmartSuggestions] = useLocalStorage<Record<string, SmartSuggestionsResponse>>('smartSuggestions', {});
+  const [smartSuggestions, setSmartSuggestions] = useLocalStorage<
+    Record<string, SmartSuggestionsResponse>
+  >("smartSuggestions", {});
 
   // 智能建议功能
   const generateSmartSuggestions = async (targetDate?: string) => {
@@ -235,7 +333,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       for (let i = 0; i < 7; i++) {
         const date = new Date(targetDateObj);
         date.setDate(date.getDate() - i);
-        const dateKey = date.toISOString().split('T')[0];
+        const dateKey = date.toISOString().split("T")[0];
         const log = await getDailyLog(dateKey);
         if (log && log.foodEntries.length > 0) {
           recentLogs.push(log);
@@ -251,7 +349,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         body: JSON.stringify({
           dailyLog: targetLog,
           userProfile,
-          recentLogs
+          recentLogs,
         }),
       });
 
@@ -266,7 +364,6 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       const newSuggestions = { ...smartSuggestions };
       newSuggestions[analysisDate] = suggestions as SmartSuggestionsResponse;
       setSmartSuggestions(newSuggestions);
-
     } catch (error) {
       console.warn("Smart suggestions error:", error);
     } finally {
@@ -279,25 +376,40 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // 用于跟踪食物条目的实际内容变化
-  const previousFoodEntriesHashRef = useRef<string>('');
+  const previousFoodEntriesHashRef = useRef<string>("");
 
   // 当食物条目变化时，使用防抖机制重新分析TEF
   useEffect(() => {
-    const currentHash = tefCacheManager.generateFoodEntriesHash(dailyLog.foodEntries);
+    // 只有在认证完成且已登录时才执行
+    if (authLoading || !isAuthenticated) {
+      return;
+    }
+
+    const currentHash = tefCacheManager.generateFoodEntriesHash(
+      dailyLog.foodEntries
+    );
 
     // 检查是否已有缓存的分析结果
-    const cachedAnalysis = tefCacheManager.getCachedAnalysis(dailyLog.foodEntries);
+    const cachedAnalysis = tefCacheManager.getCachedAnalysis(
+      dailyLog.foodEntries
+    );
     if (cachedAnalysis && dailyLog.foodEntries.length > 0) {
       // 使用缓存的分析结果
-      if (!dailyLog.tefAnalysis || JSON.stringify(dailyLog.tefAnalysis) !== JSON.stringify(cachedAnalysis)) {
-        console.log('Applying cached TEF analysis');
-        setDailyLog(currentLog => {
+      if (
+        !dailyLog.tefAnalysis ||
+        JSON.stringify(dailyLog.tefAnalysis) !== JSON.stringify(cachedAnalysis)
+      ) {
+        console.log("Applying cached TEF analysis");
+        setDailyLog((currentLog) => {
           const updatedLog = {
             ...currentLog,
-            tefAnalysis: cachedAnalysis
+            tefAnalysis: cachedAnalysis,
           };
-          saveDailyLog(updatedLog.date, updatedLog).catch(error => {
-            console.error('保存TEF分析结果失败：', error);
+          saveDailyLog(
+            updatedLog.date,
+            extractDailyLogFields(updatedLog)
+          ).catch((error) => {
+            console.error("保存TEF分析结果失败：", error);
           });
           return updatedLog;
         });
@@ -307,14 +419,21 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
     }
 
     // 检查是否需要重新分析
-    if (!tefCacheManager.shouldAnalyzeTEF(dailyLog.foodEntries, previousFoodEntriesHashRef.current)) {
+    if (
+      !tefCacheManager.shouldAnalyzeTEF(
+        dailyLog.foodEntries,
+        previousFoodEntriesHashRef.current
+      )
+    ) {
       return;
     }
 
     // 更新哈希引用
     previousFoodEntriesHashRef.current = currentHash;
 
-    console.log('Food entries changed significantly, starting TEF analysis countdown...');
+    console.log(
+      "Food entries changed significantly, starting TEF analysis countdown..."
+    );
 
     // 清除之前的定时器
     if (tefAnalysisTimeoutRef.current) {
@@ -331,7 +450,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
       // 每秒更新倒计时
       countdownIntervalRef.current = setInterval(() => {
-        setTEFAnalysisCountdown(prev => {
+        setTEFAnalysisCountdown((prev) => {
           if (prev <= 1) {
             if (countdownIntervalRef.current) {
               clearInterval(countdownIntervalRef.current);
@@ -344,54 +463,75 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
 
       // 设置15秒的防抖延迟
       tefAnalysisTimeoutRef.current = setTimeout(() => {
-        console.log('Starting TEF analysis after 15 seconds delay...');
+        console.log("Starting TEF analysis after 15 seconds delay...");
         setTEFAnalysisCountdown(0);
-        performTEFAnalysis(dailyLog.foodEntries).then(tefResult => {
-          if (tefResult) {
-            // 使用本地工具计算基础TEF，并结合AI分析的乘数和因素
-            const localTEFAnalysis = generateTEFAnalysis(
-              dailyLog.foodEntries,
-              tefResult.enhancementMultiplier
-            );
+        performTEFAnalysis(dailyLog.foodEntries)
+          .then((tefResult) => {
+            if (tefResult) {
+              // 使用本地工具计算基础TEF，并结合AI分析的乘数和因素
+              const localTEFAnalysis = generateTEFAnalysis(
+                dailyLog.foodEntries,
+                tefResult.enhancementMultiplier
+              );
 
-            const finalAnalysis = {
-              ...localTEFAnalysis,
-              // 使用AI分析的因素，如果AI没有提供则使用本地识别的
-              enhancementFactors: tefResult.enhancementFactors && tefResult.enhancementFactors.length > 0
-                ? tefResult.enhancementFactors
-                : localTEFAnalysis.enhancementFactors,
-              analysisTimestamp: tefResult.analysisTimestamp || localTEFAnalysis.analysisTimestamp,
-            };
-
-            // 缓存分析结果
-            tefCacheManager.setCachedAnalysis(dailyLog.foodEntries, finalAnalysis);
-
-            console.log('AI enhancementFactors:', tefResult.enhancementFactors);
-            console.log('Local enhancementFactors:', localTEFAnalysis.enhancementFactors);
-
-            setDailyLog(currentLog => {
-              const updatedLog = {
-                ...currentLog,
-                tefAnalysis: finalAnalysis
+              const finalAnalysis = {
+                ...localTEFAnalysis,
+                // 使用AI分析的因素，如果AI没有提供则使用本地识别的
+                enhancementFactors:
+                  tefResult.enhancementFactors &&
+                  tefResult.enhancementFactors.length > 0
+                    ? tefResult.enhancementFactors
+                    : localTEFAnalysis.enhancementFactors,
+                analysisTimestamp:
+                  tefResult.analysisTimestamp ||
+                  localTEFAnalysis.analysisTimestamp,
               };
-              saveDailyLog(updatedLog.date, updatedLog).catch(error => {
-                console.error('保存TEF分析结果失败：', error);
+
+              // 缓存分析结果
+              tefCacheManager.setCachedAnalysis(
+                dailyLog.foodEntries,
+                finalAnalysis
+              );
+
+              console.log(
+                "AI enhancementFactors:",
+                tefResult.enhancementFactors
+              );
+              console.log(
+                "Local enhancementFactors:",
+                localTEFAnalysis.enhancementFactors
+              );
+
+              setDailyLog((currentLog) => {
+                const updatedLog = {
+                  ...currentLog,
+                  tefAnalysis: finalAnalysis,
+                };
+                saveDailyLog(
+                  updatedLog.date,
+                  extractDailyLogFields(updatedLog)
+                ).catch((error) => {
+                  console.error("保存TEF分析结果失败：", error);
+                });
+                return updatedLog;
               });
-              return updatedLog;
-            });
-          }
-        }).catch(error => {
-          console.warn('TEF analysis failed:', error);
-        });
+            }
+          })
+          .catch((error) => {
+            console.warn("TEF analysis failed:", error);
+          });
       }, 15000); // 15秒
     } else {
       // 如果没有食物条目，清除TEF分析和倒计时
       setTEFAnalysisCountdown(0);
       if (dailyLog.tefAnalysis) {
-        setDailyLog(currentLog => {
+        setDailyLog((currentLog) => {
           const updatedLog = { ...currentLog, tefAnalysis: undefined };
-          saveDailyLog(updatedLog.date, updatedLog).catch(error => {
-            console.error('清除TEF分析结果失败：', error);
+          saveDailyLog(
+            updatedLog.date,
+            extractDailyLogFields(updatedLog)
+          ).catch((error) => {
+            console.error("清除TEF分析结果失败：", error);
           });
           return updatedLog;
         });
@@ -407,20 +547,37 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         clearInterval(countdownIntervalRef.current);
       }
     };
-  }, [dailyLog.foodEntries, aiConfig, saveDailyLog]);
+  }, [
+    dailyLog.foodEntries,
+    aiConfig,
+    saveDailyLog,
+    authLoading,
+    isAuthenticated,
+  ]);
 
   // 当日期变化时，检查是否有该日期的智能建议
   useEffect(() => {
     const currentDateSuggestions = smartSuggestions[dailyLog.date];
 
     // 如果当前日期没有建议，且有足够的数据，可以提示用户生成建议
-    if (!currentDateSuggestions && dailyLog.foodEntries.length > 0 && checkAIConfig()) {
-      console.log(`No smart suggestions found for ${dailyLog.date}, user can generate new ones`);
+    if (
+      !currentDateSuggestions &&
+      dailyLog.foodEntries.length > 0 &&
+      checkAIConfig()
+    ) {
+      console.log(
+        `No smart suggestions found for ${dailyLog.date}, user can generate new ones`
+      );
     }
   }, [dailyLog.date, smartSuggestions, dailyLog.foodEntries.length]);
 
   // 当用户配置或每日日志（特别是体重、日期和活动水平）变化时，重新计算BMR和TDEE
   useEffect(() => {
+    // 只有在认证完成且已登录时才执行
+    if (authLoading || !isAuthenticated) {
+      return;
+    }
+
     if (userProfile && dailyLog.date) {
       // 计算额外的TEF增强
       const additionalTEF = dailyLog.tefAnalysis
@@ -430,8 +587,8 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
       const rates = calculateMetabolicRates(userProfile, {
         weight: dailyLog.weight,
         activityLevel: dailyLog.activityLevel,
-        additionalTEF
-      })
+        additionalTEF,
+      });
 
       const newBmr = rates?.bmr;
       const newTdee = rates?.tdee;
@@ -441,139 +598,164 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         dailyLog.calculatedTDEE !== newTdee ||
         (rates && !dailyLog.calculatedBMR && !dailyLog.calculatedTDEE)
       ) {
-        setDailyLog(currentLogState => {
+        setDailyLog((currentLogState) => {
           const updatedLogWithNewRates = {
             ...currentLogState,
             calculatedBMR: newBmr,
             calculatedTDEE: newTdee,
           };
           // 只有在实际值发生变化时才保存，避免不必要的写入
-          if (currentLogState.calculatedBMR !== newBmr || currentLogState.calculatedTDEE !== newTdee || (rates && (!currentLogState.calculatedBMR || !currentLogState.calculatedTDEE))) {
-            saveDailyLog(updatedLogWithNewRates.date, updatedLogWithNewRates).catch(error => {
-              console.error('保存BMR/TDEE计算结果失败：', error);
+          if (
+            currentLogState.calculatedBMR !== newBmr ||
+            currentLogState.calculatedTDEE !== newTdee ||
+            (rates &&
+              (!currentLogState.calculatedBMR ||
+                !currentLogState.calculatedTDEE))
+          ) {
+            saveDailyLog(
+              updatedLogWithNewRates.date,
+              extractDailyLogFields(updatedLogWithNewRates)
+            ).catch((error) => {
+              console.error("保存BMR/TDEE计算结果失败：", error);
             });
           }
           return updatedLogWithNewRates;
         });
       }
     }
-  }, [userProfile, dailyLog.date, dailyLog.weight, dailyLog.activityLevel, dailyLog.tefAnalysis, saveDailyLog, dailyLog.calculatedBMR, dailyLog.calculatedTDEE]); // Added dependencies
+  }, [
+    userProfile,
+    dailyLog.date,
+    dailyLog.weight,
+    dailyLog.activityLevel,
+    dailyLog.tefAnalysis,
+    saveDailyLog,
+    dailyLog.calculatedBMR,
+    dailyLog.calculatedTDEE,
+    authLoading,
+    isAuthenticated,
+  ]); // Added dependencies
 
   // 处理每日活动水平变化
   const handleDailyActivityLevelChange = (newValue: string) => {
     setCurrentDayActivityLevelForSelect(newValue);
-    setDailyLog(prevLog => ({
+    setDailyLog((prevLog) => ({
       ...prevLog,
       activityLevel: newValue,
     }));
     // 触发图表刷新（因为活动水平影响TDEE计算）
-    setChartRefreshTrigger(prev => prev + 1);
+    setChartRefreshTrigger((prev) => prev + 1);
   };
 
   // 检查AI配置是否完整
   const checkAIConfig = () => {
-    const modelType = uploadedImages.length > 0 ? "visionModel" : "agentModel"
-    const modelConfig = aiConfig[modelType]
+    const modelType = uploadedImages.length > 0 ? "visionModel" : "agentModel";
+    const modelConfig = currentAIConfig[modelType];
 
     if (!modelConfig.name || !modelConfig.baseUrl || !modelConfig.apiKey) {
       toast({
         title: (
           <span className="flex items-center">
             <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.aiConfigIncomplete')}
+            {t("errors.aiConfigIncomplete")}
           </span>
         ),
-        description: t('errors.configureModelFirst', {
-          modelType: uploadedImages.length > 0 ? t('modelTypes.vision') : t('modelTypes.work')
+        description: t("errors.configureModelFirst", {
+          modelType:
+            uploadedImages.length > 0
+              ? t("modelTypes.vision")
+              : t("modelTypes.work"),
         }),
         variant: "destructive",
-      })
-      return false
+      });
+      return false;
     }
-    return true
-  }
+    return true;
+  };
 
   // 处理图片上传
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files || files.length === 0) return
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     if (uploadedImages.length + files.length > 5) {
       toast({
         title: (
           <span className="flex items-center">
             <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.imageCountExceeded')}
+            {t("errors.imageCountExceeded")}
           </span>
         ),
-        description: t('errors.maxImagesAllowed'),
+        description: t("errors.maxImagesAllowed"),
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setIsCompressing(true)
+    setIsCompressing(true);
 
     try {
-      const newImages: ImagePreview[] = []
+      const newImages: ImagePreview[] = [];
 
       for (let i = 0; i < files.length; i++) {
-        const file = files[i]
+        const file = files[i];
 
         if (!file.type.startsWith("image/")) {
           toast({
             title: (
               <span className="flex items-center">
                 <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-                {t('errors.invalidFileType')}
+                {t("errors.invalidFileType")}
               </span>
             ),
-            description: t('errors.notImageFile', { fileName: file.name }),
+            description: t("errors.notImageFile", { fileName: file.name }),
             variant: "destructive",
-          })
-          continue
+          });
+          continue;
         }
 
-        const previewUrl = URL.createObjectURL(file)
-        const compressedFile = await compressImage(file, 500 * 1024) // 500KB
+        const previewUrl = URL.createObjectURL(file);
+        const compressedFile = await compressImage(file, 500 * 1024); // 500KB
 
         newImages.push({
           file,
           url: previewUrl,
           compressedFile,
-        })
+        });
       }
 
-      setUploadedImages((prev) => [...prev, ...newImages])
+      setUploadedImages((prev) => [...prev, ...newImages]);
     } catch (error) {
-      console.error("Error processing images:", error)
+      console.error("Error processing images:", error);
       toast({
         title: (
           <span className="flex items-center">
             <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.imageProcessingFailed')}
+            {t("errors.imageProcessingFailed")}
           </span>
         ),
-        description: t('errors.cannotProcessImages'),
+        description: t("errors.cannotProcessImages"),
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsCompressing(false)
+      setIsCompressing(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""
+        fileInputRef.current.value = "";
       }
     }
-  }
+  };
 
   // 删除已上传的图片
   const handleRemoveImage = (index: number) => {
     setUploadedImages((prev) => {
-      const newImages = [...prev]
-      URL.revokeObjectURL(newImages[index].url)
-      newImages.splice(index, 1)
-      return newImages
-    })
-  }
+      const newImages = [...prev];
+      URL.revokeObjectURL(newImages[index].url);
+      newImages.splice(index, 1);
+      return newImages;
+    });
+  };
 
   // 处理提交（文本+可能的图片）
   const handleSubmit = async () => {
@@ -582,42 +764,44 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         title: (
           <span className="flex items-center">
             <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
-            {t('errors.emptyInput')}
+            {t("errors.emptyInput")}
           </span>
         ),
-        description: t('errors.enterTextOrUpload'),
+        description: t("errors.enterTextOrUpload"),
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    if (!checkAIConfig()) return
+    if (!checkAIConfig()) return;
 
-    setIsProcessing(true)
+    setIsProcessing(true);
     try {
-      let result
-      const effectiveWeight = dailyLog.weight || userProfile.weight
+      let result;
+      const effectiveWeight = dailyLog.weight || userProfile.weight;
 
       if (uploadedImages.length > 0) {
-        const formData = new FormData()
-        formData.append("text", inputText)
-        formData.append("type", activeTab)
-        formData.append("userWeight", effectiveWeight.toString())
-        formData.append("aiConfig", JSON.stringify(aiConfig))
+        const formData = new FormData();
+        formData.append("text", inputText);
+        formData.append("type", activeTab);
+        formData.append("userWeight", effectiveWeight.toString());
+        formData.append("aiConfig", JSON.stringify(aiConfig));
         uploadedImages.forEach((img, index) => {
-          formData.append(`image${index}`, img.compressedFile || img.file)
-        })
+          formData.append(`image${index}`, img.compressedFile || img.file);
+        });
 
         const response = await fetch("/api/openai/parse-with-images", {
           method: "POST",
           body: formData,
-        })
+        });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: "解析失败" }))
-          throw new Error(errorData.message || "解析失败")
+          const errorData = await response
+            .json()
+            .catch(() => ({ message: "解析失败" }));
+          throw new Error(errorData.message || "解析失败");
         }
-        result = await response.json()
+        result = await response.json();
       } else {
         const response = await fetch("/api/openai/parse", {
           method: "POST",
@@ -630,48 +814,66 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
             type: activeTab,
             userWeight: effectiveWeight,
           }),
-        })
+        });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: "解析失败" }))
-          throw new Error(errorData.message || "解析失败")
+          const errorData = await response
+            .json()
+            .catch(() => ({ message: "解析失败" }));
+          throw new Error(errorData.message || "解析失败");
         }
-        result = await response.json()
+        result = await response.json();
       }
 
-      const updatedLog = { ...dailyLog }
+      const updatedLog = { ...dailyLog };
 
       if (activeTab === "food" && result.food) {
-        updatedLog.foodEntries = [...updatedLog.foodEntries, ...result.food]
-        recalculateSummary(updatedLog)
+        updatedLog.foodEntries = [...updatedLog.foodEntries, ...result.food];
+        recalculateSummary(updatedLog);
+
+        // 保存新添加的食物条目到服务器
+        try {
+          await saveFoodEntries(updatedLog.date, result.food);
+        } catch (error) {
+          console.error("保存食物条目失败：", error);
+          // 即使保存失败，也继续更新本地状态
+        }
       } else if (activeTab === "exercise" && result.exercise) {
-        updatedLog.exerciseEntries = [...updatedLog.exerciseEntries, ...result.exercise]
-        recalculateSummary(updatedLog)
+        updatedLog.exerciseEntries = [
+          ...updatedLog.exerciseEntries,
+          ...result.exercise,
+        ];
+        recalculateSummary(updatedLog);
       }
 
-      setDailyLog(updatedLog)
-      saveDailyLog(updatedLog.date, updatedLog).catch(error => {
-        console.error('保存日志数据失败：', error);
-      })
+      setDailyLog(updatedLog);
+      saveDailyLog(updatedLog.date, extractDailyLogFields(updatedLog)).catch(
+        (error) => {
+          console.error("保存日志数据失败：", error);
+        }
+      );
       // 触发图表刷新
-      setChartRefreshTrigger(prev => prev + 1)
+      setChartRefreshTrigger((prev) => prev + 1);
       // 刷新日期记录状态
-      refreshRecords()
+      refreshRecords();
 
-      setInputText("")
-      setUploadedImages([])
+      setInputText("");
+      setUploadedImages([]);
 
       toast({
         title: (
           <span className="flex items-center">
             <CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />
-            {t('success.recordAdded')}
+            {t("success.recordAdded")}
           </span>
         ),
-        description: activeTab === "food" ? t('success.foodAdded') : t('success.exerciseAdded'),
-      })
+        description:
+          activeTab === "food"
+            ? t("success.foodAdded")
+            : t("success.exerciseAdded"),
+      });
     } catch (error: any) {
-      console.error("Error:", error)
+      console.error("Error:", error);
       toast({
         title: (
           <span className="flex items-center">
@@ -681,169 +883,250 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         ),
         description: error.message || "无法解析您的输入，请重试。",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   // 删除条目
-  const handleDeleteEntry = (id: string, type: "food" | "exercise") => {
-    const updatedLog = { ...dailyLog }
+  const handleDeleteEntry = async (id: string, type: "food" | "exercise") => {
+    const updatedLog = { ...dailyLog };
 
     if (type === "food") {
-      updatedLog.foodEntries = updatedLog.foodEntries.filter((entry) => entry.log_id !== id)
+      // 先从服务器删除
+      try {
+        await deleteFoodEntry(id);
+      } catch (error) {
+        console.error("删除食物条目失败：", error);
+        toast({
+          title: "删除失败",
+          description: "无法删除食物条目，请重试。",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      updatedLog.foodEntries = updatedLog.foodEntries.filter(
+        (entry) => entry.log_id !== id
+      );
     } else {
-      updatedLog.exerciseEntries = updatedLog.exerciseEntries.filter((entry) => entry.log_id !== id)
+      updatedLog.exerciseEntries = updatedLog.exerciseEntries.filter(
+        (entry) => entry.log_id !== id
+      );
     }
 
-    recalculateSummary(updatedLog)
-    setDailyLog(updatedLog)
-    saveDailyLog(updatedLog.date, updatedLog).catch(error => {
-      console.error('删除条目后保存失败：', error);
-    })
+    recalculateSummary(updatedLog);
+    setDailyLog(updatedLog);
+    saveDailyLog(updatedLog.date, extractDailyLogFields(updatedLog)).catch(
+      (error) => {
+        console.error("删除条目后保存失败：", error);
+      }
+    );
     // 触发图表刷新
-    setChartRefreshTrigger(prev => prev + 1)
+    setChartRefreshTrigger((prev) => prev + 1);
     // 刷新日期记录状态
-    refreshRecords()
+    refreshRecords();
 
     toast({
       title: (
         <span className="flex items-center">
           <Trash2 className="mr-2 h-5 w-5 text-green-500" />
-          {t('success.recordDeleted')}
+          {t("success.recordDeleted")}
         </span>
       ),
-      description: type === "food" ? t('success.foodDeleted') : t('success.exerciseDeleted'),
-    })
-  }
+      description:
+        type === "food"
+          ? t("success.foodDeleted")
+          : t("success.exerciseDeleted"),
+    });
+  };
 
   // 更新条目
-  const handleUpdateEntry = (updatedEntry: FoodEntry | ExerciseEntry, type: "food" | "exercise") => {
-    const updatedLog = { ...dailyLog }
+  const handleUpdateEntry = async (
+    updatedEntry: FoodEntry | ExerciseEntry,
+    type: "food" | "exercise"
+  ) => {
+    const updatedLog = { ...dailyLog };
 
     if (type === "food") {
+      // 先更新服务器
+      try {
+        await updateFoodEntry(
+          (updatedEntry as FoodEntry).log_id,
+          updatedEntry as FoodEntry
+        );
+      } catch (error) {
+        console.error("更新食物条目失败：", error);
+        toast({
+          title: "更新失败",
+          description: "无法更新食物条目，请重试。",
+          variant: "destructive",
+        });
+        return;
+      }
+
       updatedLog.foodEntries = updatedLog.foodEntries.map((entry) =>
-        entry.log_id === (updatedEntry as FoodEntry).log_id ? (updatedEntry as FoodEntry) : entry,
-      )
+        entry.log_id === (updatedEntry as FoodEntry).log_id
+          ? (updatedEntry as FoodEntry)
+          : entry
+      );
     } else {
       updatedLog.exerciseEntries = updatedLog.exerciseEntries.map((entry) =>
-        entry.log_id === (updatedEntry as ExerciseEntry).log_id ? (updatedEntry as ExerciseEntry) : entry,
-      )
+        entry.log_id === (updatedEntry as ExerciseEntry).log_id
+          ? (updatedEntry as ExerciseEntry)
+          : entry
+      );
     }
 
-    recalculateSummary(updatedLog)
-    setDailyLog(updatedLog)
-    saveDailyLog(updatedLog.date, updatedLog).catch(error => {
-      console.error('更新条目后保存失败：', error);
-    })
+    recalculateSummary(updatedLog);
+    setDailyLog(updatedLog);
+    saveDailyLog(updatedLog.date, extractDailyLogFields(updatedLog)).catch(
+      (error) => {
+        console.error("更新条目后保存失败：", error);
+      }
+    );
     // 触发图表刷新
-    setChartRefreshTrigger(prev => prev + 1)
+    setChartRefreshTrigger((prev) => prev + 1);
     // 刷新日期记录状态
-    refreshRecords()
+    refreshRecords();
 
     toast({
       title: (
         <span className="flex items-center">
           <Edit3 className="mr-2 h-5 w-5 text-green-500" />
-          {t('success.recordUpdated')}
+          {t("success.recordUpdated")}
         </span>
       ),
-      description: type === "food" ? t('success.foodUpdated') : t('success.exerciseUpdated'),
-    })
-  }
+      description:
+        type === "food"
+          ? t("success.foodUpdated")
+          : t("success.exerciseUpdated"),
+    });
+  };
 
   const recalculateSummary = (log: DailyLog) => {
-    let totalCaloriesConsumed = 0
-    let totalCarbs = 0
-    let totalProtein = 0
-    let totalFat = 0
-    let totalCaloriesBurned = 0
-    const micronutrients: Record<string, number> = {}
+    let totalCaloriesConsumed = 0;
+    let totalCarbs = 0;
+    let totalProtein = 0;
+    let totalFat = 0;
+    let totalCaloriesBurned = 0;
+    const micronutrients: Record<string, number> = {};
 
     log.foodEntries.forEach((entry) => {
       if (entry.total_nutritional_info_consumed) {
-        totalCaloriesConsumed += entry.total_nutritional_info_consumed.calories || 0
-        totalCarbs += entry.total_nutritional_info_consumed.carbohydrates || 0
-        totalProtein += entry.total_nutritional_info_consumed.protein || 0
-        totalFat += entry.total_nutritional_info_consumed.fat || 0
-        Object.entries(entry.total_nutritional_info_consumed).forEach(([key, value]) => {
-          if (!["calories", "carbohydrates", "protein", "fat"].includes(key) && typeof value === "number") {
-            micronutrients[key] = (micronutrients[key] || 0) + value
+        totalCaloriesConsumed +=
+          entry.total_nutritional_info_consumed.calories || 0;
+        totalCarbs += entry.total_nutritional_info_consumed.carbohydrates || 0;
+        totalProtein += entry.total_nutritional_info_consumed.protein || 0;
+        totalFat += entry.total_nutritional_info_consumed.fat || 0;
+        Object.entries(entry.total_nutritional_info_consumed).forEach(
+          ([key, value]) => {
+            if (
+              !["calories", "carbohydrates", "protein", "fat"].includes(key) &&
+              typeof value === "number"
+            ) {
+              micronutrients[key] = (micronutrients[key] || 0) + value;
+            }
           }
-        })
+        );
       }
-    })
+    });
 
     log.exerciseEntries.forEach((entry) => {
-      totalCaloriesBurned += entry.calories_burned_estimated || 0
-    })
+      totalCaloriesBurned += entry.calories_burned_estimated || 0;
+    });
 
     log.summary = {
       totalCaloriesConsumed,
       totalCaloriesBurned,
       macros: { carbs: totalCarbs, protein: totalProtein, fat: totalFat },
       micronutrients,
-    }
-  }
+    };
+  };
 
   const handleSaveDailyWeight = () => {
-    const dateKey = format(selectedDate, "yyyy-MM-dd")
+    const dateKey = format(selectedDate, "yyyy-MM-dd");
     if (!currentDayWeight.trim()) {
-      const updatedLog = { ...dailyLog, weight: undefined }
-      setDailyLog(updatedLog)
-      saveDailyLog(dateKey, updatedLog).catch(error => {
-        console.error('清除体重数据失败：', error);
-      })
+      const updatedLog = { ...dailyLog, weight: undefined };
+      setDailyLog(updatedLog);
+      saveDailyLog(dateKey, extractDailyLogFields(updatedLog)).catch(
+        (error) => {
+          console.error("清除体重数据失败：", error);
+        }
+      );
       // 刷新日期记录状态
-      refreshRecords()
+      refreshRecords();
       toast({
-        title: <span className="flex items-center"><Info className="mr-2 h-5 w-5" />{t('success.weightCleared')}</span>,
-        description: t('success.weightClearedDesc', { date: dateKey })
-      })
-      return
+        title: (
+          <span className="flex items-center">
+            <Info className="mr-2 h-5 w-5" />
+            {t("success.weightCleared")}
+          </span>
+        ),
+        description: t("success.weightClearedDesc", { date: dateKey }),
+      });
+      return;
     }
 
-    const weightValue = parseFloat(currentDayWeight)
+    const weightValue = parseFloat(currentDayWeight);
     if (isNaN(weightValue) || weightValue <= 0) {
       toast({
-        title: <span className="flex items-center"><AlertCircle className="mr-2 h-5 w-5 text-destructive" />{t('validation.invalidWeight')}</span>,
-        description: t('validation.invalidWeightDesc'),
-        variant: "destructive"
-      })
-      return
+        title: (
+          <span className="flex items-center">
+            <AlertCircle className="mr-2 h-5 w-5 text-destructive" />
+            {t("validation.invalidWeight")}
+          </span>
+        ),
+        description: t("validation.invalidWeightDesc"),
+        variant: "destructive",
+      });
+      return;
     }
 
-    const updatedLog = { ...dailyLog, weight: weightValue }
-    setDailyLog(updatedLog)
-    saveDailyLog(dateKey, updatedLog).catch(error => {
-      console.error('保存体重数据失败：', error);
-    })
+    const updatedLog = { ...dailyLog, weight: weightValue };
+    setDailyLog(updatedLog);
+    saveDailyLog(dateKey, extractDailyLogFields(updatedLog)).catch((error) => {
+      console.error("保存体重数据失败：", error);
+    });
     // 触发图表刷新
-    setChartRefreshTrigger(prev => prev + 1)
+    setChartRefreshTrigger((prev) => prev + 1);
     // 刷新日期记录状态
-    refreshRecords()
+    refreshRecords();
     toast({
-      title: <span className="flex items-center"><CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />{t('success.weightSaved')}</span>,
-      description: t('success.weightSavedDesc', { date: dateKey, weight: weightValue })
-    })
-  }
+      title: (
+        <span className="flex items-center">
+          <CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />
+          {t("success.weightSaved")}
+        </span>
+      ),
+      description: t("success.weightSavedDesc", {
+        date: dateKey,
+        weight: weightValue,
+      }),
+    });
+  };
 
   // 处理每日状态保存
   const handleSaveDailyStatus = (status: DailyStatus) => {
-    const dateKey = format(selectedDate, "yyyy-MM-dd")
-    const updatedLog = { ...dailyLog, dailyStatus: status }
-    setDailyLog(updatedLog)
-    saveDailyLog(dateKey, updatedLog).catch(error => {
-      console.error('保存每日状态失败：', error);
-    })
+    const dateKey = format(selectedDate, "yyyy-MM-dd");
+    const updatedLog = { ...dailyLog, dailyStatus: status };
+    setDailyLog(updatedLog);
+    saveDailyLog(dateKey, extractDailyLogFields(updatedLog)).catch((error) => {
+      console.error("保存每日状态失败：", error);
+    });
     // 刷新日期记录状态
-    refreshRecords()
+    refreshRecords();
     toast({
-      title: <span className="flex items-center"><CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />每日状态已保存</span>,
-      description: `已保存 ${dateKey} 的状态记录`
-    })
-  }
+      title: (
+        <span className="flex items-center">
+          <CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />
+          每日状态已保存
+        </span>
+      ),
+      description: `已保存 ${dateKey} 的状态记录`,
+    });
+  };
 
   return (
     <AuthGuard>
@@ -858,67 +1141,71 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         </div>
 
         <style jsx>{`
-        @keyframes breathing {
-          0%, 100% {
-            transform: scale(1) rotate(0deg);
-            opacity: 0.45;
+          @keyframes breathing {
+            0%,
+            100% {
+              transform: scale(1) rotate(0deg);
+              opacity: 0.45;
+            }
+            50% {
+              transform: scale(1.1) rotate(2deg);
+              opacity: 0.25;
+            }
           }
-          50% {
-            transform: scale(1.1) rotate(2deg);
-            opacity: 0.25;
-          }
-        }
 
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0px) translateX(0px) scale(1);
+          @keyframes float {
+            0%,
+            100% {
+              transform: translateY(0px) translateX(0px) scale(1);
+            }
+            33% {
+              transform: translateY(-10px) translateX(5px) scale(1.05);
+            }
+            66% {
+              transform: translateY(5px) translateX(-3px) scale(0.98);
+            }
           }
-          33% {
-            transform: translateY(-10px) translateX(5px) scale(1.05);
-          }
-          66% {
-            transform: translateY(5px) translateX(-3px) scale(0.98);
-          }
-        }
 
-        @keyframes glow {
-          0%, 100% {
-            transform: translateX(-50%) scale(1);
-            opacity: 0.3;
+          @keyframes glow {
+            0%,
+            100% {
+              transform: translateX(-50%) scale(1);
+              opacity: 0.3;
+            }
+            50% {
+              transform: translateX(-50%) scale(1.2);
+              opacity: 0.15;
+            }
           }
-          50% {
-            transform: translateX(-50%) scale(1.2);
-            opacity: 0.15;
+
+          @keyframes bounce-slow {
+            0%,
+            100% {
+              transform: translateY(0px) scale(1);
+              opacity: 0.35;
+            }
+            50% {
+              transform: translateY(-15px) scale(1.08);
+              opacity: 0.5;
+            }
           }
-        }
 
-        @keyframes bounce-slow {
-          0%, 100% {
-            transform: translateY(0px) scale(1);
-            opacity: 0.35;
+          .animate-breathing {
+            animation: breathing 6s ease-in-out infinite;
           }
-          50% {
-            transform: translateY(-15px) scale(1.08);
-            opacity: 0.50;
+
+          .animate-float {
+            animation: float 8s ease-in-out infinite;
           }
-        }
 
-        .animate-breathing {
-          animation: breathing 6s ease-in-out infinite;
-        }
+          .animate-glow {
+            animation: glow 5s ease-in-out infinite;
+          }
 
-        .animate-float {
-          animation: float 8s ease-in-out infinite;
-        }
-
-        .animate-glow {
-          animation: glow 5s ease-in-out infinite;
-        }
-
-        .animate-bounce-slow {
-          animation: bounce-slow 7s ease-in-out infinite;
-        }
-      `}</style>
+          .animate-bounce-slow {
+            animation: bounce-slow 7s ease-in-out infinite;
+          }
+        `}</style>
         <div className="relative z-10 container mx-auto py-12 px-6 sm:px-8 lg:px-12 max-w-6xl">
           <header className="mb-16 fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-8">
@@ -935,7 +1222,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                     SnapFit AI
                   </h1>
                   <p className="text-muted-foreground text-lg">
-                    {t('ui.subtitle')}
+                    {t("ui.subtitle")}
                   </p>
                 </div>
               </div>
@@ -948,7 +1235,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                         className="w-full sm:w-[280px] justify-start text-left font-normal text-base h-12"
                       >
                         <CalendarDays className="mr-3 h-5 w-5 text-primary" />
-                        {format(selectedDate, "PPP (eeee)", { locale: currentLocale })}
+                        {format(selectedDate, "PPP (eeee)", {
+                          locale: currentLocale,
+                        })}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="end">
@@ -969,30 +1258,32 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                         href={`/${resolvedParams.locale}/settings?tab=ai`}
                         className="hover:text-primary transition-colors underline-offset-2 hover:underline"
                       >
-                        {t('ui.quickConfig')}
+                        {t("ui.quickConfig")}
                       </Link>
                       <span>/</span>
                       <Link
                         href={`/${resolvedParams.locale}/settings?tab=data`}
                         className="hover:text-primary transition-colors underline-offset-2 hover:underline"
                       >
-                        {t('ui.dataExport')}
+                        {t("ui.dataExport")}
                       </Link>
                     </div>
 
                     {/* 导出提醒 */}
-                    {exportReminder.shouldRemind && exportReminder.hasEnoughData && (
-                      <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-md border border-amber-200 dark:border-amber-800">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>
-                          {exportReminder.lastExportDate === null
-                            ? t('ui.neverExported')
-                            : t('ui.exportReminder', { days: exportReminder.daysSinceLastExport })
-                          }
-                        </span>
-                        <Clock className="h-3 w-3 ml-1" />
-                      </div>
-                    )}
+                    {exportReminder.shouldRemind &&
+                      exportReminder.hasEnoughData && (
+                        <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-md border border-amber-200 dark:border-amber-800">
+                          <AlertTriangle className="h-3 w-3" />
+                          <span>
+                            {exportReminder.lastExportDate === null
+                              ? t("ui.neverExported")
+                              : t("ui.exportReminder", {
+                                  days: exportReminder.daysSinceLastExport,
+                                })}
+                          </span>
+                          <Clock className="h-3 w-3 ml-1" />
+                        </div>
+                      )}
                   </div>
                 </div>
               </div>
@@ -1002,7 +1293,10 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
             <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* 左侧：管理图表 (占2列) */}
               <div className="lg:col-span-2">
-                <ManagementCharts selectedDate={selectedDate} refreshTrigger={chartRefreshTrigger} />
+                <ManagementCharts
+                  selectedDate={selectedDate}
+                  refreshTrigger={chartRefreshTrigger}
+                />
               </div>
 
               {/* 右侧：体重和活动水平 (占1列) */}
@@ -1013,25 +1307,31 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                       <Weight className="h-6 w-6" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold">{t('ui.todayWeight')}</h3>
-                      <p className="text-muted-foreground">{t('ui.recordWeightChanges')}</p>
+                      <h3 className="text-lg font-semibold">
+                        {t("ui.todayWeight")}
+                      </h3>
+                      <p className="text-muted-foreground">
+                        {t("ui.recordWeightChanges")}
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-4">
                     <Input
                       id="daily-weight"
                       type="number"
-                      placeholder={t('placeholders.weightExample')}
+                      placeholder={t("placeholders.weightExample")}
                       value={currentDayWeight}
                       onChange={(e) => setCurrentDayWeight(e.target.value)}
                       className="w-full h-12 text-base"
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSaveDailyWeight()
+                        if (e.key === "Enter") {
+                          handleSaveDailyWeight();
                           // 聚焦到活动水平选择器
-                          const activitySelect = document.getElementById('daily-activity-level')
+                          const activitySelect = document.getElementById(
+                            "daily-activity-level"
+                          );
                           if (activitySelect) {
-                            activitySelect.click()
+                            activitySelect.click();
                           }
                         }
                       }}
@@ -1042,7 +1342,7 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                       className="btn-gradient-primary w-full h-12"
                     >
                       <Save className="mr-2 h-4 w-4" />
-                      {t('ui.saveWeight')}
+                      {t("ui.saveWeight")}
                     </Button>
                   </div>
                 </div>
@@ -1053,32 +1353,49 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                       <UserCheck className="h-6 w-6" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold">{t('ui.activityLevel')}</h3>
-                      <p className="text-muted-foreground">{t('ui.setTodayActivity')}</p>
+                      <h3 className="text-lg font-semibold">
+                        {t("ui.activityLevel")}
+                      </h3>
+                      <p className="text-muted-foreground">
+                        {t("ui.setTodayActivity")}
+                      </p>
                     </div>
                   </div>
                   <Select
                     value={currentDayActivityLevelForSelect}
                     onValueChange={(value) => {
-                      handleDailyActivityLevelChange(value)
+                      handleDailyActivityLevelChange(value);
                       // 选择完活动水平后，聚焦到输入区域
                       setTimeout(() => {
-                        const textarea = document.querySelector('textarea')
+                        const textarea = document.querySelector("textarea");
                         if (textarea) {
-                          textarea.focus()
+                          textarea.focus();
                         }
-                      }, 100)
+                      }, 100);
                     }}
                   >
-                    <SelectTrigger className="w-full h-12 text-base" id="daily-activity-level">
-                      <SelectValue placeholder={t('ui.selectActivityLevel')} />
+                    <SelectTrigger
+                      className="w-full h-12 text-base"
+                      id="daily-activity-level"
+                    >
+                      <SelectValue placeholder={t("ui.selectActivityLevel")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="sedentary">{t('activityLevels.sedentary')}</SelectItem>
-                      <SelectItem value="light">{t('activityLevels.light')}</SelectItem>
-                      <SelectItem value="moderate">{t('activityLevels.moderate')}</SelectItem>
-                      <SelectItem value="active">{t('activityLevels.active')}</SelectItem>
-                      <SelectItem value="very_active">{t('activityLevels.very_active')}</SelectItem>
+                      <SelectItem value="sedentary">
+                        {t("activityLevels.sedentary")}
+                      </SelectItem>
+                      <SelectItem value="light">
+                        {t("activityLevels.light")}
+                      </SelectItem>
+                      <SelectItem value="moderate">
+                        {t("activityLevels.moderate")}
+                      </SelectItem>
+                      <SelectItem value="active">
+                        {t("activityLevels.active")}
+                      </SelectItem>
+                      <SelectItem value="very_active">
+                        {t("activityLevels.very_active")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1095,34 +1412,64 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                     <ClipboardPenLine className="h-6 w-6" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-semibold">{t('ui.recordHealthData')}</h2>
-                    <p className="text-muted-foreground text-lg">{t('ui.recordHealthDataDesc')}</p>
+                    <h2 className="text-2xl font-semibold">
+                      {t("ui.recordHealthData")}
+                    </h2>
+                    <p className="text-muted-foreground text-lg">
+                      {t("ui.recordHealthDataDesc")}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!isMobile && <span className="text-sm text-muted-foreground">今日记录</span>}
+                  {!isMobile && (
+                    <span className="text-sm text-muted-foreground">
+                      今日记录
+                    </span>
+                  )}
                   <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
                     {(() => {
-                      let count = 0
-                      if (dailyLog.foodEntries.length > 0) count++
-                      if (dailyLog.exerciseEntries.length > 0) count++
-                      if (dailyLog.dailyStatus) count++
-                      return `${count}/3`
+                      let count = 0;
+                      if (dailyLog.foodEntries.length > 0) count++;
+                      if (dailyLog.exerciseEntries.length > 0) count++;
+                      if (dailyLog.dailyStatus) count++;
+                      return `${count}/3`;
                     })()}
                   </span>
                 </div>
               </div>
 
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-                <TabsList className="grid w-full grid-cols-3 h-14">
-                  <TabsTrigger value="food" className="text-base py-4 px-8">
-                    <Utensils className="mr-2 h-5 w-5" />{t('ui.dietRecord')}
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="mb-8"
+              >
+                <TabsList className="grid w-full grid-cols-3 h-14 bg-muted/50">
+                  <TabsTrigger
+                    value="food"
+                    className="text-sm sm:text-base py-2 px-2 sm:px-4 flex-col sm:flex-row gap-1 sm:gap-2 min-w-0"
+                  >
+                    <Utensils className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                    <span className="truncate text-xs sm:text-sm">
+                      {t("ui.dietRecord")}
+                    </span>
                   </TabsTrigger>
-                  <TabsTrigger value="exercise" className="text-base py-4 px-8">
-                    <Dumbbell className="mr-2 h-5 w-5" />{t('ui.exerciseRecord')}
+                  <TabsTrigger
+                    value="exercise"
+                    className="text-sm sm:text-base py-2 px-2 sm:px-4 flex-col sm:flex-row gap-1 sm:gap-2 min-w-0"
+                  >
+                    <Dumbbell className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                    <span className="truncate text-xs sm:text-sm">
+                      {t("ui.exerciseRecord")}
+                    </span>
                   </TabsTrigger>
-                  <TabsTrigger value="status" className="text-base py-4 px-8">
-                    <Activity className="mr-2 h-5 w-5" />{t('ui.dailyStatus')}
+                  <TabsTrigger
+                    value="status"
+                    className="text-sm sm:text-base py-2 px-2 sm:px-4 flex-col sm:flex-row gap-1 sm:gap-2 min-w-0"
+                  >
+                    <Activity className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                    <span className="truncate text-xs sm:text-sm">
+                      {t("ui.dailyStatus")}
+                    </span>
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -1138,8 +1485,8 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                   <Textarea
                     placeholder={
                       activeTab === "food"
-                        ? t('placeholders.foodExample')
-                        : t('placeholders.exerciseExample')
+                        ? t("placeholders.foodExample")
+                        : t("placeholders.exerciseExample")
                     }
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
@@ -1150,11 +1497,15 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                 {activeTab !== "status" && uploadedImages.length > 0 && (
                   <div className="p-6 rounded-xl bg-muted/30 border">
                     <p className="text-muted-foreground mb-4 flex items-center font-medium">
-                      <ImageIcon className="mr-2 h-5 w-5" /> {t('images.uploaded', { count: uploadedImages.length })}
+                      <ImageIcon className="mr-2 h-5 w-5" />{" "}
+                      {t("images.uploaded", { count: uploadedImages.length })}
                     </p>
                     <div className="flex flex-wrap gap-3">
                       {uploadedImages.map((img, index) => (
-                        <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-white dark:border-slate-700 shadow-md hover:shadow-lg transition-all group">
+                        <div
+                          key={index}
+                          className="relative w-20 h-20 rounded-lg overflow-hidden border-2 border-white dark:border-slate-700 shadow-md hover:shadow-lg transition-all group"
+                        >
                           <img
                             src={img.url || "/placeholder.svg"}
                             alt={`预览 ${index + 1}`}
@@ -1183,19 +1534,31 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                         multiple
                         className="hidden"
                         onChange={handleImageUpload}
-                        disabled={isProcessing || isCompressing || uploadedImages.length >= 5}
+                        disabled={
+                          isProcessing ||
+                          isCompressing ||
+                          uploadedImages.length >= 5
+                        }
                         ref={fileInputRef}
                       />
                       <Button
                         variant="outline"
                         type="button"
                         size="lg"
-                        disabled={isProcessing || isCompressing || uploadedImages.length >= 5}
+                        disabled={
+                          isProcessing ||
+                          isCompressing ||
+                          uploadedImages.length >= 5
+                        }
                         onClick={() => fileInputRef.current?.click()}
                         className="h-12 px-6"
                       >
                         <UploadCloud className="mr-2 h-5 w-5" />
-                        {isCompressing ? t('buttons.imageProcessing') : `${t('buttons.uploadImages')} (${uploadedImages.length}/5)`}
+                        {isCompressing
+                          ? t("buttons.imageProcessing")
+                          : `${t("buttons.uploadImages")} (${
+                              uploadedImages.length
+                            }/5)`}
                       </Button>
                       {uploadedImages.length > 0 && (
                         <Button
@@ -1204,7 +1567,8 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                           onClick={() => setUploadedImages([])}
                           className="text-destructive hover:text-destructive h-12"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" /> {t('buttons.clearImages')}
+                          <Trash2 className="mr-2 h-4 w-4" />{" "}
+                          {t("buttons.clearImages")}
                         </Button>
                       )}
                     </div>
@@ -1213,20 +1577,44 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                       onClick={handleSubmit}
                       size="lg"
                       className="btn-gradient-primary w-full sm:w-auto px-12 h-12 text-base"
-                      disabled={isProcessing || isCompressing || (!inputText.trim() && uploadedImages.length === 0)}
+                      disabled={
+                        isProcessing ||
+                        isCompressing ||
+                        (!inputText.trim() && uploadedImages.length === 0)
+                      }
                     >
                       {isProcessing ? (
                         <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          <svg
+                            className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
                           </svg>
-                          {t('buttons.processing')}
+                          {t("buttons.processing")}
                         </>
                       ) : (
                         <>
-                          {activeTab === "food" ? <Utensils className="mr-2 h-5 w-5" /> : <Dumbbell className="mr-2 h-5 w-5" />}
-                          {t('buttons.submitRecord')}
+                          {activeTab === "food" ? (
+                            <Utensils className="mr-2 h-5 w-5" />
+                          ) : (
+                            <Dumbbell className="mr-2 h-5 w-5" />
+                          )}
+                          {t("buttons.submitRecord")}
                         </>
                       )}
                     </Button>
@@ -1244,7 +1632,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                   <div className="absolute top-0 left-0 w-12 h-12 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin"></div>
                 </div>
               </div>
-              <p className="text-lg text-slate-600 dark:text-slate-400 font-medium">{t('loading.dataLoading')}</p>
+              <p className="text-lg text-slate-600 dark:text-slate-400 font-medium">
+                {t("loading.dataLoading")}
+              </p>
             </div>
           )}
 
@@ -1256,8 +1646,14 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                     <Utensils className="h-6 w-6" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-semibold">{t('ui.myMeals')}</h3>
-                    <p className="text-muted-foreground text-lg">{t('ui.todayFoodCount', { count: dailyLog.foodEntries.length })}</p>
+                    <h3 className="text-2xl font-semibold">
+                      {t("ui.myMeals")}
+                    </h3>
+                    <p className="text-muted-foreground text-lg">
+                      {t("ui.todayFoodCount", {
+                        count: dailyLog.foodEntries.length,
+                      })}
+                    </p>
                   </div>
                 </div>
 
@@ -1266,8 +1662,10 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                     <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted/50">
                       <Utensils className="h-10 w-10" />
                     </div>
-                    <p className="text-xl font-medium mb-3">{t('ui.noFoodRecords')}</p>
-                    <p className="text-lg opacity-75">{t('ui.addFoodAbove')}</p>
+                    <p className="text-xl font-medium mb-3">
+                      {t("ui.noFoodRecords")}
+                    </p>
+                    <p className="text-lg opacity-75">{t("ui.addFoodAbove")}</p>
                   </div>
                 ) : (
                   <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
@@ -1276,7 +1674,9 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                         key={entry.log_id}
                         entry={entry}
                         onDelete={() => handleDeleteEntry(entry.log_id, "food")}
-                        onUpdate={(updated) => handleUpdateEntry(updated, "food")}
+                        onUpdate={(updated) =>
+                          handleUpdateEntry(updated, "food")
+                        }
                       />
                     ))}
                   </div>
@@ -1291,8 +1691,14 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                     <Dumbbell className="h-6 w-6" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-semibold">{t('ui.myExercise')}</h3>
-                    <p className="text-muted-foreground text-lg">{t('ui.todayExerciseCount', { count: dailyLog.exerciseEntries.length })}</p>
+                    <h3 className="text-2xl font-semibold">
+                      {t("ui.myExercise")}
+                    </h3>
+                    <p className="text-muted-foreground text-lg">
+                      {t("ui.todayExerciseCount", {
+                        count: dailyLog.exerciseEntries.length,
+                      })}
+                    </p>
                   </div>
                 </div>
 
@@ -1301,8 +1707,12 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                     <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted/50">
                       <Dumbbell className="h-10 w-10" />
                     </div>
-                    <p className="text-xl font-medium mb-3">{t('ui.noExerciseRecords')}</p>
-                    <p className="text-lg opacity-75">{t('ui.addExerciseAbove')}</p>
+                    <p className="text-xl font-medium mb-3">
+                      {t("ui.noExerciseRecords")}
+                    </p>
+                    <p className="text-lg opacity-75">
+                      {t("ui.addExerciseAbove")}
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
@@ -1310,8 +1720,12 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
                       <ExerciseEntryCard
                         key={entry.log_id}
                         entry={entry}
-                        onDelete={() => handleDeleteEntry(entry.log_id, "exercise")}
-                        onUpdate={(updated) => handleUpdateEntry(updated, "exercise")}
+                        onDelete={() =>
+                          handleDeleteEntry(entry.log_id, "exercise")
+                        }
+                        onUpdate={(updated) =>
+                          handleUpdateEntry(updated, "exercise")
+                        }
                       />
                     ))}
                   </div>
@@ -1352,5 +1766,5 @@ export default function Dashboard({ params }: { params: Promise<{ locale: string
         </div>
       </div>
     </AuthGuard>
-  )
+  );
 }

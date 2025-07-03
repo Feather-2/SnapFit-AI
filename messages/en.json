@@ -712,7 +712,7 @@
       "baseUrlPlaceholder": "e.g., https://api.openai.com",
       "apiKeyPlaceholder": "Enter API Key",
       "selectModel": "Select Model",
-      "modelNamePlaceholder": "e.g., gpt-4o",
+      "modelNamePlaceholder": "e.g., gpt-4.1-mini",
       "fetchModels": "Fetch Models",
       "testConnection": "Test Connection",
       "memoryManagement": {

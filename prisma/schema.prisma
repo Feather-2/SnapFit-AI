@@ -19,10 +19,12 @@ model User {
   updatedAt DateTime @updatedAt
 
   // 关联的数据
-  profile      UserProfile?
-  dailyLogs    DailyLog[]
-  aiMemories   AIMemory[]
-  aiConfig     AIConfig?
+  profile         UserProfile?
+  dailyLogs       DailyLog[]
+  foodEntries     FoodEntry[]
+  exerciseEntries ExerciseEntry[]
+  aiMemories      AIMemory[]
+  aiConfig        AIConfig?
 
   @@map("users")
 }
@@ -66,12 +68,11 @@ model DailyLog {
   calculatedTDEE   Float?
   tefAnalysis      String?   // JSON 字符串存储 TEF 分析
   dailyStatus      String?   // JSON 字符串存储每日状态
+  summary          String?   // JSON 字符串存储每日汇总
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  foodEntries     FoodEntry[]
-  exerciseEntries ExerciseEntry[]
 
   @@unique([userId, date])
   @@map("daily_logs")
@@ -80,7 +81,7 @@ model DailyLog {
 // 食物记录表
 model FoodEntry {
   id                              String   @id @default(cuid())
-  logId                          String
+  logId                          String   // 引用 DailyLog 的日期字符串
   userId                         String
   foodName                       String
   consumedGrams                  Float
@@ -93,7 +94,7 @@ model FoodEntry {
   createdAt                      DateTime @default(now())
   updatedAt                      DateTime @updatedAt
 
-  dailyLog DailyLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("food_entries")
 }
@@ -101,7 +102,7 @@ model FoodEntry {
 // 运动记录表
 model ExerciseEntry {
   id                        String   @id @default(cuid())
-  logId                     String
+  logId                     String   // 引用 DailyLog 的日期字符串
   userId                    String
   exerciseName              String
   exerciseType              String   // cardio, strength, flexibility, other
@@ -119,7 +120,7 @@ model ExerciseEntry {
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 
-  dailyLog DailyLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("exercise_entries")
 }
@@ -149,10 +150,9 @@ model AIMemory {
 model AIConfig {
   id              String   @id @default(cuid())
   userId          String   @unique
+  agentModel      String?  // JSON 字符串存储工作模型/Agents模型配置
   chatModel       String?  // JSON 字符串存储聊天模型配置
-  parseModel      String?  // JSON 字符串存储解析模型配置
-  adviceModel     String?  // JSON 字符串存储建议模型配置
-  tefModel        String?  // JSON 字符串存储 TEF 模型配置
+  visionModel     String?  // JSON 字符串存储视觉模型配置
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

@@ -728,7 +728,7 @@
       "baseUrlPlaceholder": "例如: https://api.openai.com",
       "apiKeyPlaceholder": "输入 API Key",
       "selectModel": "选择模型",
-      "modelNamePlaceholder": "例如: gpt-4o",
+      "modelNamePlaceholder": "例如: gpt-4.1-mini",
       "fetchModels": "获取模型",
       "testConnection": "测试连接",
       "memoryManagement": {

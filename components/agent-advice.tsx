@@ -1,58 +1,80 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react"
-import { RefreshCw } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
-import { cn } from "@/lib/utils"
-import type { DailyLog, AIConfig } from "@/lib/types"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { RefreshCw } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { MarkdownRenderer } from "@/components/markdown-renderer";
+import { cn } from "@/lib/utils";
+import type { DailyLog, AIConfig } from "@/lib/types";
 
 interface AgentAdviceProps {
-  dailyLog: DailyLog
-  userProfile: any
-  aiConfig: AIConfig
+  dailyLog: DailyLog;
+  userProfile: any;
+  aiConfig: AIConfig;
 }
 
 const defaultAIConfigFromParent: AIConfig = {
-  agentModel: { name: "gpt-4o", baseUrl: "https://api.openai.com", apiKey: "" },
-  chatModel: { name: "gpt-4o", baseUrl: "https://api.openai.com", apiKey: "" },
-  visionModel: { name: "gpt-4o", baseUrl: "https://api.openai.com", apiKey: "" },
+  agentModel: {
+    name: "gpt-4.1-mini",
+    baseUrl: "https://api.openai.com",
+    apiKey: "",
+  },
+  chatModel: {
+    name: "gpt-4.1-mini",
+    baseUrl: "https://api.openai.com",
+    apiKey: "",
+  },
+  visionModel: {
+    name: "gpt-4.1-mini",
+    baseUrl: "https://api.openai.com",
+    apiKey: "",
+  },
 };
 
-export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProps) {
-  const [advice, setAdvice] = useState<string>("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [isStreaming, setIsStreaming] = useState(false)
-  const { toast } = useToast()
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const [isClient, setIsClient] = useState(false)
+export function AgentAdvice({
+  dailyLog,
+  userProfile,
+  aiConfig,
+}: AgentAdviceProps) {
+  const [advice, setAdvice] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const { toast } = useToast();
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true)
-  }, [])
+    setIsClient(true);
+  }, []);
 
   const isAiReady = useMemo(() => {
-    const configToUse = isClient ? aiConfig : defaultAIConfigFromParent
-    const model = configToUse.agentModel
-    return !!(model && model.name && model.baseUrl && model.apiKey)
-  }, [isClient, aiConfig])
+    const configToUse = isClient ? aiConfig : defaultAIConfigFromParent;
+    const model = configToUse.agentModel;
+    return !!(model && model.name && model.baseUrl && model.apiKey);
+  }, [isClient, aiConfig]);
 
   const fetchAdvice = useCallback(async () => {
     if (!isAiReady) {
-      setAdvice("请先在设置页面配置 AI 模型以获取个性化建议。")
-      return
+      setAdvice("请先在设置页面配置 AI 模型以获取个性化建议。");
+      return;
     }
 
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
+      abortControllerRef.current.abort();
     }
-    abortControllerRef.current = new AbortController()
+    abortControllerRef.current = new AbortController();
 
-    setIsLoading(true)
-    setIsStreaming(true)
-    setAdvice("")
+    setIsLoading(true);
+    setIsStreaming(true);
+    setAdvice("");
 
     try {
       const response = await fetch("/api/openai/advice-stream", {
@@ -66,54 +88,61 @@ export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProp
           userProfile,
         }),
         signal: abortControllerRef.current.signal,
-      })
-      
+      });
+
       if (!response.ok) {
-        throw new Error(`获取建议失败: ${response.statusText || response.status}`)
+        throw new Error(
+          `获取建议失败: ${response.statusText || response.status}`
+        );
       }
       if (!response.body) {
-        throw new Error("响应体为空")
+        throw new Error("响应体为空");
       }
-      
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
       try {
         while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          
-          const chunk = decoder.decode(value, { stream: true })
-          setAdvice((prev) => prev + chunk)
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          setAdvice((prev) => prev + chunk);
         }
       } finally {
-        reader.releaseLock()
-        setIsStreaming(false)
+        reader.releaseLock();
+        setIsStreaming(false);
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        return
+        return;
       }
-      
+
       toast({
         title: "获取建议失败",
-        description: error instanceof Error ? error.message : "无法获取个性化建议，请稍后重试",
+        description:
+          error instanceof Error
+            ? error.message
+            : "无法获取个性化建议，请稍后重试",
         variant: "destructive",
-      })
-      setAdvice("基于您的健康数据，建议均衡饮食并保持适当运动。请记录更多数据以获取更精准的建议。")
+      });
+      setAdvice(
+        "基于您的健康数据，建议均衡饮食并保持适当运动。请记录更多数据以获取更精准的建议。"
+      );
     } finally {
-      setIsLoading(false)
-      setIsStreaming(false)
+      setIsLoading(false);
+      setIsStreaming(false);
     }
-  }, [isAiReady, aiConfig, dailyLog, userProfile, toast])
+  }, [isAiReady, aiConfig, dailyLog, userProfile, toast]);
 
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
+        abortControllerRef.current.abort();
       }
-    }
-  }, [])
+    };
+  }, []);
 
   return (
     <div className="health-card h-full flex flex-col">
@@ -125,7 +154,9 @@ export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProp
             </div>
             <div>
               <h3 className="text-2xl font-semibold">智能建议</h3>
-              <p className="text-muted-foreground text-lg">基于您的健康数据生成的个性化建议</p>
+              <p className="text-muted-foreground text-lg">
+                基于您的健康数据生成的个性化建议
+              </p>
             </div>
           </div>
           <Button
@@ -142,7 +173,9 @@ export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProp
         <div className="flex-grow">
           {isLoading && !advice ? (
             <div className="text-center py-12">
-              <p className="text-lg text-muted-foreground">正在生成个性化建议...</p>
+              <p className="text-lg text-muted-foreground">
+                正在生成个性化建议...
+              </p>
             </div>
           ) : advice ? (
             <div className="space-y-4">
@@ -150,7 +183,9 @@ export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProp
               {isStreaming && (
                 <div className="flex items-center space-x-3">
                   <div className="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
-                  <span className="text-sm text-muted-foreground">AI正在思考...</span>
+                  <span className="text-sm text-muted-foreground">
+                    AI正在思考...
+                  </span>
                 </div>
               )}
             </div>
@@ -166,5 +201,5 @@ export function AgentAdvice({ dailyLog, userProfile, aiConfig }: AgentAdviceProp
         </div>
       </div>
     </div>
-  )
+  );
 }

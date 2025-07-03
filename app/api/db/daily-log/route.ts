@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '@/lib/auth-middleware'
-import { prisma } from '@/lib/prisma'
+import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth-middleware";
+import { prisma } from "@/lib/prisma";
 
 // 获取每日日志
 export const GET = withAuth(async (request) => {
   try {
-    const userId = request.userId!
-    const { searchParams } = new URL(request.url)
-    const date = searchParams.get('date')
+    const userId = request.userId!;
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get("date");
 
     if (date) {
       // 获取特定日期的日志
@@ -15,49 +15,79 @@ export const GET = withAuth(async (request) => {
         where: {
           userId_date: {
             userId,
-            date
-          }
+            date,
+          },
         },
-        include: {
-          foodEntries: true,
-          exerciseEntries: true
-        }
-      })
+      });
 
-      return NextResponse.json({ dailyLog })
+      if (dailyLog) {
+        // 手动获取相关的食物条目和运动条目
+        const [foodEntries, exerciseEntries] = await Promise.all([
+          prisma.foodEntry.findMany({
+            where: { userId, logId: date },
+            orderBy: { createdAt: "asc" },
+          }),
+          prisma.exerciseEntry.findMany({
+            where: { userId, logId: date },
+            orderBy: { createdAt: "asc" },
+          }),
+        ]);
+
+        return NextResponse.json({
+          dailyLog: {
+            ...dailyLog,
+            foodEntries,
+            exerciseEntries,
+          },
+        });
+      }
+
+      return NextResponse.json({ dailyLog: null });
     } else {
       // 获取所有日志
       const dailyLogs = await prisma.dailyLog.findMany({
         where: { userId },
-        include: {
-          foodEntries: true,
-          exerciseEntries: true
-        },
-        orderBy: { date: 'desc' }
-      })
+        orderBy: { date: "desc" },
+      });
 
-      return NextResponse.json({ dailyLogs })
+      // 为每个日志获取相关的食物条目和运动条目
+      const logsWithEntries = await Promise.all(
+        dailyLogs.map(async (log) => {
+          const [foodEntries, exerciseEntries] = await Promise.all([
+            prisma.foodEntry.findMany({
+              where: { userId, logId: log.date },
+              orderBy: { createdAt: "asc" },
+            }),
+            prisma.exerciseEntry.findMany({
+              where: { userId, logId: log.date },
+              orderBy: { createdAt: "asc" },
+            }),
+          ]);
+
+          return {
+            ...log,
+            foodEntries,
+            exerciseEntries,
+          };
+        })
+      );
+
+      return NextResponse.json({ dailyLogs: logsWithEntries });
     }
   } catch (error) {
-    console.error('Get daily log error:', error)
-    return NextResponse.json(
-      { error: '获取每日日志失败' },
-      { status: 500 }
-    )
+    console.error("Get daily log error:", error);
+    return NextResponse.json({ error: "获取每日日志失败" }, { status: 500 });
   }
-})
+});
 
 // 创建或更新每日日志
 export const POST = withAuth(async (request) => {
   try {
-    const userId = request.userId!
-    const data = await request.json()
+    const userId = request.userId!;
+    const data = await request.json();
 
     if (!data.date) {
-      return NextResponse.json(
-        { error: 'date 是必填字段' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "date 是必填字段" }, { status: 400 });
     }
 
     // 使用 upsert 创建或更新日志
@@ -65,8 +95,8 @@ export const POST = withAuth(async (request) => {
       where: {
         userId_date: {
           userId,
-          date: data.date
-        }
+          date: data.date,
+        },
       },
       update: {
         weight: data.weight,
@@ -75,6 +105,7 @@ export const POST = withAuth(async (request) => {
         calculatedTDEE: data.calculatedTDEE,
         tefAnalysis: data.tefAnalysis ? JSON.stringify(data.tefAnalysis) : null,
         dailyStatus: data.dailyStatus ? JSON.stringify(data.dailyStatus) : null,
+        summary: data.summary ? JSON.stringify(data.summary) : null,
       },
       create: {
         userId,
@@ -85,52 +116,58 @@ export const POST = withAuth(async (request) => {
         calculatedTDEE: data.calculatedTDEE,
         tefAnalysis: data.tefAnalysis ? JSON.stringify(data.tefAnalysis) : null,
         dailyStatus: data.dailyStatus ? JSON.stringify(data.dailyStatus) : null,
+        summary: data.summary ? JSON.stringify(data.summary) : null,
       },
-      include: {
-        foodEntries: true,
-        exerciseEntries: true
-      }
-    })
+    });
 
-    return NextResponse.json({ dailyLog })
+    // 手动获取相关的食物条目和运动条目
+    const [foodEntries, exerciseEntries] = await Promise.all([
+      prisma.foodEntry.findMany({
+        where: { userId, logId: data.date },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.exerciseEntry.findMany({
+        where: { userId, logId: data.date },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
+
+    return NextResponse.json({
+      dailyLog: {
+        ...dailyLog,
+        foodEntries,
+        exerciseEntries,
+      },
+    });
   } catch (error) {
-    console.error('Save daily log error:', error)
-    return NextResponse.json(
-      { error: '保存每日日志失败' },
-      { status: 500 }
-    )
+    console.error("Save daily log error:", error);
+    return NextResponse.json({ error: "保存每日日志失败" }, { status: 500 });
   }
-})
+});
 
 // 删除每日日志
 export const DELETE = withAuth(async (request) => {
   try {
-    const userId = request.userId!
-    const { searchParams } = new URL(request.url)
-    const date = searchParams.get('date')
+    const userId = request.userId!;
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get("date");
 
     if (!date) {
-      return NextResponse.json(
-        { error: 'date 参数是必需的' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "date 参数是必需的" }, { status: 400 });
     }
 
     await prisma.dailyLog.delete({
       where: {
         userId_date: {
           userId,
-          date
-        }
-      }
-    })
+          date,
+        },
+      },
+    });
 
-    return NextResponse.json({ message: '每日日志已删除' })
+    return NextResponse.json({ message: "每日日志已删除" });
   } catch (error) {
-    console.error('Delete daily log error:', error)
-    return NextResponse.json(
-      { error: '删除每日日志失败' },
-      { status: 500 }
-    )
+    console.error("Delete daily log error:", error);
+    return NextResponse.json({ error: "删除每日日志失败" }, { status: 500 });
   }
-})
+});

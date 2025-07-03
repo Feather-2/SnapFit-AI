@@ -1,23 +1,24 @@
-import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
-import { notFound } from 'next/navigation';
-import "../globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/toaster"
-import { MainNav } from "@/components/main-nav"
-import { AuthProvider } from "@/components/auth-provider"
-import { locales } from '@/i18n';
+import type React from "react";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages } from "next-intl/server";
+import { notFound } from "next/navigation";
+import "../globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/toaster";
+import { ConditionalNav } from "@/components/conditional-nav";
+import { AuthProvider } from "@/components/auth-provider";
+import { locales } from "@/i18n";
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "SnapFit AI",
-  description: "AI-based Personal Health Management Tool. Your personal cyber coach and nutritionist.",
-  generator: 'Feather-2'
-}
+  description:
+    "AI-based Personal Health Management Tool. Your personal cyber coach and nutritionist.",
+  generator: "Feather-2",
+};
 
 interface LocaleLayoutProps {
   children: React.ReactNode;
@@ -26,7 +27,7 @@ interface LocaleLayoutProps {
 
 export default async function LocaleLayout({
   children,
-  params
+  params,
 }: LocaleLayoutProps) {
   const { locale } = await params;
 
@@ -41,16 +42,21 @@ export default async function LocaleLayout({
   return (
     <NextIntlClientProvider messages={messages}>
       <AuthProvider>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           <div className="min-h-screen bg-background">
-            <MainNav />
+            <ConditionalNav />
             <main>{children}</main>
           </div>
           <Toaster />
         </ThemeProvider>
       </AuthProvider>
     </NextIntlClientProvider>
-  )
+  );
 }
 
 export function generateStaticParams() {
