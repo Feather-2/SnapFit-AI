@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect, useRef, use } from "react";
+import { useState, useEffect, useRef, use, useMemo, useCallback } from "react";
 import { format } from "date-fns";
 import { zhCN, enUS } from "date-fns/locale";
 import Link from "next/link";
@@ -71,12 +71,13 @@ import { ManagementCharts } from "@/components/management-charts";
 import { SmartSuggestions } from "@/components/smart-suggestions";
 import { DailyStatusCard } from "@/components/DailyStatusCard";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { useDailyLogServer } from "@/hooks/use-daily-log-server";
+import { useDailyLogCache } from "@/hooks/use-daily-log-cache";
 import { useAIConfigServer } from "@/hooks/use-ai-config-server";
 import { useExportReminder } from "@/hooks/use-export-reminder";
 import { useDateRecords } from "@/hooks/use-date-records";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useFoodEntries } from "@/hooks/use-food-entries";
+import { useExerciseEntries } from "@/hooks/use-exercise-entries";
 import { compressImage } from "@/lib/image-utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -168,12 +169,42 @@ export default function Dashboard({
 
   const currentAIConfig = aiConfig || defaultAIConfig;
 
-  // 使用服务端存储钩子获取日志数据
-  const { getDailyLog, saveDailyLog, isLoading } = useDailyLogServer();
+  // 稳定化userProfile.activityLevel的引用，避免不必要的useEffect触发
+  const userActivityLevel = useMemo(
+    () => userProfile.activityLevel,
+    [userProfile.activityLevel]
+  );
+
+  // 使用服务端存储钩子获取日志数据（带缓存）
+  const { getDailyLog, getBatchDailyLogs, saveDailyLog, isLoading } =
+    useDailyLogCache();
+
+  // 防抖保存机制
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedSaveDailyLog = useCallback(
+    (date: string, data: Partial<DailyLog>, delay: number = 1000) => {
+      // 清除之前的定时器
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // 设置新的定时器
+      saveTimeoutRef.current = setTimeout(() => {
+        saveDailyLog(date, data).catch((error) => {
+          console.error("防抖保存失败：", error);
+        });
+      }, delay);
+    },
+    [saveDailyLog]
+  );
 
   // 使用食物条目Hook
   const { saveFoodEntries, deleteFoodEntry, updateFoodEntry } =
     useFoodEntries();
+
+  // 使用运动条目Hook
+  const { saveExerciseEntries, deleteExerciseEntry, updateExerciseEntry } =
+    useExerciseEntries();
 
   // 使用导出提醒Hook
   const exportReminder = useExportReminder();
@@ -189,7 +220,8 @@ export default function Dashboard({
 
   // 辅助函数：从完整的日志对象中提取应该保存到DailyLog表的字段
   const extractDailyLogFields = (log: DailyLog) => {
-    const { foodEntries, exerciseEntries, ...dailyLogFields } = log;
+    const { foodEntries, exerciseEntries, summary, ...dailyLogFields } = log;
+    // 移除summary字段，因为它现在由服务端动态计算
     return dailyLogFields;
   };
 
@@ -272,7 +304,7 @@ export default function Dashboard({
   }, [
     selectedDate,
     getDailyLog,
-    userProfile.activityLevel,
+    userActivityLevel,
     authLoading,
     isAuthenticated,
   ]);
@@ -327,18 +359,18 @@ export default function Dashboard({
 
     setSmartSuggestionsLoading(true);
     try {
-      // 获取目标日期前7天的数据
-      const recentLogs = [];
+      // 获取目标日期前7天的数据（使用批量获取优化）
       const targetDateObj = new Date(analysisDate);
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(targetDateObj);
-        date.setDate(date.getDate() - i);
-        const dateKey = date.toISOString().split("T")[0];
-        const log = await getDailyLog(dateKey);
-        if (log && log.foodEntries.length > 0) {
-          recentLogs.push(log);
-        }
-      }
+      const endDate = analysisDate;
+      const startDateObj = new Date(targetDateObj);
+      startDateObj.setDate(startDateObj.getDate() - 6);
+      const startDate = startDateObj.toISOString().split("T")[0];
+
+      console.log(`🤖 智能建议批量获取数据: ${startDate} 到 ${endDate}`);
+      const allLogs = await getBatchDailyLogs(startDate, endDate);
+      const recentLogs = allLogs.filter(
+        (log) => log && log.foodEntries.length > 0
+      );
 
       const response = await fetch("/api/openai/smart-suggestions", {
         method: "POST",
@@ -405,12 +437,12 @@ export default function Dashboard({
             ...currentLog,
             tefAnalysis: cachedAnalysis,
           };
-          saveDailyLog(
+          // 使用防抖保存，避免频繁的TEF分析保存
+          debouncedSaveDailyLog(
             updatedLog.date,
-            extractDailyLogFields(updatedLog)
-          ).catch((error) => {
-            console.error("保存TEF分析结果失败：", error);
-          });
+            extractDailyLogFields(updatedLog),
+            2000 // TEF分析结果延迟2秒保存
+          );
           return updatedLog;
         });
       }
@@ -507,12 +539,12 @@ export default function Dashboard({
                   ...currentLog,
                   tefAnalysis: finalAnalysis,
                 };
-                saveDailyLog(
+                // 使用防抖保存，避免频繁的TEF分析保存
+                debouncedSaveDailyLog(
                   updatedLog.date,
-                  extractDailyLogFields(updatedLog)
-                ).catch((error) => {
-                  console.error("保存TEF分析结果失败：", error);
-                });
+                  extractDailyLogFields(updatedLog),
+                  2000 // TEF分析结果延迟2秒保存
+                );
                 return updatedLog;
               });
             }
@@ -612,12 +644,12 @@ export default function Dashboard({
               (!currentLogState.calculatedBMR ||
                 !currentLogState.calculatedTDEE))
           ) {
-            saveDailyLog(
+            // 使用防抖保存，避免频繁的BMR/TDEE计算保存
+            debouncedSaveDailyLog(
               updatedLogWithNewRates.date,
-              extractDailyLogFields(updatedLogWithNewRates)
-            ).catch((error) => {
-              console.error("保存BMR/TDEE计算结果失败：", error);
-            });
+              extractDailyLogFields(updatedLogWithNewRates),
+              1500 // BMR/TDEE计算结果延迟1.5秒保存
+            );
           }
           return updatedLogWithNewRates;
         });
@@ -829,7 +861,7 @@ export default function Dashboard({
 
       if (activeTab === "food" && result.food) {
         updatedLog.foodEntries = [...updatedLog.foodEntries, ...result.food];
-        recalculateSummary(updatedLog);
+        // summary现在由服务端动态计算，无需手动重新计算
 
         // 保存新添加的食物条目到服务器
         try {
@@ -843,7 +875,15 @@ export default function Dashboard({
           ...updatedLog.exerciseEntries,
           ...result.exercise,
         ];
-        recalculateSummary(updatedLog);
+        // summary现在由服务端动态计算，无需手动重新计算
+
+        // 保存新添加的运动条目到服务器
+        try {
+          await saveExerciseEntries(updatedLog.date, result.exercise);
+        } catch (error) {
+          console.error("保存运动条目失败：", error);
+          // 即使保存失败，也继续更新本地状态
+        }
       }
 
       setDailyLog(updatedLog);
@@ -911,12 +951,25 @@ export default function Dashboard({
         (entry) => entry.log_id !== id
       );
     } else {
+      // 先从服务器删除
+      try {
+        await deleteExerciseEntry(id);
+      } catch (error) {
+        console.error("删除运动条目失败：", error);
+        toast({
+          title: "删除失败",
+          description: "无法删除运动条目，请重试。",
+          variant: "destructive",
+        });
+        return;
+      }
+
       updatedLog.exerciseEntries = updatedLog.exerciseEntries.filter(
         (entry) => entry.log_id !== id
       );
     }
 
-    recalculateSummary(updatedLog);
+    // summary现在由服务端动态计算，无需手动重新计算
     setDailyLog(updatedLog);
     saveDailyLog(updatedLog.date, extractDailyLogFields(updatedLog)).catch(
       (error) => {
@@ -972,6 +1025,22 @@ export default function Dashboard({
           : entry
       );
     } else {
+      // 先更新服务器
+      try {
+        await updateExerciseEntry(
+          (updatedEntry as ExerciseEntry).log_id,
+          updatedEntry as ExerciseEntry
+        );
+      } catch (error) {
+        console.error("更新运动条目失败：", error);
+        toast({
+          title: "更新失败",
+          description: "无法更新运动条目，请重试。",
+          variant: "destructive",
+        });
+        return;
+      }
+
       updatedLog.exerciseEntries = updatedLog.exerciseEntries.map((entry) =>
         entry.log_id === (updatedEntry as ExerciseEntry).log_id
           ? (updatedEntry as ExerciseEntry)
@@ -979,7 +1048,7 @@ export default function Dashboard({
       );
     }
 
-    recalculateSummary(updatedLog);
+    // summary现在由服务端动态计算，无需手动重新计算
     setDailyLog(updatedLog);
     saveDailyLog(updatedLog.date, extractDailyLogFields(updatedLog)).catch(
       (error) => {
@@ -1005,45 +1074,7 @@ export default function Dashboard({
     });
   };
 
-  const recalculateSummary = (log: DailyLog) => {
-    let totalCaloriesConsumed = 0;
-    let totalCarbs = 0;
-    let totalProtein = 0;
-    let totalFat = 0;
-    let totalCaloriesBurned = 0;
-    const micronutrients: Record<string, number> = {};
-
-    log.foodEntries.forEach((entry) => {
-      if (entry.total_nutritional_info_consumed) {
-        totalCaloriesConsumed +=
-          entry.total_nutritional_info_consumed.calories || 0;
-        totalCarbs += entry.total_nutritional_info_consumed.carbohydrates || 0;
-        totalProtein += entry.total_nutritional_info_consumed.protein || 0;
-        totalFat += entry.total_nutritional_info_consumed.fat || 0;
-        Object.entries(entry.total_nutritional_info_consumed).forEach(
-          ([key, value]) => {
-            if (
-              !["calories", "carbohydrates", "protein", "fat"].includes(key) &&
-              typeof value === "number"
-            ) {
-              micronutrients[key] = (micronutrients[key] || 0) + value;
-            }
-          }
-        );
-      }
-    });
-
-    log.exerciseEntries.forEach((entry) => {
-      totalCaloriesBurned += entry.calories_burned_estimated || 0;
-    });
-
-    log.summary = {
-      totalCaloriesConsumed,
-      totalCaloriesBurned,
-      macros: { carbs: totalCarbs, protein: totalProtein, fat: totalFat },
-      micronutrients,
-    };
-  };
+  // recalculateSummary函数已移除，summary现在由服务端动态计算
 
   const handleSaveDailyWeight = () => {
     const dateKey = format(selectedDate, "yyyy-MM-dd");

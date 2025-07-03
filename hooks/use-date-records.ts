@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
-import { useDailyLogServer } from "./use-daily-log-server";
+import { useDailyLogCache } from "./use-daily-log-cache";
 import { useAuth } from "./use-auth";
 
 interface DateRecordsHook {
@@ -14,7 +14,7 @@ interface DateRecordsHook {
 export function useDateRecords(): DateRecordsHook {
   const [recordedDates, setRecordedDates] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
-  const { getAllDailyLogs } = useDailyLogServer();
+  const { getAllDailyLogs } = useDailyLogCache();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   // 检查某个日期是否有记录

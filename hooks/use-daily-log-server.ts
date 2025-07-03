@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useServerStorage } from "./use-server-storage";
 import type { DailyLog } from "@/lib/types";
+import {
+  withCalculatedSummary,
+  withCalculatedSummaries,
+} from "@/lib/summary-utils";
 
 interface DailyLogServerHook {
   getDailyLog: (date: string) => Promise<DailyLog | null>;
@@ -33,7 +37,7 @@ export function useDailyLogServer(): DailyLogServerHook {
             dailyStatus: log.dailyStatus
               ? JSON.parse(log.dailyStatus)
               : undefined,
-            summary: log.summary ? JSON.parse(log.summary) : undefined,
+            // summary现在由服务端动态计算，无需解析
             foodEntries:
               log.foodEntries?.map((entry: any) => ({
                 ...entry,
@@ -121,7 +125,7 @@ export function useDailyLogServer(): DailyLogServerHook {
           dailyStatus: log.dailyStatus
             ? JSON.parse(log.dailyStatus)
             : undefined,
-          summary: log.summary ? JSON.parse(log.summary) : undefined,
+          // summary现在由服务端动态计算，无需解析
           foodEntries:
             log.foodEntries?.map((entry: any) => ({
               ...entry,

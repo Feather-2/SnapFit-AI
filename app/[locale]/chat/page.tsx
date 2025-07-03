@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { useDailyLogServer } from "@/hooks/use-daily-log-server";
+import { useDailyLogCache } from "@/hooks/use-daily-log-cache";
 import { useAIMemory } from "@/hooks/use-ai-memory";
 import { useAIConfigServer } from "@/hooks/use-ai-config-server";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
@@ -361,7 +361,7 @@ export default function ChatPage() {
   };
 
   const currentAIConfig = aiConfig || defaultAIConfig;
-  const { getDailyLog } = useDailyLogServer();
+  const { getDailyLog, getBatchDailyLogs } = useDailyLogCache();
   const [todayLog, setTodayLog] = useState(null);
 
   // AI记忆管理
@@ -472,33 +472,34 @@ export default function ChatPage() {
       });
   }, [getDailyLog]);
 
-  // 获取近3天的详细数据
+  // 获取近3天的详细数据（使用批量获取优化）
   useEffect(() => {
     const loadRecentData = async () => {
-      const logs = [];
       const today = new Date();
-      for (let i = 0; i < 3; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateKey = format(date, "yyyy-MM-dd");
-        try {
-          const log = await getDailyLog(dateKey);
-          if (
+      const endDate = format(today, "yyyy-MM-dd");
+      const startDate = format(
+        new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000),
+        "yyyy-MM-dd"
+      );
+
+      try {
+        console.log(`🤖 聊天页面批量获取近3天数据: ${startDate} 到 ${endDate}`);
+        const allLogs = await getBatchDailyLogs(startDate, endDate);
+        const validLogs = allLogs.filter(
+          (log) =>
             log &&
             (log.foodEntries?.length > 0 || log.exerciseEntries?.length > 0)
-          ) {
-            logs.push(log);
-          }
-        } catch (error) {
-          console.log(`No data for ${dateKey}`);
-        }
+        );
+        console.log("Recent health data loaded:", validLogs.length, "days");
+        setRecentHealthData(validLogs);
+      } catch (error) {
+        console.error("Failed to load recent health data:", error);
+        setRecentHealthData([]);
       }
-      console.log("Recent health data loaded:", logs.length, "days");
-      setRecentHealthData(logs);
     };
 
     loadRecentData();
-  }, [getDailyLog]);
+  }, [getBatchDailyLogs]);
 
   // 获取当前选择的专家
   const currentExpert =

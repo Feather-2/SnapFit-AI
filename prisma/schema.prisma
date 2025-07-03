@@ -68,7 +68,6 @@ model DailyLog {
   calculatedTDEE   Float?
   tefAnalysis      String?   // JSON 字符串存储 TEF 分析
   dailyStatus      String?   // JSON 字符串存储每日状态
-  summary          String?   // JSON 字符串存储每日汇总
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

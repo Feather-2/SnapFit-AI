@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useDailyLogServer } from "./use-daily-log-server";
+import { useIndexedDB } from "./use-indexed-db";
 import { useAuth } from "./use-auth";
 
 interface ExportReminderState {
@@ -18,7 +18,6 @@ export function useExportReminder(): ExportReminderState {
     hasEnoughData: false,
     dataSpanDays: 0,
   });
-  const { getAllDailyLogs } = useDailyLogServer();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
@@ -30,7 +29,7 @@ export function useExportReminder(): ExportReminderState {
     const checkExportReminder = async () => {
       try {
         // 首先检查IndexedDB中的数据
-        const hasEnoughData = await checkDataSpan();
+        const hasEnoughData = await checkIndexedDBData();
 
         if (!hasEnoughData.hasData) {
           // 如果没有足够的数据，不提醒导出
@@ -82,29 +81,51 @@ export function useExportReminder(): ExportReminderState {
       }
     };
 
-    // 检查服务端数据的时间跨度
-    const checkDataSpan = async (): Promise<{
+    // 检查IndexedDB中的healthLogs数据
+    const checkIndexedDBData = async (): Promise<{
       hasData: boolean;
       spanDays: number;
     }> => {
       try {
-        const allLogs = await getAllDailyLogs();
+        // 直接访问IndexedDB检查healthLogs数据
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = window.indexedDB.open("healthApp", 2);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
 
-        if (!allLogs || allLogs.length === 0) {
+        if (!db.objectStoreNames.contains("healthLogs")) {
+          db.close();
+          return { hasData: false, spanDays: 0 };
+        }
+
+        const transaction = db.transaction(["healthLogs"], "readonly");
+        const store = transaction.objectStore("healthLogs");
+
+        const allData = await new Promise<any[]>((resolve, reject) => {
+          const request = store.getAll();
+          request.onsuccess = () => resolve(request.result || []);
+          request.onerror = () => reject(request.error);
+        });
+
+        db.close();
+
+        if (!allData || allData.length === 0) {
           return { hasData: false, spanDays: 0 };
         }
 
         // 获取所有有数据的日期
-        const dates = allLogs
-          .filter(
-            (log) =>
+        const dates = allData
+          .filter((log: any) => {
+            return (
               log &&
               ((log.foodEntries && log.foodEntries.length > 0) ||
                 (log.exerciseEntries && log.exerciseEntries.length > 0) ||
                 log.weight !== undefined)
-          )
-          .map((log) => new Date(log.date))
-          .sort((a, b) => a.getTime() - b.getTime());
+            );
+          })
+          .map((log: any) => new Date(log.date))
+          .sort((a: Date, b: Date) => a.getTime() - b.getTime());
 
         if (dates.length === 0) {
           return { hasData: false, spanDays: 0 };
@@ -122,7 +143,7 @@ export function useExportReminder(): ExportReminderState {
           spanDays: daysDiff + 1, // 实际天数
         };
       } catch (error) {
-        console.error("检查数据跨度失败:", error);
+        console.error("检查IndexedDB数据失败:", error);
         return { hasData: false, spanDays: 0 };
       }
     };
@@ -133,7 +154,7 @@ export function useExportReminder(): ExportReminderState {
     const interval = setInterval(checkExportReminder, 60 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [getAllDailyLogs, authLoading, isAuthenticated]);
+  }, [authLoading, isAuthenticated]);
 
   return reminderState;
 }

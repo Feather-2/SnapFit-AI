@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth-middleware";
 import { prisma } from "@/lib/prisma";
+import {
+  withCalculatedSummary,
+  withCalculatedSummaries,
+} from "@/lib/summary-utils";
 
 // 获取每日日志
 export const GET = withAuth(async (request) => {
@@ -33,12 +37,15 @@ export const GET = withAuth(async (request) => {
           }),
         ]);
 
+        // 动态计算summary并返回
+        const logWithSummary = withCalculatedSummary({
+          ...dailyLog,
+          foodEntries,
+          exerciseEntries,
+        });
+
         return NextResponse.json({
-          dailyLog: {
-            ...dailyLog,
-            foodEntries,
-            exerciseEntries,
-          },
+          dailyLog: logWithSummary,
         });
       }
 
@@ -50,7 +57,7 @@ export const GET = withAuth(async (request) => {
         orderBy: { date: "desc" },
       });
 
-      // 为每个日志获取相关的食物条目和运动条目
+      // 为每个日志获取相关的食物条目和运动条目，并动态计算summary
       const logsWithEntries = await Promise.all(
         dailyLogs.map(async (log) => {
           const [foodEntries, exerciseEntries] = await Promise.all([
@@ -72,7 +79,10 @@ export const GET = withAuth(async (request) => {
         })
       );
 
-      return NextResponse.json({ dailyLogs: logsWithEntries });
+      // 为所有日志动态计算summary
+      const logsWithSummaries = withCalculatedSummaries(logsWithEntries);
+
+      return NextResponse.json({ dailyLogs: logsWithSummaries });
     }
   } catch (error) {
     console.error("Get daily log error:", error);
@@ -105,7 +115,7 @@ export const POST = withAuth(async (request) => {
         calculatedTDEE: data.calculatedTDEE,
         tefAnalysis: data.tefAnalysis ? JSON.stringify(data.tefAnalysis) : null,
         dailyStatus: data.dailyStatus ? JSON.stringify(data.dailyStatus) : null,
-        summary: data.summary ? JSON.stringify(data.summary) : null,
+        // 移除summary字段，改为动态计算
       },
       create: {
         userId,
@@ -116,7 +126,7 @@ export const POST = withAuth(async (request) => {
         calculatedTDEE: data.calculatedTDEE,
         tefAnalysis: data.tefAnalysis ? JSON.stringify(data.tefAnalysis) : null,
         dailyStatus: data.dailyStatus ? JSON.stringify(data.dailyStatus) : null,
-        summary: data.summary ? JSON.stringify(data.summary) : null,
+        // 移除summary字段，改为动态计算
       },
     });
 
@@ -132,12 +142,15 @@ export const POST = withAuth(async (request) => {
       }),
     ]);
 
+    // 动态计算summary并返回
+    const logWithSummary = withCalculatedSummary({
+      ...dailyLog,
+      foodEntries,
+      exerciseEntries,
+    });
+
     return NextResponse.json({
-      dailyLog: {
-        ...dailyLog,
-        foodEntries,
-        exerciseEntries,
-      },
+      dailyLog: logWithSummary,
     });
   } catch (error) {
     console.error("Save daily log error:", error);

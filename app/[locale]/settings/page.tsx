@@ -27,7 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { useDailyLogServer } from "@/hooks/use-daily-log-server";
+import { useDailyLogCache } from "@/hooks/use-daily-log-cache";
 import { useAIMemoryServer } from "@/hooks/use-ai-memory-server";
 import { useAIMemory } from "@/hooks/use-ai-memory";
 import { useAIConfigServer } from "@/hooks/use-ai-config-server";
@@ -115,7 +115,7 @@ function SettingsContent() {
       : "profile";
   });
 
-  const { getAllDailyLogs } = useDailyLogServer();
+  const { getAllDailyLogs } = useDailyLogCache();
   const { getAllMemories: getAllServerMemories } = useAIMemoryServer();
   const { memories, updateMemory, clearMemory, clearAllMemories } =
     useAIMemory();

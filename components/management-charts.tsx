@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { format, subDays, parseISO, eachDayOfInterval } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import { useDailyLogServer } from "@/hooks/use-daily-log-server";
+import { useDailyLogCache } from "@/hooks/use-daily-log-cache";
 import {
   Select,
   SelectContent,
@@ -71,7 +71,7 @@ export function ManagementCharts({
   const [dateRange, setDateRange] = useState<DateRange>("7d");
   const [isDataOptimized, setIsDataOptimized] = useState(false);
   const [realDataCount, setRealDataCount] = useState(0);
-  const { getDailyLog, isLoading: serverLoading } = useDailyLogServer();
+  const { getBatchDailyLogs, isLoading: serverLoading } = useDailyLogCache();
 
   // 日期范围选项
   const dateRangeOptions: DateRangeOption[] = [
@@ -88,7 +88,7 @@ export function ManagementCharts({
     }, 100); // 减少延迟时间
 
     return () => clearTimeout(timer);
-  }, [selectedDate, refreshTrigger, getDailyLog, dateRange]);
+  }, [selectedDate, refreshTrigger, getBatchDailyLogs, dateRange]);
 
   const fetchChartData = async () => {
     setIsLoading(true);
@@ -98,45 +98,46 @@ export function ManagementCharts({
         (option) => option.value === dateRange
       );
       const daysToFetch = selectedRange?.days || 7;
+
+      // 计算日期范围
+      const endDate = format(selectedDate, "yyyy-MM-dd");
+      const startDate = format(
+        subDays(selectedDate, daysToFetch - 1),
+        "yyyy-MM-dd"
+      );
+
+      console.log(`📊 批量获取图表数据: ${startDate} 到 ${endDate}`);
+
+      // 批量获取数据
+      const dailyLogs = await getBatchDailyLogs(startDate, endDate);
+
+      // 创建日期到日志的映射
+      const logsByDate = dailyLogs.reduce((acc, log) => {
+        acc[log.date] = log;
+        return acc;
+      }, {} as Record<string, any>);
+
       const data: ChartData[] = [];
 
       for (let i = daysToFetch - 1; i >= 0; i--) {
         const date = subDays(selectedDate, i);
         const dateStr = format(date, "yyyy-MM-dd");
+        const dailyLog = logsByDate[dateStr];
 
-        try {
-          const dailyLog = await getDailyLog(dateStr);
+        // 为每一天都创建一个条目，即使没有数据
+        const chartEntry: ChartData = {
+          date: format(date, "MM/dd", { locale: zhCN }),
+          weight: dailyLog?.weight !== undefined ? dailyLog.weight : undefined,
+          caloriesIn: Math.round(dailyLog?.summary?.totalCaloriesConsumed || 0),
+          caloriesOut: Math.round(dailyLog?.summary?.totalCaloriesBurned || 0),
+          calorieDeficit: Math.round(
+            (dailyLog?.summary?.totalCaloriesConsumed || 0) -
+              (dailyLog?.summary?.totalCaloriesBurned || 0) -
+              (dailyLog?.calculatedTDEE || 1800)
+          ),
+        };
 
-          // 为每一天都创建一个条目，即使没有数据
-          const chartEntry: ChartData = {
-            date: format(date, "MM/dd", { locale: zhCN }),
-            weight:
-              dailyLog?.weight !== undefined ? dailyLog.weight : undefined,
-            caloriesIn: Math.round(
-              dailyLog?.summary?.totalCaloriesConsumed || 0
-            ),
-            caloriesOut: Math.round(
-              dailyLog?.summary?.totalCaloriesBurned || 0
-            ),
-            calorieDeficit: Math.round(
-              (dailyLog?.summary?.totalCaloriesConsumed || 0) -
-                (dailyLog?.summary?.totalCaloriesBurned || 0) -
-                (dailyLog?.calculatedTDEE || 1800)
-            ),
-          };
-
-          data.push(chartEntry);
-        } catch (error) {
-          // 即使出错也添加一个空数据点，保持图表连续性
-          console.warn(`获取 ${dateStr} 数据失败:`, error);
-          data.push({
-            date: format(date, "MM/dd", { locale: zhCN }),
-            weight: undefined,
-            caloriesIn: 0,
-            caloriesOut: 0,
-            calorieDeficit: -1800,
-          });
-        }
+        data.push(chartEntry);
       }
 
       // 检查是否有任何真实数据

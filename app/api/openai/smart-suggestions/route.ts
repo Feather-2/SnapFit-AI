@@ -1,53 +1,59 @@
-import { OpenAICompatibleClient } from "@/lib/openai-client"
-import type { DailyLog, UserProfile } from "@/lib/types"
-import { formatDailyStatusForAI } from "@/lib/utils"
+import { OpenAICompatibleClient } from "@/lib/openai-client";
+import type { DailyLog, UserProfile } from "@/lib/types";
+import { formatDailyStatusForAI } from "@/lib/utils";
 
 export async function POST(req: Request) {
   try {
-    const { dailyLog, userProfile, recentLogs } = await req.json()
+    const { dailyLog, userProfile, recentLogs } = await req.json();
 
     if (!dailyLog || !userProfile) {
-      return Response.json({ error: "Missing required data" }, { status: 400 })
+      return Response.json({ error: "Missing required data" }, { status: 400 });
     }
 
     // 获取AI配置
-    const aiConfigStr = req.headers.get("x-ai-config")
+    const aiConfigStr = req.headers.get("x-ai-config");
     if (!aiConfigStr) {
-      return Response.json({ error: "AI configuration not found" }, { status: 400 })
+      return Response.json(
+        { error: "AI configuration not found" },
+        { status: 400 }
+      );
     }
 
-    const aiConfig = JSON.parse(aiConfigStr)
-    const modelConfig = aiConfig.agentModel
+    const aiConfig = JSON.parse(aiConfigStr);
+    const modelConfig = aiConfig.agentModel;
 
     // 创建客户端
-    const client = new OpenAICompatibleClient(modelConfig.baseUrl, modelConfig.apiKey)
+    const client = new OpenAICompatibleClient(
+      modelConfig.baseUrl,
+      modelConfig.apiKey
+    );
 
     // 准备数据摘要
     const dataSummary = {
       today: {
         date: dailyLog.date,
-        calories: dailyLog.summary.totalCalories,
-        protein: dailyLog.summary.totalProtein,
-        carbs: dailyLog.summary.totalCarbohydrates,
-        fat: dailyLog.summary.totalFat,
-        exercise: dailyLog.summary.totalExerciseCalories,
+        calories: dailyLog.summary.totalCaloriesConsumed,
+        protein: dailyLog.summary.macros.protein,
+        carbs: dailyLog.summary.macros.carbs,
+        fat: dailyLog.summary.macros.fat,
+        exercise: dailyLog.summary.totalCaloriesBurned,
         weight: dailyLog.weight,
         bmr: dailyLog.calculatedBMR,
         tdee: dailyLog.calculatedTDEE,
         tefAnalysis: dailyLog.tefAnalysis,
-        foodEntries: dailyLog.foodEntries.map(entry => ({
+        foodEntries: dailyLog.foodEntries.map((entry) => ({
           name: entry.food_name,
           mealType: entry.meal_type,
           calories: entry.total_nutritional_info_consumed?.calories || 0,
           protein: entry.total_nutritional_info_consumed?.protein || 0,
-          timestamp: entry.timestamp
+          timestamp: entry.timestamp,
         })),
-        exerciseEntries: dailyLog.exerciseEntries.map(entry => ({
+        exerciseEntries: dailyLog.exerciseEntries.map((entry) => ({
           name: entry.exercise_name,
           calories: entry.calories_burned,
-          duration: entry.duration_minutes
+          duration: entry.duration_minutes,
         })),
-        dailyStatus: formatDailyStatusForAI(dailyLog.dailyStatus)
+        dailyStatus: formatDailyStatusForAI(dailyLog.dailyStatus),
       },
       profile: {
         age: userProfile.age,
@@ -58,23 +64,38 @@ export async function POST(req: Request) {
         goal: userProfile.goal,
         targetWeight: userProfile.targetWeight,
         targetCalories: userProfile.targetCalories,
-        notes: [
-          userProfile.notes,
-          userProfile.professionalMode && userProfile.medicalHistory ? `\n\n医疗信息: ${userProfile.medicalHistory}` : '',
-          userProfile.professionalMode && userProfile.lifestyle ? `\n\n生活方式: ${userProfile.lifestyle}` : '',
-          userProfile.professionalMode && userProfile.healthAwareness ? `\n\n健康认知: ${userProfile.healthAwareness}` : ''
-        ].filter(Boolean).join('') || undefined
+        notes:
+          [
+            userProfile.notes,
+            userProfile.professionalMode && userProfile.medicalHistory
+              ? `\n\n医疗信息: ${userProfile.medicalHistory}`
+              : "",
+            userProfile.professionalMode && userProfile.lifestyle
+              ? `\n\n生活方式: ${userProfile.lifestyle}`
+              : "",
+            userProfile.professionalMode && userProfile.healthAwareness
+              ? `\n\n健康认知: ${userProfile.healthAwareness}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("") || undefined,
       },
-      recent: recentLogs ? recentLogs.slice(0, 7).map((log: any) => ({
-        date: log.date,
-        calories: log.summary.totalCalories,
-        exercise: log.summary.totalExerciseCalories,
-        weight: log.weight,
-        foodNames: log.foodEntries.map((entry: any) => entry.food_name).slice(0, 5), // 只取前5个食物名称
-        exerciseNames: log.exerciseEntries.map((entry: any) => entry.exercise_name).slice(0, 3), // 只取前3个运动名称
-        dailyStatus: formatDailyStatusForAI(log.dailyStatus)
-      })) : []
-    }
+      recent: recentLogs
+        ? recentLogs.slice(0, 7).map((log: any) => ({
+            date: log.date,
+            calories: log.summary.totalCaloriesConsumed,
+            exercise: log.summary.totalCaloriesBurned,
+            weight: log.weight,
+            foodNames: log.foodEntries
+              .map((entry: any) => entry.food_name)
+              .slice(0, 5), // 只取前5个食物名称
+            exerciseNames: log.exerciseEntries
+              .map((entry: any) => entry.exercise_name)
+              .slice(0, 3), // 只取前3个运动名称
+            dailyStatus: formatDailyStatusForAI(log.dailyStatus),
+          }))
+        : [],
+    };
 
     // 定义不同类型的建议提示词
     const suggestionPrompts = {
@@ -110,7 +131,7 @@ export async function POST(req: Request) {
           "summary": "营养状况专业评价"
         }
       `,
-      
+
       exercise: `
         你是一位认证的运动生理学家，专精运动处方设计和能量代谢优化。
 
@@ -143,7 +164,7 @@ export async function POST(req: Request) {
           "summary": "运动效能专业评价"
         }
       `,
-      
+
       metabolism: `
         你是一位内分泌代谢专家，专精能量代谢调节和体重管理的生理机制。
 
@@ -175,7 +196,7 @@ export async function POST(req: Request) {
           "summary": "代谢效率专业评价"
         }
       `,
-      
+
       behavior: `
         你是一位行为心理学专家，专精健康行为改变和习惯养成的科学方法。
 
@@ -273,52 +294,61 @@ export async function POST(req: Request) {
           ],
           "summary": "整体健康状况专业评价"
         }
-      `
-    }
+      `,
+    };
 
     // 并发获取所有建议
-    const suggestionPromises = Object.entries(suggestionPrompts).map(async ([key, prompt]) => {
-      try {
-        const { text } = await client.generateText({
-          model: modelConfig.name,
-          prompt,
-          response_format: { type: "json_object" },
-        })
-        
-        const result = JSON.parse(text)
-        return { key, ...result }
-      } catch (error) {
-        console.warn(`Failed to get ${key} suggestions:`, error)
-        return {
-          key,
-          category: key,
-          priority: "low",
-          suggestions: [],
-          summary: "分析暂时不可用"
+    const suggestionPromises = Object.entries(suggestionPrompts).map(
+      async ([key, prompt]) => {
+        try {
+          const { text } = await client.generateText({
+            model: modelConfig.name,
+            prompt,
+            response_format: { type: "json_object" },
+          });
+
+          const result = JSON.parse(text);
+          return { key, ...result };
+        } catch (error) {
+          console.warn(`Failed to get ${key} suggestions:`, error);
+          return {
+            key,
+            category: key,
+            priority: "low",
+            suggestions: [],
+            summary: "分析暂时不可用",
+          };
         }
       }
-    })
+    );
 
     // 等待所有建议完成
-    const allSuggestions = await Promise.all(suggestionPromises)
+    const allSuggestions = await Promise.all(suggestionPromises);
 
     // 按优先级排序
-    const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 }
-    allSuggestions.sort((a: any, b: any) =>
-      (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0)
-    )
+    const priorityOrder: Record<string, number> = {
+      high: 3,
+      medium: 2,
+      low: 1,
+    };
+    allSuggestions.sort(
+      (a: any, b: any) =>
+        (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0)
+    );
 
     return Response.json({
       suggestions: allSuggestions,
       generatedAt: new Date().toISOString(),
-      dataDate: dailyLog.date
-    })
-
+      dataDate: dailyLog.date,
+    });
   } catch (error) {
-    console.error("Smart Suggestions Error:", error)
-    return Response.json({ 
-      error: "Failed to generate suggestions",
-      suggestions: []
-    }, { status: 500 })
+    console.error("Smart Suggestions Error:", error);
+    return Response.json(
+      {
+        error: "Failed to generate suggestions",
+        suggestions: [],
+      },
+      { status: 500 }
+    );
   }
 }
