@@ -19,15 +19,35 @@ export function calculateDailySummary(
 
   // 计算食物摄入的营养数据
   foodEntries.forEach((entry) => {
-    if (entry.total_nutritional_info_consumed) {
-      totalCaloriesConsumed +=
-        entry.total_nutritional_info_consumed.calories || 0;
-      totalCarbs += entry.total_nutritional_info_consumed.carbohydrates || 0;
-      totalProtein += entry.total_nutritional_info_consumed.protein || 0;
-      totalFat += entry.total_nutritional_info_consumed.fat || 0;
-      
+    // 处理数据库中的JSON字符串字段，支持两种命名方式
+    let nutritionalInfo;
+    const entryAny = entry as any;
+
+    // 尝试驼峰命名（数据库字段）
+    if (entryAny.totalNutritionalInfoConsumed) {
+      if (typeof entryAny.totalNutritionalInfoConsumed === 'string') {
+        try {
+          nutritionalInfo = JSON.parse(entryAny.totalNutritionalInfoConsumed);
+        } catch (error) {
+          console.error('Failed to parse nutritional info:', error);
+        }
+      } else {
+        nutritionalInfo = entryAny.totalNutritionalInfoConsumed;
+      }
+    }
+    // 尝试下划线命名（类型定义）
+    else if (entryAny.total_nutritional_info_consumed) {
+      nutritionalInfo = entryAny.total_nutritional_info_consumed;
+    }
+
+    if (nutritionalInfo) {
+      totalCaloriesConsumed += nutritionalInfo.calories || 0;
+      totalCarbs += nutritionalInfo.carbohydrates || 0;
+      totalProtein += nutritionalInfo.protein || 0;
+      totalFat += nutritionalInfo.fat || 0;
+
       // 计算微量营养素
-      Object.entries(entry.total_nutritional_info_consumed).forEach(
+      Object.entries(nutritionalInfo).forEach(
         ([key, value]) => {
           if (
             !["calories", "carbohydrates", "protein", "fat"].includes(key) &&
@@ -40,9 +60,11 @@ export function calculateDailySummary(
     }
   });
 
-  // 计算运动消耗的热量
+  // 计算运动消耗的热量，支持两种命名方式
   exerciseEntries.forEach((entry) => {
-    totalCaloriesBurned += entry.calories_burned_estimated || 0;
+    const entryAny = entry as any;
+    const caloriesBurned = entryAny.caloriesBurnedEstimated || entryAny.calories_burned_estimated || 0;
+    totalCaloriesBurned += caloriesBurned;
   });
 
   return {

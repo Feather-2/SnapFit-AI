@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { ConditionalNav } from "@/components/conditional-nav";
 import { AuthProvider } from "@/components/auth-provider";
+import { VersionChecker } from "@/components/version-checker";
 import { locales } from "@/i18n";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -53,6 +54,7 @@ export default async function LocaleLayout({
             <main>{children}</main>
           </div>
           <Toaster />
+          <VersionChecker />
         </ThemeProvider>
       </AuthProvider>
     </NextIntlClientProvider>

@@ -43,6 +43,8 @@ RUN cp next.config.docker.mjs next.config.mjs
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV SKIP_ENV_VALIDATION=1
+ENV NEXT_PUBLIC_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+ENV NEXT_PUBLIC_APP_VERSION=1.0.0
 
 # 启用 pnpm
 RUN corepack enable pnpm

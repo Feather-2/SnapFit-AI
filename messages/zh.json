@@ -554,6 +554,8 @@
       "saveProfile": "保存个人信息",
       "saveSuccess": "保存成功",
       "saveSuccessDesc": "您的个人资料已更新",
+      "saveFailed": "保存失败",
+      "saveFailedDesc": "保存个人资料时出现错误，请重试",
       "bmrFormula": "BMR 计算公式",
       "selectBmrFormula": "选择BMR计算公式",
       "mifflinStJeor": "Mifflin-St Jeor",

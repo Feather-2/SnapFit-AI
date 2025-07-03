@@ -89,10 +89,10 @@ function SettingsContent() {
   const { toast } = useToast();
   const t = useTranslation("settings");
   const searchParams = useSearchParams();
-  const [userProfile, setUserProfile] = useLocalStorage(
-    "userProfile",
-    defaultUserProfile
-  );
+  // 使用服务器端用户配置存储
+  const { userProfile, saveUserProfile: saveUserProfileServer, isLoading: profileLoading } = useUserProfileServer();
+  const currentUserProfile = userProfile || defaultUserProfile;
+
   // 使用服务器端 AI 配置存储
   const { aiConfig, saveAIConfig: saveAIConfigServer } = useAIConfigServer();
   const currentAIConfig = aiConfig || defaultAIConfig;
@@ -259,9 +259,22 @@ function SettingsContent() {
     [editingMemories, memoryUpdateTimeouts, updateMemory, toast]
   );
 
-  // 使用独立的表单状态，避免与 localStorage 状态冲突
-  const [formData, setFormData] = useState(defaultUserProfile);
-  const [aiFormData, setAIFormData] = useState(defaultAIConfig);
+  // 使用独立的表单状态，从服务端数据初始化
+  const [formData, setFormData] = useState(currentUserProfile);
+  const [aiFormData, setAIFormData] = useState(currentAIConfig);
+
+  // 同步服务端数据到表单状态
+  useEffect(() => {
+    if (userProfile) {
+      setFormData(userProfile);
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    if (aiConfig) {
+      setAIFormData(aiConfig);
+    }
+  }, [aiConfig]);
 
   // 模型列表状态
   const [agentModels, setAgentModels] = useState<OpenAIModel[]>([]);
@@ -490,13 +503,22 @@ function SettingsContent() {
   );
 
   // 保存用户配置
-  const handleSaveProfile = useCallback(() => {
-    setUserProfile(formData);
-    toast({
-      title: t("profile.saveSuccess"),
-      description: t("profile.saveSuccessDesc"),
-    });
-  }, [formData, setUserProfile, toast]);
+  const handleSaveProfile = useCallback(async () => {
+    try {
+      await saveUserProfileServer(formData);
+      toast({
+        title: t("profile.saveSuccess"),
+        description: t("profile.saveSuccessDesc"),
+      });
+    } catch (error) {
+      console.error("Failed to save user profile:", error);
+      toast({
+        title: t("profile.saveFailed"),
+        description: error instanceof Error ? error.message : t("profile.saveFailedDesc"),
+        variant: "destructive",
+      });
+    }
+  }, [formData, saveUserProfileServer, toast]);
 
   // 保存AI配置
   const handleSaveAIConfig = useCallback(() => {
@@ -792,28 +814,28 @@ function SettingsContent() {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto sm:h-10">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto sm:h-10 bg-muted/50">
           <TabsTrigger
             value="profile"
-            className="text-xs sm:text-sm py-2 px-2 sm:px-3"
+            className="text-xs sm:text-sm py-2 px-1 sm:px-3 min-w-0 flex-1"
           >
             <span className="truncate">{t("tabs.profile")}</span>
           </TabsTrigger>
           <TabsTrigger
             value="goals"
-            className="text-xs sm:text-sm py-2 px-2 sm:px-3"
+            className="text-xs sm:text-sm py-2 px-1 sm:px-3 min-w-0 flex-1"
           >
             <span className="truncate">{t("tabs.goals")}</span>
           </TabsTrigger>
           <TabsTrigger
             value="ai"
-            className="text-xs sm:text-sm py-2 px-2 sm:px-3"
+            className="text-xs sm:text-sm py-2 px-1 sm:px-3 min-w-0 flex-1"
           >
             <span className="truncate">{t("tabs.ai")}</span>
           </TabsTrigger>
           <TabsTrigger
             value="data"
-            className="text-xs sm:text-sm py-2 px-2 sm:px-3"
+            className="text-xs sm:text-sm py-2 px-1 sm:px-3 min-w-0 flex-1"
           >
             <span className="truncate">{t("tabs.data")}</span>
           </TabsTrigger>
