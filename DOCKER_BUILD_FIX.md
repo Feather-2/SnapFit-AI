@@ -1,10 +1,23 @@
 # Docker 构建错误修复方案
 
 ## 问题描述
-在 GitHub Actions 中执行 Docker 构建时，`pnpm build` 步骤失败，错误信息：
+
+在 GitHub Actions 中执行 Docker 构建时出现错误：
+
+### 第一个错误（已修复）
+
 ```
 ERROR: failed to build: failed to solve: process "/bin/sh -c pnpm build" did not complete successfully: exit code: 1
 ```
+
+### 第二个错误（已修复）
+
+```
+ERROR  Unknown option: 'max-old-space-size'
+For help, run: pnpm help config
+```
+
+这是因为尝试使用 `pnpm config set node-options` 设置 Node.js 选项，但这不是 pnpm 的有效配置选项。
 
 ## 可能的原因分析
 
@@ -20,8 +33,9 @@ ERROR: failed to build: failed to solve: process "/bin/sh -c pnpm build" did not
 已修改 `Dockerfile` 包含以下改进：
 
 - 添加更多系统依赖：`cairo-dev`, `pango-dev`, `jpeg-dev`, `giflib-dev`
-- 增加内存限制：`NODE_OPTIONS="--max-old-space-size=4096"`
-- 优化 pnpm 配置
+- 正确设置内存限制：使用 `NODE_OPTIONS="--max-old-space-size=4096"` 作为环境变量
+- 修复 pnpm 配置：移除无效的 `node-options` 配置
+- 添加 `packageManager` 字段到 package.json 以避免 Corepack 警告
 - 添加详细的错误处理和调试信息
 
 ### 2. 优化 GitHub Actions
@@ -34,13 +48,35 @@ ERROR: failed to build: failed to solve: process "/bin/sh -c pnpm build" did not
 
 ### 3. 创建调试工具
 
-- `Dockerfile.debug` - 用于本地调试的简化版本
+- `Dockerfile.simple` - 最简化的测试版本
+- `Dockerfile.debug` - 用于本地调试的详细版本
 - `debug-build.yml` - 专门用于调试的 GitHub Actions 工作流
 - `package.build-test.json` - 固定版本的依赖文件
+
+### 4. 关键修复
+
+**修复 pnpm 配置错误**：
+
+```dockerfile
+# 错误的方式（已修复）
+RUN pnpm config set node-options "--max-old-space-size=4096"
+
+# 正确的方式
+RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm i --frozen-lockfile
+```
+
+**添加 packageManager 字段**：
+
+```json
+{
+  "packageManager": "pnpm@9.0.0"
+}
+```
 
 ## 使用方法
 
 ### 本地测试
+
 ```bash
 # 使用调试版本 Dockerfile
 docker build -f Dockerfile.debug -t debug-test .
@@ -50,11 +86,13 @@ docker build -f Dockerfile.debug -t debug-test .
 ```
 
 ### GitHub Actions 调试
+
 1. 手动触发 `debug-build.yml` 工作流
 2. 查看详细的构建日志
 3. 根据错误信息进一步调整
 
 ### 生产构建
+
 ```bash
 # 推送代码后自动触发
 git push origin main
@@ -79,16 +117,19 @@ git push origin main
 4. 考虑使用更大的 GitHub Actions runner
 
 ### 内存相关错误：
+
 - 增加 `NODE_OPTIONS` 中的内存限制
 - 考虑使用 GitHub Actions 的大型 runner
 
 ### 依赖相关错误：
+
 - 检查 pnpm-lock.yaml 是否与 package.json 同步
 - 尝试删除 node_modules 和 pnpm-lock.yaml 重新安装
 
 ## 监控和维护
 
 建议定期：
+
 1. 更新依赖版本
 2. 测试构建流程
 3. 监控构建时间和资源使用

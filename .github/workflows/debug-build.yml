@@ -29,11 +29,17 @@ jobs:
       - name: 设置Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 尝试本地构建（调试模式）
+      - name: 尝试简单构建测试
         run: |
-          echo "开始调试构建..."
-          docker build --progress=plain --no-cache -f Dockerfile.debug -t debug-test . || true
-          echo "构建完成，检查日志..."
+          echo "开始简单构建测试..."
+          docker build --progress=plain --no-cache -f Dockerfile.simple -t simple-test . || true
+          echo "简单构建完成"
+
+      - name: 尝试完整构建（调试模式）
+        run: |
+          echo "开始完整构建测试..."
+          docker build --progress=plain --no-cache -f Dockerfile -t full-test . || true
+          echo "完整构建完成"
 
       - name: 检查构建环境
         run: |

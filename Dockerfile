@@ -26,8 +26,7 @@ COPY package.json pnpm-lock.yaml* ./
 # 启用 pnpm 并安装依赖
 RUN corepack enable pnpm && \
     pnpm config set store-dir /app/.pnpm-store && \
-    pnpm config set node-options "--max-old-space-size=4096" && \
-    pnpm i --frozen-lockfile
+    NODE_OPTIONS="--max-old-space-size=4096" pnpm i --frozen-lockfile
 
 # 构建阶段
 FROM base AS builder
@@ -41,7 +40,6 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV SKIP_ENV_VALIDATION=1
-ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 # 启用 pnpm
 RUN corepack enable pnpm
@@ -49,7 +47,7 @@ RUN corepack enable pnpm
 # 生成 Prisma 客户端
 RUN npx prisma generate
 
-# 构建应用 - 增加内存限制和详细输出
+# 构建应用 - 使用环境变量设置内存限制
 RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm build
 
 # 生产阶段 - 使用更小的基础镜像

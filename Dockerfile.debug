@@ -19,9 +19,9 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
 
 # 启用 pnpm 并安装依赖
-RUN corepack enable pnpm
-RUN pnpm config set store-dir /app/.pnpm-store
-RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm i --frozen-lockfile
+RUN corepack enable pnpm && \
+    pnpm config set store-dir /app/.pnpm-store && \
+    NODE_OPTIONS="--max-old-space-size=4096" pnpm i --frozen-lockfile
 
 # 复制源代码
 COPY . .
