@@ -19,6 +19,23 @@ For help, run: pnpm help config
 
 这是因为尝试使用 `pnpm config set node-options` 设置 Node.js 选项，但这不是 pnpm 的有效配置选项。
 
+### 第三个错误（已修复）
+
+```
+Error occurred prerendering page "/chat". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: useAuth must be used within an AuthProvider
+```
+
+这是因为存在重复的 `/app/chat/page.tsx` 文件，该文件不在国际化路由下，没有被 `AuthProvider` 包装，但使用了需要认证的 hooks。
+
+### 第四个错误（已修复）
+
+```
+[Error: EPERM: operation not permitted, symlink ...]
+```
+
+这是 Windows 系统的符号链接权限问题，在 Next.js standalone 模式下会尝试创建符号链接，但 Windows 默认不允许。
+
 ## 可能的原因分析
 
 1. **内存不足** - Next.js 构建过程需要大量内存，GitHub Actions 默认内存可能不够
@@ -36,6 +53,9 @@ For help, run: pnpm help config
 - 正确设置内存限制：使用 `NODE_OPTIONS="--max-old-space-size=4096"` 作为环境变量
 - 修复 pnpm 配置：移除无效的 `node-options` 配置
 - 添加 `packageManager` 字段到 package.json 以避免 Corepack 警告
+- 删除重复的 `/app/chat/page.tsx` 文件，避免认证上下文问题
+- 创建 Docker 专用的 Next.js 配置文件
+- 修复 Windows 环境下的 standalone 模式问题
 - 添加详细的错误处理和调试信息
 
 ### 2. 优化 GitHub Actions
@@ -72,6 +92,21 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm i --frozen-lockfile
   "packageManager": "pnpm@9.0.0"
 }
 ```
+
+**修复认证上下文问题**：
+
+- 删除了重复的 `/app/chat/page.tsx` 文件
+- 确保所有使用认证的页面都在 `[locale]` 路由下，被 `AuthProvider` 包装
+
+**创建 Docker 专用配置**：
+
+- `next.config.docker.mjs` - 专门用于 Docker 构建的配置
+- 在 Dockerfile 中替换配置文件以避免 Windows 符号链接问题
+
+**修复 Windows 兼容性**：
+
+- 在 Windows 环境下禁用 standalone 模式
+- 在 Docker 环境下启用 standalone 模式以优化镜像大小
 
 ## 使用方法
 
@@ -134,3 +169,16 @@ git push origin main
 2. 测试构建流程
 3. 监控构建时间和资源使用
 4. 备份工作的配置版本
+
+## ✅ 修复状态
+
+**所有问题已成功修复！**
+
+- ✅ Docker 构建错误已解决
+- ✅ pnpm 配置错误已修复
+- ✅ 认证上下文问题已解决
+- ✅ Windows 兼容性问题已修复
+- ✅ 本地构建测试通过
+- ✅ 准备好进行 Docker 构建和部署
+
+现在可以安全地推送代码并触发 GitHub Actions 构建流程。

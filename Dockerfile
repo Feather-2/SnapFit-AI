@@ -36,6 +36,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# 使用 Docker 专用的 Next.js 配置
+RUN cp next.config.docker.mjs next.config.mjs
+
 # 设置环境变量
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production

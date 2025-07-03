@@ -1,4 +1,4 @@
-import createNextIntlPlugin from "next-intl/plugin";
+import createNextIntlPlugin from 'next-intl/plugin';
 
 const withNextIntl = createNextIntlPlugin();
 
@@ -13,8 +13,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // 只在非 Windows 环境启用 standalone 输出模式
-  ...(process.platform !== "win32" && { output: "standalone" }),
-};
+  // 启用 standalone 输出模式，用于 Docker 部署
+  output: 'standalone',
+}
 
 export default withNextIntl(nextConfig);
